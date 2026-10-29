@@ -170,6 +170,11 @@ def test_watchdog_cleanup_kills_live_child_and_grandchild(tmp_path):
         assert all(psutil.pid_exists(pid) for pid in pids)
         kill_tree(process)
         assert not process.is_alive()
+        assert process.exitcode is not None
+        # The owning multiprocessing object must retain its child's exit
+        # status, including on Unix where another waiter could consume it.
+        process.join(timeout=0)
+        assert process.exitcode is not None
         assert all(not psutil.pid_exists(pid) or psutil.Process(pid).status() == psutil.STATUS_ZOMBIE for pid in pids)
     finally:
         if process.is_alive():

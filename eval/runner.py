@@ -81,6 +81,7 @@ def kill_tree(process):
     """Kill only descendants of the process this harness started."""
     if process.pid is None:
         return
+    descendants = []
     try:
         parent = psutil.Process(process.pid)
         # Freeze before enumerating. Freeze each generation and rescan: a child
@@ -104,10 +105,13 @@ def kill_tree(process):
             except psutil.NoSuchProcess:
                 pass
         parent.kill()
-        psutil.wait_procs([*descendants, parent], timeout=5)
     except psutil.NoSuchProcess:
         pass
+    # On Unix psutil.wait_procs calls waitpid for our direct child. If it
+    # reaps this PID first, multiprocessing loses the exit status and may
+    # continue to report is_alive(). Only multiprocessing may reap its child.
     process.join(timeout=5)
+    psutil.wait_procs(descendants, timeout=5)
 
 
 def _arm_worker(adapter, arm, model, seed, timing, audit, output, hooks, oracle_data):
