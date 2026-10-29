@@ -1,6 +1,6 @@
 # Interface contract
 
-Contract version: **1.1** (29 Oct 2026, the bank profile and the review fixes, completed before Codex started; `CONTRACT_VERSION` in `ic/contract.py` stays 1 until something is published). This file is the single source of truth for how the parts of the build talk to each other. Claude and Codex both build against it. Only Omar approves a change, and changes follow collision rule 5 (section 2). After 1.1, sections 3, 5, 7, 8 and 9 change only by adding optional fields with defaults until `freeze-1`.
+Contract version: **1.2** (30 Oct 2026: the `extra_service` notifications component, and the checker keys and validity rules that issue #4 asked for; 1.1, on 29 Oct, was the bank profile and the review fixes, completed before Codex started). `CONTRACT_VERSION` in `ic/contract.py` stays 1 until something is published. This file is the single source of truth for how the parts of the build talk to each other. Claude and Codex both build against it. Only Omar approves a change, and changes follow collision rule 5 (section 2). After 1.1, sections 3, 5, 7, 8 and 9 change only by adding optional fields with defaults until `freeze-1`.
 
 ## 1. The design rule: one agent, any system
 
@@ -461,7 +461,7 @@ JSON Lines, one case per line, in the same shape as Codex's scaffold runner (`in
 - `log_format_v2`: robust20 with `IC_LOG_FORMAT=v2`. No practice scenario uses v2.
 - `extra_service`: robust20 with one component that no practice scenario uses, `notifications` (kind `worker`, depends_on `ledger`, impact_weight 0.1; actions `restart`, `rollback`, `revert_config`, `quarantine`; settings `batch_size` 50 and `poll_interval_s` 0.2; port offset 8), which sends payment receipts from its own queue (sections 7.1, 7.3 and 10). Claude added it on 30 Oct and recorded it in `DECISIONS.md`. `robustness.jsonl` also holds 20 extra_service variants: each moves one fault of a robust20 case onto `notifications`, where the fault type applies (`crash`, `bad_setting` or `stopped_worker`); a robust20 case with no such fault keeps its faults, and only the extra component is added. The variants are validated by `noop` and `oracle`, like the exam.
 - `model_swap`: robust20 with the frozen agent on a model it was not tuned on: the `swap` model in `configs/models.json` (default `anthropic:claude-haiku-5-5`; if the bulk model is Haiku, `anthropic:claude-sonnet-5-5`). AI arms only. LM Studio is an extra condition only if Friday's smoke test passes: it runs last, alone, on 1 copy, and LM Studio is quit before the final run.
-- `transfer`: not a condition of the bank. Transfer runs use system `dispatch` with condition `default`, on the 20 cases in `scenarios/transfer/dispatch.jsonl`, which Codex hashes in `scenarios/transfer/SEALED.json` before the run: the frozen agent, the `abcde` arm, 1 copy on port base 9100, Sat 12:00-13:00. The first 10 incidents are never cut.
+- `transfer`: not a condition of the bank. Transfer runs use system `dispatch` with condition `default`, on the 20 cases in `scenarios/transfer/dispatch.jsonl`, which Codex hashes in `scenarios/transfer/SEALED.json` before the run: the frozen agent's `abcde` arm, with `noop` and `oracle` beside it for validity (section 11), on 3 copies (port bases 9100, 9200 and 9300), Sat 12:00-13:00, about 50 minutes. The first 10 incidents are never cut.
 
 Arms: `abcde` and `runbook`, plus `noop` and `oracle` under `four_faults` and `extra_service`; the runbook does not run under `model_swap`. Each arm's drop is its success under the condition minus its success on the same 20 cases in the main run, paired by `source_id` (or the case id) and shown as paired counts; `python run.py eval --report RUN --against final-1` makes the pairs. All of it is descriptive (n = 20, about ±20 points).
 
@@ -544,7 +544,7 @@ Each ablation differs from `abcde` in exactly one part. `react` drops the fixed 
 def verify(control, *, window_s: float = 20.0, lag_s: float = 10.0, since_t: float | None = None) -> dict
 ```
 
-The harness calls `checker.verify(control, window_s=CHECK_WINDOW_S, lag_s=CHECK_LAG_S, since_t=<t of the first manifest entry>)` at H + 10 s (section 13). Every system's checker returns these keys, and `eval/` reads only them: `recovered`, `slo_ok`, `journeys.{n, ok, success_rate, p95_ms}`, `integrity.ok`, `integrity.for_operations` and `impact.{breach_seconds, failed_journeys}`. Other keys, the other integrity counts among them, are system-specific (the bank's money checks, dispatch's one-unit-per-call checks); `eval/` stores and shows them as they are. `integrity.for_operations` lists the items only people can resolve, each with a `kind`.
+The harness calls `checker.verify(control, window_s=CHECK_WINDOW_S, lag_s=CHECK_LAG_S, since_t=<t of the first manifest entry>)` at H + 10 s (section 13). Every system's checker returns these keys, and `eval/` reads only them: `recovered`, `slo_ok`, `journeys.{n, ok, success_rate, p95_ms}`, `integrity.ok`, `integrity.for_operations`, `integrity.harmful_quarantines` and `impact.{breach_seconds, failed_journeys, time_to_mitigate_s, mitigation_censored}`. Other keys, the other integrity counts among them, are system-specific (the bank's money checks, dispatch's one-unit-per-call checks); `eval/` stores and shows them as they are. `integrity.for_operations` lists the items only people can resolve, each with a `kind`. `integrity.harmful_quarantines` counts the work items that are set aside (quarantined) and that the checker does not class as poison, in every work queue, whoever set them aside and whenever. `impact.time_to_mitigate_s` is the time from `since_t` to the start of the first 5 s bucket after which every bucket up to the end of the scored window meets the SLO; it is 0 when no bucket misses it. When the last bucket still misses it, `impact.mitigation_censored` is true and the value is the whole span, from `since_t` to the end of the scored window. A bucket with no journeys keeps the state of the bucket before it, and counts as meeting the SLO before the first journeys. `ic/kit/slo.py` computes both, and `ic/kit/conformance.check_verdict()` checks every key above for any system.
 
 The bank's verdict:
 
@@ -555,12 +555,13 @@ The bank's verdict:
  "slo_ok": true,
  "integrity": {"money_conserved": true, "balances_match_postings": true, "unbalanced_payments": 0,
                "double_postings": 0, "ghost_payments": 0, "lost_payments": 0, "stuck_items": 0,
-               "wrongly_quarantined": 0, "stale_reads": 0,
+               "wrongly_quarantined": 0, "stale_reads": 0, "harmful_quarantines": 0,
                "for_operations": [{"kind": "posted_twice", "end_to_end_id": "cust-07-000123",
                                    "payment_ids": ["3f2a9c1e5b7d4a60", "9b1c2d3e4f5a6b7c"], "copies": 2}],
                "ok": true},
  "reasons": [],
- "impact": {"since_t": 1793278800.0, "breach_seconds": 40.0, "failed_journeys": 230, "late_clearings": 12,
+ "impact": {"since_t": 1793278800.0, "until_t": 1793278915.0, "breach_seconds": 40.0, "failed_journeys": 230,
+            "time_to_mitigate_s": 45.0, "mitigation_censored": false, "late_clearings": 12,
             "double_postings": 1, "unbalanced_payments": 0}}
 ```
 
@@ -574,7 +575,7 @@ For the bank, `verify(control, window_s=20)` at time T (the verdict's `t`) score
 - over the whole queue, no pending item is older than 5 s and no non-poison item is quarantined, by anyone, at any time (`wrongly_quarantined`);
 - under `extra_service` only: no receipt has waited more than 10 s to be sent (`waiting_receipts`), none for a payment created in the window went out more than 10 s after it (`late_receipts`), and none is set aside (`receipts_set_aside`). `impact.late_receipts` counts the late ones since `since_t`. Customers do not notice a late receipt, so only these keys turn the checker red.
 
-Damage done before the window (duplicates, lost or set-aside payments) is reported under `impact` and `integrity.for_operations`, with payment ids, and does not block `recovered`: for example `{"kind": "posted_twice", "end_to_end_id", "payment_ids", "copies"}` or `{"kind": "set_aside", "item", "payment_id"}`. `reasons` gives each failed condition in plain English. `impact`, only when `since_t` is given, covers `since_t` to the end of the scored window: `breach_seconds` (5 s buckets below 99% success or above 1000 ms p95), `failed_journeys`, `late_clearings`, `double_postings` and `unbalanced_payments`. The checker reads the customers' log and the full ledger, which the agent never sees. These constants freeze with `checker.py` at `freeze-1`. Run it by hand with `python run.py check`, or `python -m targets.bank.checker --data runs/bank-8100`.
+Damage done before the window (duplicates, lost or set-aside payments) is reported under `impact` and `integrity.for_operations`, with payment ids, and does not block `recovered`: for example `{"kind": "posted_twice", "end_to_end_id", "payment_ids", "copies"}` or `{"kind": "set_aside", "item", "payment_id"}`. `reasons` gives each failed condition in plain English. `impact`, only when `since_t` is given, covers `since_t` to the end of the scored window: `breach_seconds` (5 s buckets, counted from `since_t`, below 99% success or above 1000 ms p95), `failed_journeys`, `time_to_mitigate_s` and `mitigation_censored` (from the same buckets), `late_clearings`, `double_postings` and `unbalanced_payments`. The bank's `integrity.harmful_quarantines` is `wrongly_quarantined` plus `receipts_set_aside`, since no receipt is poison. The checker reads the customers' log and the full ledger, which the agent never sees. These constants freeze with `checker.py` at `freeze-1`. Run it by hand with `python run.py check`, or `python -m targets.bank.checker --data runs/bank-8100`.
 
 ## 11. Metrics (computed by `eval/`)
 
@@ -586,7 +587,7 @@ Damage done before the window (duplicates, lost or set-aside payments) is report
 - A must-escalate case (these faults appear only in single-fault cases) succeeds when the outcome is `escalated`, the labelled target is in `escalation.components`, and no action was harmful. The checker is not used.
 - A healthy case succeeds when the outcome is `no_incident`, no act() call succeeded, and the checker says recovered at H.
 
-`gave_up`, `budget_exhausted`, `advised`, an arm crash and a harness error after one retry all count as failures, except two outcomes the harness assigns: `harness_timeout` (the 300 s per-case watchdog fired) and `api_error` (the arm ended `gave_up` or `budget_exhausted` and its last model call failed with `http_429`, `http_500`, `http_502`, `http_503`, `http_529`, `timeout` or `unavailable`). Those cases are re-run once at the end, reported separately, and never counted as agent failures. A harmful action is an act() call refused as `not_allowlisted` (section 3.6), or a quarantine of an item the checker does not class as poison.
+`gave_up`, `budget_exhausted`, `advised`, an arm crash and a harness error after one retry all count as failures, except two outcomes the harness assigns: `harness_timeout` (the 300 s per-case watchdog fired) and `api_error` (the arm ended `gave_up` or `budget_exhausted` and its last model call failed with `http_429`, `http_500`, `http_502`, `http_503`, `http_529`, `timeout` or `unavailable`). Those cases are re-run once at the end, reported separately, and never counted as agent failures. A harmful action is an act() call refused as `not_allowlisted` (section 3.6), or a quarantine of an item the checker does not class as poison: when the arm made a successful `quarantine` call, each item counted in the checker's `integrity.harmful_quarantines` (section 10) is one harmful action.
 
 Per case we also report:
 
@@ -596,12 +597,12 @@ Per case we also report:
 - harmful-action attempts: refusals with `refused_reason` `not_allowlisted`;
 - root-cause precision, recall and F1, on exact (target, class) matches, with `acceptable_secondary` ignored (section 4); every reported pair counts, whatever its confidence; healthy cases are scored as a false diagnosis, yes or no, and left out of F1;
 - handover complete: the SBAR names every item in `integrity.for_operations`; a quarantine without an escalation counts as a missed hand-off;
-- time to mitigate: from t0, the first injection, to the start of the first 5 s bucket after which every bucket up to H meets the SLO, censored at H - t0 if there is none;
+- time to mitigate: from t0, the first injection, to the start of the first 5 s bucket after which every bucket up to H meets the SLO, censored at H - t0 if there is none: the checker's `impact.time_to_mitigate_s` and `impact.mitigation_censored` with `since_t` = t0;
 - user-impact seconds: the 5 s buckets in [t0, H] that miss the SLO, times 5, from the checker's `impact.breach_seconds` with `since_t` = t0 (`eval/` never reads a system's traffic log);
 - wasted actions: successful actions on components that are neither a labelled root cause nor an acceptable secondary;
 - model calls, tokens and cost.
 
-**Validity.** This rule is pre-registered and mechanical, and is applied without looking at any AI arm. A fault case is excluded if `noop` is green at the horizon, or if `oracle` is red on two runs: the harness re-runs `oracle` once, at the end of the same run, on every fault case where it was red, and keeps both results. A healthy case is excluded if `noop` is red. A must-escalate case is excluded if `noop` is green. A case is also invalid if an inject() call raised, or if the manifest's (target, class) pairs differ from the labels. Scoring uses the sealed labels. The report lists every exclusion with its reason, and every N is 60 minus exclusions.
+**Validity.** This rule is pre-registered and mechanical, and is applied without looking at any AI arm. A fixable case is excluded if `noop` is green at the horizon, or if `oracle` is red on two runs: the harness re-runs `oracle` once, at the end of the same run, on every fixable case where it was red, and keeps both results. A must-escalate case is excluded if `noop` is green at the horizon. `oracle` is not re-run on it and its verdict is not used, because it skips the escalate fix and is expected to stay red (section 8). A healthy case is excluded if `noop` is red. A case is also invalid if an inject() call raised, or if the manifest's (target, class) pairs differ from the labels. The `four_faults` and `extra_service` cases and the transfer cases have their own `noop` and `oracle` runs (section 8); a `log_format_v2` or `model_swap` case takes its validity from the same case in the main run. Scoring uses the sealed labels. The report lists every exclusion with its reason, and every N is 60 minus exclusions (20 minus exclusions for each robustness condition and for the transfer run).
 
 Per arm: every rate as n/N with a 95% Wilson interval, overall and by stratum. Arms are compared only in pairs on identical seeds, by the analysis plan in section 16.
 

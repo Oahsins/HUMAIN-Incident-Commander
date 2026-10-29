@@ -1,10 +1,11 @@
 """Does an adapter keep the contract? Run this against any new system's adapter (docs/ADDING-A-SYSTEM.md).
 
-    from ic.kit.conformance import check_adapter
+    from ic.kit.conformance import check_adapter, check_verdict
     problems = check_adapter(adapter)          # [] when it conforms
     problems = check_adapter(adapter, act=False)   # skip act(): read-only systems
+    problems = check_verdict(checker.verify(control, since_t=t0))   # the keys eval/ reads from any checker
 
-It calls describe(), observe(), probe() and logs() once each, and act() once
+check_adapter calls describe(), observe(), probe() and logs() once each, and act() once
 with an action no component allows (which must come back refused, never raise).
 """
 
@@ -90,4 +91,46 @@ def check_adapter(adapter, act=True):
         else:
             if answer.get("ok") or not answer.get("refused"):
                 problems.append("act(): an action outside the six must come back refused")
+    return problems
+
+
+def _number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _count(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def check_verdict(verdict, impact=True):
+    """A list of contract problems in a checker's verdict (CONTRACT.md section 10), empty when it has every key
+    eval/ reads. impact=False for a verdict taken without since_t, which has no impact."""
+    problems = []
+    for key in ("recovered", "slo_ok"):
+        if not isinstance(verdict.get(key), bool):
+            problems.append(f"verdict: {key} must be true or false")
+    journeys = verdict.get("journeys") or {}
+    for key in ("n", "ok"):
+        if not _count(journeys.get(key)):
+            problems.append(f"verdict: journeys.{key} must be a whole number")
+    for key in ("success_rate", "p95_ms"):
+        if key not in journeys or not (journeys[key] is None or _number(journeys[key])):
+            problems.append(f"verdict: journeys.{key} must be a number or null")
+    integrity = verdict.get("integrity") or {}
+    if not isinstance(integrity.get("ok"), bool):
+        problems.append("verdict: integrity.ok must be true or false")
+    operations = integrity.get("for_operations")
+    if not isinstance(operations, list) or not all(isinstance(item, dict) and item.get("kind") for item in operations):
+        problems.append("verdict: integrity.for_operations must be a list of items, each with a kind")
+    if not _count(integrity.get("harmful_quarantines")):
+        problems.append("verdict: integrity.harmful_quarantines must be a whole number")
+    if impact:
+        found = verdict.get("impact") or {}
+        for key in ("breach_seconds", "time_to_mitigate_s"):
+            if not _number(found.get(key)) or found[key] < 0:
+                problems.append(f"verdict: impact.{key} must be seconds, 0 or more")
+        if not _count(found.get("failed_journeys")):
+            problems.append("verdict: impact.failed_journeys must be a whole number")
+        if not isinstance(found.get("mitigation_censored"), bool):
+            problems.append("verdict: impact.mitigation_censored must be true or false")
     return problems

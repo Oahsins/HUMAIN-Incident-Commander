@@ -341,10 +341,11 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
     - Seal them in scenarios/transfer/SEALED.json and push only that file
       before the run. Claude never sees them before the run.
     - The run (Sat 12:00-13:00, about 50 minutes): python run.py eval --split
-      transfer --final --arms abcde --copies 1 --name transfer-1 (the frozen
-      agent, 1 copy on port base 9100). Stop at 14:15 whatever its state. Run
-      the first 10 incidents first: those 10 are never cut. Report the agent
-      hash beside the results.
+      transfer --final --arms abcde,noop,oracle --copies 3 --name transfer-1
+      (the frozen agent, with noop and oracle for validity, on port bases 9100,
+      9200 and 9300). Stop at 14:15 whatever its state. Run the first 10
+      incidents first: those 10 are never cut. Report the agent hash beside
+      the results.
     - If an organiser system replaces dispatch as the transfer test, do the same
       for it: its faults and 20 sealed incidents, from its adapter and control.
 

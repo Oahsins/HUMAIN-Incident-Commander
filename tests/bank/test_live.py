@@ -13,7 +13,7 @@ import time
 import pytest
 
 from ic import contract, inject, systems
-from ic.kit.conformance import check_adapter
+from ic.kit.conformance import check_adapter, check_verdict
 
 pytestmark = pytest.mark.skipif(os.environ.get("IC_SLOW") != "1", reason="starts live copies of the test bank; set IC_SLOW=1")
 
@@ -51,6 +51,9 @@ def test_two_faults_fixed_with_failover_then_revert(bank):
 
     verdict = checker.verify(control, window_s=contract.CHECK_WINDOW_S, lag_s=contract.CHECK_LAG_S, since_t=t_fault)
     assert verdict["recovered"], verdict["reasons"]
+    assert check_verdict(verdict) == []
+    assert verdict["impact"]["time_to_mitigate_s"] >= 5        # the first bucket refused most payments
+    assert verdict["integrity"]["harmful_quarantines"] == 0
     snapshot = control.snapshot()
     assert snapshot["routing"] == {"screening": "standby"}
     assert snapshot["config"]["payments"]["max_transfer_minor"] == 1_000_000
@@ -108,3 +111,4 @@ def test_notifications_faults_turn_the_checker_red_until_fixed(bank_with_notific
         time.sleep(contract.CHECK_WINDOW_S + contract.CHECK_LAG_S + 2)
         verdict = checker.verify(control, window_s=contract.CHECK_WINDOW_S, lag_s=contract.CHECK_LAG_S)
         assert verdict["recovered"], (fault["type"], verdict["reasons"])
+        assert check_verdict(verdict, impact=False) == []

@@ -26,6 +26,11 @@ it that the agent may not repair (a payment posted twice, an item set aside)
 does not block "recovered"; it is listed under integrity.for_operations for a
 person to review.
 
+Two keys are there for the evaluation (CONTRACT.md sections 10 and 11):
+integrity.harmful_quarantines counts the items set aside that are not poison
+(no receipt is poison), and impact.time_to_mitigate_s says when the 5 s
+buckets since since_t last started meeting the SLO for good.
+
 Run: python -m targets.bank.checker --data runs/bank-8100 [--window 20] [--lag 10] [--since <unix time>]
 """
 
@@ -36,6 +41,7 @@ import sqlite3
 import time
 from collections import defaultdict
 
+from ic.kit.slo import time_to_mitigate
 from ic.kit.stats import percentile
 from ic.kit.store import read_json, write_json
 from targets.bank import ledger
@@ -281,13 +287,17 @@ def impact(records, book, since_t, until_t):
         buckets[int((start - since_t) // BUCKET_S)].append((good, ms))
         failed += 0 if good else 1
     breach = 0
-    for items in buckets.values():
+    met = {}
+    for index, items in buckets.items():
         rate = sum(1 for good, _ in items if good) / len(items)
         p95 = percentile([ms for good, ms in items if good and ms is not None], 95)
-        if rate < SUCCESS_RATE or (p95 is not None and p95 > SLO_P95_MS):
+        met[index] = not (rate < SUCCESS_RATE or (p95 is not None and p95 > SLO_P95_MS))
+        if not met[index]:
             breach += 1
+    mitigate_s, censored = time_to_mitigate(met, until_t - since_t, BUCKET_S)
     _, _, late = book.clearing(until_t, since_t)
     out = {"since_t": since_t, "until_t": until_t, "breach_seconds": breach * BUCKET_S, "failed_journeys": failed,
+           "time_to_mitigate_s": mitigate_s, "mitigation_censored": censored,
            "late_clearings": late, "double_postings": book.duplicates(since_t),
            "unbalanced_payments": book.unbalanced(since_t)}
     if book.has_receipts():
@@ -325,6 +335,7 @@ def verify(control, *, window_s=20.0, lag_s=10.0, since_t=None):
         if book.has_receipts():
             receipt_keys = ("waiting_receipts", "late_receipts", "receipts_set_aside")
             integrity.update(zip(receipt_keys, book.receipts(now, window_start)))
+        integrity["harmful_quarantines"] = wrongly + integrity.get("receipts_set_aside", 0)
         incident = impact(records, book, since_t, window_end) if since_t is not None else None
     finally:
         conn.close()
