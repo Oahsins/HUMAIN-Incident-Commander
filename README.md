@@ -31,4 +31,4 @@ python run.py down           # stops everything
 - [Codex handoff](docs/CODEX-HANDOFF.md): the tasks Codex owns on the Windows laptop
 - [Decision log](DECISIONS.md)
 
-Once results exist, the README will cover the problem, our solution, how it works, results, robustness, ablations, how to reproduce and limitations. Results will be reported only from real runs, with n/N and intervals.
+Once results exist, the README will add them. Results will be reported only from real runs, with n/N and intervals.

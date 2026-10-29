@@ -61,7 +61,7 @@ Why the split is drawn this way: **the agent's author never writes the exam.** C
 | until 00:30 | Review and merge pull request #1 (bank, kit, contract, CI, these documents) once green; the steps above; paste the handoff into both sessions | Pull request #1 | - | - |
 | 00:30-01:20 | Answer setup questions, then sleep | Agent pull request | C0: setup check, install `requirements.txt` | C2: venv and `requirements.txt`, then the runbook |
 | 01:20-03:00 | Sleep | Agent pull request: all four arms, the demo, fast tests, by 03:00 | C1: design the exam and check each sealed type live; seal 1 pushed by 03:00 (05:00 at the latest) | C2: the runbook against the contract, on a fake adapter |
-| 03:00-09:00 | Sleep | Tuning on practice scenarios (with the real model if a key is in the cloud environment); the 30 practice scenarios; tests | C1: plugin tests until seal 2 is due; `NIGHT-REPORT.md` | C3: evaluation harness and charts, on fakes; `NIGHT-REPORT.md` |
+| 03:00-09:00 | Sleep | Tuning on practice scenarios, starting only once seal 1's push is on GitHub (until then, tests only), with the real model if a key is in the cloud environment; the 30 practice scenarios; tests | C1: plugin tests until seal 2 is due; `NIGHT-REPORT.md` | C3: evaluation harness and charts, on fakes; `NIGHT-REPORT.md` |
 
 Each Codex session pushes each finished task to its `codex/*` branch, opens a draft pull request and carries on without waiting for replies. Sealed content is never pushed, only `SEALED.json`.
 
@@ -180,7 +180,7 @@ Each cut belongs to a decision point. Never cut the bottom block.
 | Evaluation | `results/runs.csv` from the first run on; the pilot; the ablations; regression tests; a frozen baseline; the pre-registered analysis plan; the decision log | Throughout |
 | Design choices | The survey against free-form ReAct; weighted shortest-job-first; the bounded allowlist and the safety wrapper; the independent checker; a trade-offs slide | Sat 16:00 |
 | Engineering | One command; Windows checked; the two clean-clone passes; tests; readable code; the contract | Sat 18:30 |
-| Presentation | A 10-slide deck, the video, the README in the same order as the page, the SBAR handover | Sat 19:00 |
+| Presentation | A 10-slide deck, the video, the README, the SBAR handover | Sat 19:00 |
 
 ## 12. Risks
 

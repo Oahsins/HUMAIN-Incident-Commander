@@ -198,6 +198,11 @@ C1  Design and seal the exam (overnight; seal 1 pushed by 03:00 Fri)
       file, pull request or message to Claude or Session B. Give its plugin a
       neutral file name (for example blind_1.py). Use it in 6 to 10 of the 60
       cases, marked "blind": true; SEALED.json counts it only as "blind".
+      Name every other sealed file neutrally too (sealed_1.py, sealed_2.py and
+      so on, release modules included; only the three named types keep their
+      names), and give the cases neutral ids (h-01 to h-60): seal 1 pushes the
+      core40 and robust20 ids, and seal 2 every sealed file's path, before
+      freeze-1.
     - Write your own sealed benign plugin under a type name of your own, with
       background changes such as a no-op release, clearing poll_interval_s 0.2
       to 0.25 or a restart of screening-standby. Healthy distractors use
@@ -209,12 +214,24 @@ C1  Design and seal the exam (overnight; seal 1 pushed by 03:00 Fri)
       each root cause with its fix. 20 single (about 6 healthy distractors,
       about 6 must-escalate, about 8 genuine faults), 25 double, 15 triple.
       Must-escalate faults appear only in single-fault cases. Build compound
-      cases from confusable pairs that share symptoms. Named held-out types
-      appear in at least a third of the cases. For practice types, at least
-      half the instances use explicit params outside each plugin's defaults and
-      variants (section 7.2). Each case holds 1 to 3 benign changes; in at
-      least 15 fault cases put one on another component within 10 s of a real
-      fault.
+      cases from confusable pairs that share symptoms. List each case's root
+      causes in an order the oracle can apply them: upstream first (the ledger
+      before clearing or payments), as section 3.7 orders fixes. In a case
+      that locks the ledger, inject any fault that writes to the ledger (such
+      as poison_payment's queue item) before the lock: while the lock is held,
+      that write raises and quarantine fails. Named held-out types appear in
+      at least a third of the cases. For practice types, at least half the
+      instances use explicit params outside each plugin's defaults and
+      variants (section 7.2), each strong enough to keep noop red at the
+      verdict, about 125 s after the last fault: locked_ledger hold_s at
+      least 300, slow_screening latency_ms at least 900, bad_update only on
+      payments, and a bad_setting value that on its own fails or rejects most
+      payments or stops clearing. Each case holds 1 to 3 benign changes; in
+      at least 15 fault cases put one on another component within 10 s of a
+      real fault. A background change never sets a key that a fault in the
+      same case sets, and never deploys to a component whose release a fault
+      in the case changes: coming after the fault, it would hide it, and
+      revert_config or rollback would then undo the wrong change.
     - Must-escalate faults must differ from the practice network_outage, show
       their evidence through observe(), probe() or logs(), have no allowlisted
       action that fixes them, and keep the checker red until a person acts.
@@ -225,21 +242,37 @@ C1  Design and seal the exam (overnight; seal 1 pushed by 03:00 Fri)
       random.Random(2026).sample(core40, 20), with at least 2 healthy and 2
       must-escalate cases (if a draw has fewer, draw again from the same
       generator). Write scenarios/heldout/robustness.jsonl, 40 lines: for each
-      robust20 case, its four-fault case (practice faults added on other
-      components until it has four faults; id <its id>-ff, input.condition
-      four_faults) and its extra_service variant (id <its id>-xs,
-      input.condition extra_service). Every line has "source_id", the robust20
-      id it was built from. Section 8 gives the rules.
-    - Before seal 1, check every sealed type live, because its labels and
-      fixes never change after it. Copy the plugins into
-      targets/bank/faults/heldout/ for this check only, run python run.py up,
-      inject one case per type with python run.py inject <type> target=<t>
-      variant=<v> --sealed, and 30 s later confirm python run.py check says
-      NOT RECOVERED. Apply its labelled fixes in order with python run.py act,
-      and 30 s after the last one confirm it says RECOVERED (a must-escalate
-      case stays NOT RECOVERED). Then python run.py down, and delete the copied
-      plugins. Seal 1 may slip to 05:00 for this check; never seal a label that
-      failed it.
+      robust20 case, its four-fault case (it keeps every fault and gains
+      fixable practice faults, never network_outage, on components its faults
+      do not touch, until it has four root causes: a healthy case gains four
+      and becomes fixable; a must-escalate case gains three and stays
+      must-escalate, the only compound must-escalate cases; id <its id>-ff,
+      input.condition four_faults) and its extra_service variant (id <its
+      id>-xs, input.condition extra_service). Every line has "source_id", the
+      robust20 id it was built from. Section 8 gives the rules.
+    - Before seal 1, check live every sealed (type, variant) that
+      heldout.jsonl uses, healthy distractors and benign plugins included,
+      and each new bad_setting value, because labels never change after it.
+      Copy the plugins into targets/bank/faults/heldout/ for this check only.
+      Check each on its own fresh copy (up to two at once, on port bases 8900
+      and 9000; pass --port-base on every command): python run.py up, then
+      python run.py inject --scenario <heldout.jsonl in HUMAIN-sealed> --id
+      <a single-fault case that uses it> --sealed, or python run.py inject
+      <type> target=<t> variant=<v> --sealed when no single-fault case uses
+      it. It prints only type names: the manifest, with any runtime value
+      such as the item id, is in runs\bank-<port base>\injected.jsonl. 125 s
+      after the inject command returns (when the harness takes noop's
+      verdict), python run.py check must say RECOVERED for a healthy case or a
+      benign change, and NOT RECOVERED for anything else. Then apply the
+      labelled fixes in order with python run.py act (none for a healthy,
+      benign or must-escalate case); 40 s after the last one it must say
+      RECOVERED (a must-escalate case stays NOT RECOVERED). Then python run.py
+      down. Delete the copied plugins at the end. Seal 1 may slip to 05:00
+      for this check; never seal a label that failed it. Plugin code can
+      still be fixed until seal 2, but labels cannot: if a type's label still
+      fails at 04:30, replace the cases that use it with cases of types that
+      passed, keeping the counts and the composition, write what you replaced
+      in NIGHT-REPORT.md, and push seal 1 by 05:00 without waiting for Omar.
     - Write scenarios/heldout/SEALED.json as CONTRACT.md section 14 says: seal 1
       with the hashes (SHA-256 of the bytes with every CRLF replaced by LF; write
       files with newline="\n"), the composition counts, and the pre-registered
@@ -274,7 +307,10 @@ C5  Dry-run the sealed faults without the agent (Fri 12:00-14:00)
       action exists), and confirm the checker goes green. For each
       must-escalate case, confirm that no allowlisted act() call turns the
       checker green.
-    - Seal 2: add the plugin hashes as a new entry in SEALED.json and push it.
+    - Seal 2: append a new entry to SEALED.json "seals" that lists every
+      sealed file: heldout.jsonl and robustness.jsonl with the same hashes as
+      seal 1, plus every plugin file in targets/bank/faults/heldout/. The final
+      run checks only the newest entry (CONTRACT.md section 14). Push it.
     - After each merge of Claude's pull requests before freeze-1, rerun this
       sealed self-test. Report pass or fail per fault only.
 
@@ -306,9 +342,9 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       before the run. Claude never sees them before the run.
     - The run (Sat 12:00-13:00, about 50 minutes): python run.py eval --split
       transfer --final --arms abcde --copies 1 --name transfer-1 (the frozen
-      agent, 1 copy on port base 9100). Stop at 14:15 whatever its state. Run the first
-      10 incidents first: those 10 are never cut. Report the agent hash beside
-      the results.
+      agent, 1 copy on port base 9100). Stop at 14:15 whatever its state. Run
+      the first 10 incidents first: those 10 are never cut. Report the agent
+      hash beside the results.
     - If an organiser system replaces dispatch as the transfer test, do the same
       for it: its faults and 20 sealed incidents, from its adapter and control.
 
@@ -500,21 +536,29 @@ C3  Evaluation harness, statistics and charts (overnight, after C2)
       instead, whatever --model and IC_MODEL say; refuse if swap is null or
       equals bulk. Refuse to start only when an AI arm is asked for and no
       model is set: noop, oracle and runbook need none.
-    - Per case: systems.platform(system, port_base=...) -> start(warm-up) ->
-      inject.apply(..., t0) -> wait the alert delay -> run the arm's
+    - Per case: systems.platform(input.system, port_base=<the copy's>,
+      seed=input.seed, condition=<input.condition after --condition>) ->
+      start(warm-up) -> inject.apply(input.system, platform.control(),
+      input.faults, seed=input.seed, allow_sealed=<True on --split heldout
+      and --split transfer, False on --split dev>, t0=t0) -> wait the alert
+      delay -> run the arm's
       run_incident on Guard(platform.adapter(), mode="auto", max_steps=40,
       audit_path=runs/audit/<run>-<case>-<arm>.jsonl, in a runs/audit/ you
-      create first), stopping it at budget_s + 5 s -> keep the system running until H -> at H + 10 s call
-      checker.verify(control, window_s=CHECK_WINDOW_S, lag_s=CHECK_LAG_S,
-      since_t=<t of the first manifest entry>) -> copy the evidence files to
-      results/<run>/cases/<case-id>/ -> stop. Timings in sections 13 and 6.
+      create first), stopping it at budget_s + 5 s -> keep the system running
+      until H -> at H + 10 s call checker.verify(control,
+      window_s=CHECK_WINDOW_S, lag_s=CHECK_LAG_S, since_t=<t of the first
+      manifest entry>) -> copy actions.jsonl, changes.jsonl, customers.jsonl,
+      logs/, the guard's audit file and the arm's result (result.json) to
+      results/<run>/cases/<case-id>/<arm>/ -> stop. Timings in sections 13
+      and 6.
     - Arms: from ic.agent import load_arm for abcde, naive_verify, fifo and
       react; baselines.runbook.run_incident for runbook; implement noop and
       oracle in eval/ (section 9; the oracle applies each fix and then its
-      then actions, with null params filled from the manifest, section 8). ic/agent/ reaches main only about 09:00
-      Fri, when Omar merges Claude's agent pull request: import it only when
-      an AI arm is asked for, so noop, oracle, runbook and your tests work
-      tonight, and an AI arm before then stops with a one-line message.
+      then actions, with null params filled from the manifest, section 8).
+      ic/agent/ reaches main only about 09:00 Fri, when Omar merges Claude's
+      agent pull request: import it only when an AI arm is asked for, so noop,
+      oracle, runbook and your tests work tonight, and an AI arm before then
+      stops with a one-line message.
     - Copies: --copies N runs cases in parallel on the first N of --port-bases
       (default 8100,8200,8300; 9100,9200,9300 for --split transfer).
       Development runs pass --port-bases 8400,8500,8600.
@@ -532,6 +576,12 @@ C3  Evaluation harness, statistics and charts (overnight, after C2)
       unavailable is scored api_error. api_error and harness_timeout cases are
       re-run once at the end, reported separately, and never counted as agent
       failures. Other errors stay in the denominator.
+    - Validity re-run: at the end, after the api_error and harness_timeout
+      re-runs, run the oracle once more on every fault case where it was red
+      (main run, four_faults and extra_service), and keep both results;
+      section 11 excludes a case only when both are red. This is the one
+      exception to "the first complete result counts", and a rerun with the
+      same --name does not repeat it.
     - --final: check the files against the newest entry in SEALED.json
       "seals" and refuse on a hash mismatch or an unlisted file, ignoring
       SEALED.json, .gitkeep and __pycache__ (section 14); manifests record git
@@ -546,8 +596,11 @@ C3  Evaluation harness, statistics and charts (overnight, after C2)
     - Done when: tests/eval pass: a fake platform and a fake arm run 4 cases on
       2 copies; a rerun with the same name skips them; --final refuses when a
       SEALED.json hash differs and accepts a matching seal while .gitkeep and
-      SEALED.json are present; Wilson 95% for 8/10 is 0.49-0.94; exact McNemar
-      with 1 and 7 discordant pairs gives p = 0.070; the report writes a
+      SEALED.json are present; --split heldout and --split transfer call
+      inject.apply with allow_sealed=True and --split dev with
+      allow_sealed=False, and each copy gets the case's condition; Wilson 95%
+      for 8/10 is 0.49-0.94; exact McNemar with 1 and 7 discordant pairs gives
+      p = 0.070; the report writes a
       Markdown table and 3 PNG charts. tests/eval/test_checker_audit.py builds
       small ledgers and customer logs, each with one planted defect (a
       duplicate, a ghost, a lost payment, a stale read, a wrongly quarantined
@@ -587,17 +640,21 @@ Paste these into the named session when the time comes.
 - **Fri 21:00, Session A (after Omar merges every open pull request):** "Start C6: tag freeze-1 and push the tag, then clean-clone pass 1 into %USERPROFILE%\Documents\HUMAIN-final with the sealed files copied in."
 - **Fri 21:30, Omar in a new PowerShell window (arms as set by GO/NO-GO 3; for the core40 cut add `--limit 40` and skip `robust-v2` and `robust-xs`):**
 
+  Paste the whole block once: it runs the main exam, then the robustness runs, one after another in the same window, each with up to 5 tries.
+
   ```powershell
   cd "$env:USERPROFILE\Documents\HUMAIN-final"
   New-Item -ItemType Directory -Force results | Out-Null
   $env:PYTHONUTF8 = '1'
-  for ($i = 1; $i -le 5; $i++) {
-    .\.venv\Scripts\python.exe run.py eval --split heldout --final --arms abcde,runbook,react,naive_verify,fifo,noop,oracle --copies 3 --name final-1 *>> results\final.log
-    if ($LASTEXITCODE -eq 0) { break }
-  }
+  $py = '.\.venv\Scripts\python.exe'
+  for ($i = 1; $i -le 5; $i++) { & $py run.py eval --split heldout --final --copies 3 --arms abcde,runbook,react,naive_verify,fifo,noop,oracle --name final-1 *>> results\final.log; if ($LASTEXITCODE -eq 0) { break } }
+  for ($i = 1; $i -le 5; $i++) { & $py run.py eval --split heldout --final --copies 3 --arms abcde,runbook,noop,oracle --condition four_faults --name robust-ff *>> results\final.log; if ($LASTEXITCODE -eq 0) { break } }
+  for ($i = 1; $i -le 5; $i++) { & $py run.py eval --split heldout --final --copies 3 --arms abcde --condition model_swap --name robust-ms *>> results\final.log; if ($LASTEXITCODE -eq 0) { break } }
+  for ($i = 1; $i -le 5; $i++) { & $py run.py eval --split heldout --final --copies 3 --arms abcde,runbook --condition log_format_v2 --name robust-v2 *>> results\final.log; if ($LASTEXITCODE -eq 0) { break } }
+  for ($i = 1; $i -le 5; $i++) { & $py run.py eval --split heldout --final --copies 3 --arms abcde,runbook,noop,oracle --condition extra_service --name robust-xs *>> results\final.log; if ($LASTEXITCODE -eq 0) { break } }
   ```
 
-  Then the robustness subset the same way: `--arms abcde,runbook,noop,oracle` with `--condition four_faults` and `extra_service` (names `robust-ff`, `robust-xs`), `--arms abcde,runbook --condition log_format_v2` (name `robust-v2`), and `--arms abcde --condition model_swap` (name `robust-ms`). Check progress with `Get-Content results\final.log -Tail 20`.
+  For the core40 cut, add `--limit 40` to the final-1 line and delete the robust-v2 and robust-xs lines. Check progress with `Get-Content results\final.log -Tail 20`.
 - **Sat 09:00, Session A:** "Start C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, seal them, push only scenarios/transfer/SEALED.json, and report."
 - **Sat 11:00, Session A:** "If the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N."
 - **Sat 12:00, Session B:** "The final run is over, so you may now open %USERPROFILE%\Documents\HUMAIN-final; change nothing there outside results/. In that folder run `python run.py eval --report final-1`, then `--report robust-ff --against final-1` (and the same for robust-v2, robust-xs and robust-ms), with n/N, intervals, and where the runbook ties or wins, and send Omar the tables for Claude." **Session A:** "Run the transfer test (C7), then open the codex/reveal pull request with the sealed files."
