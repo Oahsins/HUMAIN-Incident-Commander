@@ -11,6 +11,7 @@ import time
 import pytest
 
 from ic import contract, inject, systems
+from ic.kit.conformance import check_adapter
 
 pytestmark = pytest.mark.skipif(os.environ.get("IC_SLOW") != "1", reason="starts a real bank; set IC_SLOW=1")
 
@@ -23,6 +24,10 @@ def bank():
         yield platform
     finally:
         platform.stop()
+
+
+def test_bank_adapter_keeps_the_contract(bank):
+    assert check_adapter(bank.adapter()) == []
 
 
 def test_two_faults_fixed_with_failover_then_revert(bank):
