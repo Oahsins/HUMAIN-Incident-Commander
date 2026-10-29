@@ -1,9 +1,8 @@
 # Build plan: ABCDE Incident Commander
 
-Challenge 1, Agentic Recovery of a Failing System. Plan written 29 Oct 2026 and updated the same night after five reviews. All times are Riyadh time (UTC+3).
+Challenge 1 (an AI agent that recovers a failing system). Plan written 29 Oct 2026 and updated the same night after five reviews. All times are Riyadh time (UTC+3).
 
-- Hackathon hours: Fri 30 Oct 14:00 to 22:00, Sat 31 Oct 12:00 to 20:00.
-- Deadline: Sat 31 Oct 20:00. Our own target is to publish by 19:00.
+- Event days: Fri 30 and Sat 31 Oct; the exact hours and the deadline are in Omar's private notes. Our own target is to publish by Sat 19:00.
 - Interfaces between the parts: [CONTRACT.md](CONTRACT.md) (version 1.1). Codex's brief: [CODEX-HANDOFF.md](CODEX-HANDOFF.md).
 
 ## 1. What we are building
@@ -18,7 +17,7 @@ An AI incident commander that keeps a failing multi-service system running. It u
 
 An independent checker then decides whether the system really recovered, using evidence the agent never sees. We run a sealed exam of 60 incidents against a scripted runbook with no AI, and against weaker versions of the agent.
 
-**Built for any system.** The agent is system-agnostic. It needs only a 5-function adapter (describe, observe, logs, probe, act). A test system also supplies a control layer (how faults are injected) and a checker (what "recovered" means there). The main test system is a small bank: an app gateway, a payments service, fraud screening with a standby, a clearing worker and a simulated national payment network, around a double-entry ledger, with test customers paying nonstop. The transfer test runs the frozen agent on a second system, an emergency dispatch system that Claude builds after the freeze, so the frozen hashes show the agent never saw it. If Friday's brief supplies an organiser system, it replaces dispatch as the transfer test (section 12).
+**Built to plug into other systems.** The agent is system-agnostic. It needs only a 5-function adapter (describe, observe, logs, probe, act). A test system also supplies a control layer (how faults are injected) and a checker (what "recovered" means there). The main test system is a small bank: an app gateway, a payments service, fraud screening with a standby, a clearing worker and a simulated national payment network, around a double-entry ledger, with test customers paying nonstop. The transfer test runs the frozen agent on a second system, an emergency dispatch system that Claude builds after the freeze, so the frozen hashes show the agent never saw it. If Friday's brief supplies an organiser system, it replaces dispatch as the transfer test (section 12).
 
 ```
  test customers ──► gateway ──► payments ──► screening (+ standby)
@@ -49,20 +48,20 @@ Why the split is drawn this way: **the agent's author never writes the exam.** C
 - Claims: never name a Saudi bank; never claim SAMA or NCA compliance (say "relevant to"); the SAMA 79% figure is exposure, not outages; cite ITBench from ICML 2025, not the preprint, and carefully: 102 scenarios across three domains, 42 of them SRE; the paper gives 11.4% and 13.8% for the SRE scenarios its agents resolve, so say "fewer than one in seven"; never describe the build as production-ready.
 - Results: fill the results slide and page only from real runs, with n/N and intervals. The pilot's numbers stay internal. Add a "measured vs proposed" slide.
 - Sealing: the time GitHub received the push (shown on the pull request) proves the exam was fixed before tuning; commit times are set by the committer.
-- Prior work: the organisers said in a pre-event session that an existing project can be a starting point. If the final rules say otherwise, ask the organisers (in the event Lobby or by email) and keep the answer. We started building on 29 Oct, so `DECISIONS.md` and the README say so plainly. The commit history shows it anyway.
+- Prior work: Omar's private notes hold the basis for building before the event. If the final rules say otherwise, Omar asks the organisers and keeps the answer; Claude and Codex never contact them. We started building on 29 Oct, so `DECISIONS.md` and the README say so plainly. The commit history shows it anyway.
 - The NDA (the repository will be public): no platform name, domain or links, no organiser email address, no participant or mentor names and no platform content in the repository. Before it goes public, Codex scans the full history for secrets, and Omar searches it for the platform's name and domain (listed in Omar's private notes).
 - Authorship: Omar writes the video, the free-text answer and the page in his own voice. Claude and Codex draft and build; every commit says who made it.
 
 ## 4. Tonight, Thursday 29 Oct, and the night to Friday
 
-**Before pasting the handoff (Omar, about 00:30 Fri, after merging pull request #1):** plug in the laptop; in PowerShell run `powercfg /change standby-timeout-ac 0`, `powercfg /change hibernate-timeout-ac 0`, `powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 0` and `powercfg /setactive SCHEME_CURRENT`; pause Windows Update for a week; run `setx ANTHROPIC_API_KEY <key>` and then restart Codex so it sees the key; check that `git config --global user.name` and `user.email` are set (set them if not); let Codex edit files and run commands inside its own working folder without asking, with network access for git and pip; pre-approve its pushes to `codex/*` branches.
+**Before pasting the handoff (Omar, Thu night, once Claude's handoff fixes are merged):** the six steps at the top of `docs/CODEX-HANDOFF.md`: the power settings; Windows Update paused for a week; `ANTHROPIC_API_KEY` set in "Edit environment variables for your account", not typed into PowerShell; the two clones and `HUMAIN-sealed` made in Documents; each session opened in its own folder, allowed to work without asking, with network access, and Session A also able to write `HUMAIN-sealed`; pushes to `codex/*` pre-approved. Each Codex session sets its own git identity in its clone (Omar's GitHub no-reply address), so Omar sets none.
 
 | Time | Omar | Claude (cloud) | Codex Session A | Codex Session B |
 |---|---|---|---|---|
 | until 00:30 | Review and merge pull request #1 (bank, kit, contract, CI, these documents) once green; the steps above; paste the handoff into both sessions | Pull request #1 | - | - |
-| 00:30-00:45 | Answer setup questions, then sleep | Agent pull request | C0: setup check, install `requirements.txt` | C0 |
-| 00:45-03:00 | Sleep | Agent pull request: all four arms, the demo, fast tests, by 03:00 | C1: design the exam; seal 1 pushed by 03:00 | C2: the runbook against the contract, on a fake adapter |
-| 03:00-09:00 | Sleep | Tuning on practice scenarios (with the real model if a key is in the cloud environment); the 30 practice scenarios; tests | C1: plugin tests until seal 2 is due; `NIGHT-REPORT.md` | C3: evaluation harness and charts, on fakes; `NIGHT-REPORT.md` |
+| 00:30-01:20 | Answer setup questions, then sleep | Agent pull request | C0: setup check, install `requirements.txt` | C2: venv and `requirements.txt`, then the runbook |
+| 01:20-03:00 | Sleep | Agent pull request: all four arms, the demo, fast tests, by 03:00 | C1: design the exam and check each sealed type live; seal 1 pushed by 03:00 (05:00 at the latest) | C2: the runbook against the contract, on a fake adapter |
+| 03:00-09:00 | Sleep | Tuning on practice scenarios, starting only once seal 1's push is on GitHub (until then, tests only), with the real model if a key is in the cloud environment; the 30 practice scenarios; tests | C1: plugin tests until seal 2 is due; `NIGHT-REPORT.md` | C3: evaluation harness and charts, on fakes; `NIGHT-REPORT.md` |
 
 Each Codex session pushes each finished task to its `codex/*` branch, opens a draft pull request and carries on without waiting for replies. Sealed content is never pushed, only `SEALED.json`.
 
@@ -86,22 +85,22 @@ The 09:00 slot is required, not optional. If the morning is lost, do the same st
 | **17:30-18:30** | Read the pilot results | Pick the bulk model from the pilot's measured cost and seconds per call | - | Pilot: dev-21 to dev-30 × abcde, react, runbook, on 3 copies |
 | **18:30 GO/NO-GO 2** | Decide the framing (section 7) | | | |
 | 18:30-20:00 | Start the video script outline with Claude | The `extra_service` condition; demo polish; regression tests | - | Check `configs/prices.json`; test resume |
-| 20:00-21:00 | Second explain-back | Tests green on Windows; `DECISIONS.md` (ablation diffs, analysis plan) | - | Dry run `dry-1` on 6 practice scenarios on 3 copies, plus 1 scenario per robustness condition (runbook only); checker calibration with noop on 10 healthy cases |
+| 20:00-21:00 | Second explain-back | Tests green on Windows; `DECISIONS.md` (ablation diffs, analysis plan) | - | Dry run `dry-1` on 6 practice scenarios on 3 copies, plus 1 scenario under `log_format_v2` and `extra_service` (runbook) and 1 under `model_swap` (abcde); checker calibration with noop, 4 runs each of the 3 healthy practice cases (dev-09, dev-18, dev-24) |
 | **21:00 GO/NO-GO 3** | Set the run size (section 7) | | | |
 | **21:00-21:30 FREEZE** | Merge every open pull request (including `baselines/FROZEN.json`); approve the tag | Record the tag, the commit and the five group hashes in `DECISIONS.md` | C6: tag `freeze-1`, push the tag, clean-clone pass 1 into `%USERPROFILE%\Documents\HUMAIN-final` with the sealed files copied in | `baselines/FROZEN.json`; after the tag, the backup demo take into `replays/demo-frozen.jsonl` (pull request `codex/demo-replay`) |
 | 21:30 | Start the final run in his own PowerShell window in `HUMAIN-final`, with the 5-try auto-resume loop from the handoff; leave the laptop on mains power | Build the dispatch platform, adapter, control and checker with `ic/kit`, and `docs/ADDING-A-SYSTEM.md` (21:30 to Sat 02:00) | - | - |
 
-The final run goes case-major in `SEALED.json` order (case 1 under every arm, then case 2), so a partial run is still paired: the main exam first, then the robustness subset. It must finish by 06:00 Sat. Progress: `Get-Content results\final.log -Tail 20`.
+The final run goes case-major in the line order of `heldout.jsonl` (its first 40 ids are `core40`) (case 1 under every arm, then case 2), so a partial run is still paired: the main exam first, then the robustness subset. It must finish by 06:00 Sat. Progress: `Get-Content results\final.log -Tail 20`.
 
 ## 6. Saturday 31 Oct
 
 | Time | Omar | Claude | Codex Session A | Codex Session B |
 |---|---|---|---|---|
 | 09:00-12:00 | Check the final run finished; merge the dispatch pull request once green | Fix anything in dispatch | C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces; push only `scenarios/transfer/SEALED.json`. At 11:00, if the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N | - |
-| **12:00-13:00** | Read the results | Results write-up: tables with intervals, paired tests, where the script ties or wins | The transfer run: the frozen agent, the `abcde` arm, 1 copy on port base 9100; stop at 14:15 whatever its state | Results table and charts: `python run.py eval --report final-1` |
+| **12:00-13:00** | Read the results | Results write-up: tables with intervals, paired tests, where the script ties or wins | The transfer run: the frozen agent, the `abcde` arm, 1 copy on port base 9100; stop at 14:15 whatever its state | Results table and charts in `HUMAIN-final`: `python run.py eval --report final-1` |
 | 13:00-14:30 | Choose the demo seed with Claude | Fill the deck's results slide from real runs only | The `codex/reveal` pull request with the sealed files and the per-case evidence | Charts for the deck |
 | **14:30-16:00** | Record the 3 to 4 minute video (demo plus results), then upload it to a public link | The video script and the 75-second demo scenario | Keep the demo machine clean | - |
-| 16:00-17:30 | Make the repository public after Codex's secret scan; write the free-text answer in his own words; check the deck | Deck cut to 10 slides plus PDF; page text (Issue, Our solution, How it works); README final | Secret scan of the full history; then clean-clone pass 2: an anonymous clone, the README steps, `python run.py demo` live and again with the key unset (it must print the REPLAY line) | - |
+| 16:00-17:30 | Make the repository public after Codex's secret scan; write the free-text answer in his own words; check the deck | Deck cut to 10 slides plus PDF; page text (sections as in Omar's private notes); README final | Secret scan of the full history; then clean-clone pass 2: an anonymous clone, the README steps, `python run.py demo` live and again with the key unset (it must print the REPLAY line) | - |
 | 17:30-18:30 | Fill the project page | Fix anything from pass 2 | Repeat the clean-clone check at 18:00 | - |
 | **18:30-19:00 PUBLISH** | Publish. Open every link in a private window | - | - | - |
 | 19:00-19:45 | Buffer. Republish if anything changed. Stop editing at 19:45 | - | - | - |
@@ -111,8 +110,8 @@ The final run goes case-major in `SEALED.json` order (case 1 under every arm, th
 **GO/NO-GO 1, Fri 14:30-16:30 (rehearsed at 09:30).** On Omar's Windows laptop, on the eval port bases:
 
 1. `python run.py up` starts the bank with one command, and `python run.py status` shows every component healthy.
-2. All 6 practice faults, one at a time, each break payments in a way that `status` and `check` both show.
-3. Each heals within 30 s of the matching action, and `check` returns `recovered: true` with the ledger exact.
+2. All 6 practice faults, one at a time, each break payments in a way that `status` shows at once and `check` shows from 30 s after the injection.
+3. Each heals within 30 s of the matching action, and `check`, run 30 s after it heals, returns `recovered: true` with the ledger exact.
 4. Three copies (8100, 8200, 8300) each complete 10 up/down cycles without a port-in-use error. While two copies start and stop, a healthy third copy's checker stays green in at least 19 of 20 consecutive 20 s windows.
 
 If step 1, 2 or 3 fails and isn't fixed by 16:30, take the cut path. It keeps every Adapter and Control signature and every component name: `link()` becomes an in-service delay, and failover to `screening-standby` uses a cached decision list. If only step 4 fails, run on the copies that passed, and GO/NO-GO 3 sets the exam size.
@@ -123,7 +122,7 @@ If step 1, 2 or 3 fails and isn't fixed by 16:30, take the cut path. It keeps ev
 2. A is at least R + 2: keep the pitch as planned.
 3. Otherwise: keep the build and reframe it honestly. The script handles known faults; the agent is for held-out, compound and changed-condition faults, and it writes the handover. The sealed exam then tests exactly that claim.
 
-**GO/NO-GO 3, Fri 21:00 (run size).** From the 20:00 dry run, m = mean minutes per incident and c = the number of copies that ran without interference. Hours = (60 × arms + 140) × m / (60 × c). If that is 8 or less, run 60. Otherwise cut to the pre-registered core40 and keep only `four_faults` and `model_swap`, so hours = (40 × arms + 60) × m / (60 × c). If that is still over 8, also cut `naive_verify`. If the start slips past 22:00, recompute: the run must finish by 06:00.
+**GO/NO-GO 3, Fri 21:00 (run size).** From the 20:00 dry run, m = mean minutes per incident and c = the number of copies that ran without interference. Hours = (60 × arms + 220) × m / (60 × c). If that is 8 or less, run 60. Otherwise cut to the pre-registered core40 and keep only `four_faults` and `model_swap`, so hours = (40 × arms + 100) × m / (60 × c). If that is still over 8, also cut `naive_verify`. If the start slips past 22:00, recompute: the run must finish by 06:00.
 
 ## 8. Cut lines
 
@@ -148,7 +147,7 @@ Each cut belongs to a decision point. Never cut the bottom block.
 - 25 double-fault cases and 15 triple-fault cases, built from confusable pairs that share symptoms.
 - Three named held-out fault types (`poison_payment`, `stale_balances`, `double_posting`) appear in at least a third of the cases. One blind type appears in 6 to 10 cases, marked `"blind": true`; `SEALED.json` counts it only as "blind", and its plugin has a neutral file name.
 - `scenarios/heldout/robustness.jsonl` holds the four-fault cases (practice faults added until there are four) and the `extra_service` variants, sealed with the rest.
-- `SEALED.json` pre-registers `core40` (the first 40 ids in run order: 13 singles, including 4 healthy and 4 must-escalate; 17 doubles; 10 triples) and `robust20` (20 ids drawn with `random.Random(2026).sample`, at least 2 healthy and 2 must-escalate).
+- `SEALED.json` pre-registers `core40` (the first 40 ids in run order: 13 singles, including 4 healthy and 4 must-escalate; 17 doubles; 10 triples) and `robust20` (20 ids drawn from `core40` with `random.Random(2026).sample`, at least 2 healthy and 2 must-escalate).
 
 **Arms on identical seeds:** `abcde`, `runbook` (no AI), `react`, `naive_verify` and, if time allows, `fifo`. The harness adds `noop` and `oracle` as validity checks: a case the oracle cannot fix is excluded by the rule in CONTRACT section 11.
 
@@ -158,7 +157,7 @@ Each cut belongs to a decision point. Never cut the bottom block.
 
 **Statistics:** n/N with 95% Wilson intervals, and the analysis plan in CONTRACT section 16 (exact McNemar tests for paired yes/no outcomes, Holm's correction, paired bootstrap and Wilcoxon tests), committed before `freeze-1` and unchanged after.
 
-**Run time:** the verdict time is fixed from the alert, so every arm takes about 2.5 minutes per incident: start and stop about 8 s, warm-up 10 s, fault offsets up to 8 s, alert delay 5 s, agent budget 90 s, soak 20 s, verdict lag 10 s. The main exam of 60 incidents × 4 arms takes about 10 hours on one copy or 3.3 hours on three. The robustness subset uses `abcde` and `runbook` only: 20 cases × 4 conditions, with no runbook under `model_swap`, so 140 runs, about 1.9 hours on three copies. That is why it runs overnight, and why GO/NO-GO 3 sets the size.
+**Run time:** the verdict time is fixed from the alert, so every arm takes about 2.5 minutes per incident: start and stop about 8 s, warm-up 10 s, fault offsets up to 8 s, alert delay 5 s, agent budget 90 s, soak 20 s, verdict lag 10 s. The main exam of 60 incidents × 4 arms takes about 10 hours on one copy or 3.3 hours on three. The robustness subset uses `abcde` and `runbook` (no runbook under `model_swap`), plus `noop` and `oracle` on the 40 new cases (`four_faults` and `extra_service`): 20 cases × 4 conditions, so 220 runs, about 3 hours on three copies. That is why it runs overnight, and why GO/NO-GO 3 sets the size.
 
 **Model cost:** measured at the pilot. Session B checks the prices in `configs/prices.json` on the day, before the final run.
 
@@ -167,21 +166,21 @@ Each cut belongs to a decision point. Never cut the bottom block.
 - The provider is Anthropic. OpenAI's API is blocked from Claude's cloud container; the model client still supports OpenAI, LM Studio, replay and a mock.
 - The default model is `anthropic:claude-opus-5-5`; `IC_MODEL` overrides it. The bulk model for the final run is picked at the Friday pilot from the measured cost and seconds per call (candidates: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`) and written to `configs/models.json` as `bulk`. The `swap` model for `model_swap` is `anthropic:claude-haiku-5-5`, or `anthropic:claude-sonnet-5-5` if the bulk model is Haiku.
 - Omar adds a spend-capped key as a secret in Claude's cloud environment, so Claude can tune with the real model overnight and on Friday. Without it, the agent pull request is tested with the rule-based test model only, and the first real call is Session B's `python run.py demo` at 10:00 Fri on the laptop.
-- Keys live only in environment variables (`ANTHROPIC_API_KEY`, set with `setx` on the laptop), never in files.
+- Keys live only in environment variables (`ANTHROPIC_API_KEY`, set in the laptop's environment variables for Omar's account), never in files.
 - `ic/llm.py` sends no temperature, top_p, top_k or prefill, reads the answer's content blocks by type and sets the effort per call. Every call is logged with its status and error (CONTRACT section 9).
 - LM Studio is an extra condition only if Friday's smoke test passes. It runs last, alone, on 1 copy, and LM Studio is quit before the final run.
 - With no key, `python run.py demo` replays `replays/demo-frozen.jsonl` (the backup take Session B records after the freeze) and says so. The scripted runbook needs no key at all.
 
-## 11. How each judging criterion gets its evidence
+## 11. Where the evidence comes from
 
-| Criterion | Evidence | Ready by |
+| Area | Evidence | Ready by |
 |---|---|---|
-| Task performance | The sealed exam: recovery rate, root-cause F1, false all-clears, correct escalations, with intervals | Sat 12:00 |
-| Robustness & adaptation | Held-out and blind faults, four faults at once, changed log format, extra service, a model the agent was not tuned on, a second system built after the freeze | Sat 14:15 |
-| Evaluation & iteration | `results/runs.csv` from the first run on; the pilot; the ablations; regression tests; a frozen baseline; the pre-registered analysis plan; the decision log | Throughout |
-| Technical judgement & creativity | The survey against free-form ReAct; weighted shortest-job-first; the bounded allowlist and the safety wrapper; the independent checker; a trade-offs slide | Sat 16:00 |
-| Engineering quality | One command; Windows checked; the two clean-clone passes; tests; readable code; the contract | Sat 18:30 |
-| Communication | A 10-slide deck, the video, the README in the project page's order, the SBAR handover | Sat 19:00 |
+| Held-out results | The sealed exam: recovery rate, root-cause F1, false all-clears, correct escalations, with intervals | Sat 12:00 |
+| Robustness | Held-out and blind faults, four faults at once, changed log format, extra service, a model the agent was not tuned on, a second system built after the freeze | Sat 14:15 |
+| Evaluation | `results/runs.csv` from the first run on; the pilot; the ablations; regression tests; a frozen baseline; the pre-registered analysis plan; the decision log | Throughout |
+| Design choices | The survey against free-form ReAct; weighted shortest-job-first; the bounded allowlist and the safety wrapper; the independent checker; a trade-offs slide | Sat 16:00 |
+| Engineering | One command; Windows checked; the two clean-clone passes; tests; readable code; the contract | Sat 18:30 |
+| Presentation | A 10-slide deck, the video, the README, the SBAR handover | Sat 19:00 |
 
 ## 12. Risks
 
@@ -194,7 +193,7 @@ Each cut belongs to a decision point. Never cut the bottom block.
 | The overnight run crashes | A 300 s per-case watchdog (`harness_timeout`); provider errors scored `api_error`; both re-run once at the end and reported separately; the 5-try auto-resume loop on 3 copies; case-major order, so a partial run is still paired; at Sat 11:00, if the main exam is incomplete, stop the robustness subset and report n of N |
 | A sealed file is committed by mistake | `.gitignore`, staging by explicit path, `git status --short` before every commit, `.git/info/exclude` on the laptop |
 | An organiser system is supplied | Decide by Fri 10:00 if the briefs are out (else at 14:00). The bank keeps the sealed exam; the organiser system replaces dispatch as the transfer test. Claude writes its adapter, control and checker; Codex writes its faults and 20 sealed incidents. Before `freeze-1`, Claude runs only the conformance check and the Control tests on it, never the agent. Organiser material never enters the repository unless the brief says it may be redistributed; the adapter reads it from the folder in `IC_ORGANISER_DIR` |
-| The brief rules out pre-built work | Ask the organisers (in the event Lobby or by email); disclose the 29 Oct start |
+| The brief rules out pre-built work | Omar asks the organisers and keeps the answer (Claude and Codex never contact them); disclose the 29 Oct start |
 | Omar can't explain a part in the interview | Two explain-back sessions on Friday; every module starts with a plain-English docstring |
 
 ## 13. Open decisions for Omar

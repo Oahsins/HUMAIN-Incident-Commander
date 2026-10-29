@@ -1,6 +1,6 @@
 # Interface contract
 
-Contract version: **1.1** (29 Oct 2026, the bank profile and the review fixes; `CONTRACT_VERSION` in `ic/contract.py` stays 1 until something is published). This file is the single source of truth for how the parts of the build talk to each other. Claude (Opus) and Codex Astra both build against it. Only Omar approves a change, and changes follow collision rule 5 (section 2). After 1.1, sections 3, 5, 7, 8 and 9 change only by adding optional fields with defaults until `freeze-1`.
+Contract version: **1.1** (29 Oct 2026, the bank profile and the review fixes, completed before Codex started; `CONTRACT_VERSION` in `ic/contract.py` stays 1 until something is published). This file is the single source of truth for how the parts of the build talk to each other. Claude and Codex both build against it. Only Omar approves a change, and changes follow collision rule 5 (section 2). After 1.1, sections 3, 5, 7, 8 and 9 change only by adding optional fields with defaults until `freeze-1`.
 
 ## 1. The design rule: one agent, any system
 
@@ -12,7 +12,7 @@ The incident commander is system-agnostic. It never imports anything from a targ
 | **Checker** | The independent answer to "has it really recovered?" | Measuring the agent on that system. Optional; never given to the agent |
 | **Control** | Privileged fault injection: kill, deploy, change settings, slow links, touch the datastore | Running our own exam on that system. Optional; never given to the agent |
 
-To run the agent on a new system (an organiser-supplied one, dispatch, a real bank's monitoring stack), only the adapter is needed, and the agent code does not change. An adapter without write access runs the agent in advise mode (section 9). Our test systems have all three parts; a real system usually has only the adapter. The agent and the scripted runbook reach the adapter only through the safety wrapper (section 3.6).
+To run the agent on a new system (an organiser-supplied one, dispatch, or, by design but not yet tested, a real monitoring stack), only the adapter is needed, and the agent code does not change. An adapter without write access runs the agent in advise mode (section 9). Our test systems have all three parts; a real system usually has only the adapter. The agent and the scripted runbook reach the adapter only through the safety wrapper (section 3.6).
 
 That is the transfer claim. The evaluation tests it by running the frozen agent, unchanged (the same agent hash, section 15), on a second system built to this contract after the freeze, so the frozen hashes show the agent never saw it, with faults and incidents that a different builder wrote and the agent's author never sees before the run. It shows transfer between test systems built the same way; connecting to a real monitoring stack needs only an adapter, which is designed but not yet tested.
 
@@ -26,7 +26,7 @@ Each path has one owner. Nobody edits another owner's files; open an issue or as
 | `ic/` | Claude | The agent (`ic/agent/`), the safety wrapper (`ic/guard.py`), model calls (`ic/llm.py`), contract constants (`ic/contract.py`) and the demo (`ic/demo.py`); and the test tooling: the kit for building test systems (`ic/kit/`) and the system and injector loaders (`ic/systems.py`, `ic/inject.py`). Section 15 hashes them as separate groups |
 | `targets/bank/` (except `faults/heldout/`) | Claude | The banking test system: its spec, releases, adapter, control and checker; its 6 practice fault types, the `noise` and `network_outage` cases and the `benign` background changes |
 | `scenarios/dev/` | Claude | `dev.jsonl`: 30 practice scenarios, dev-01 to dev-20 for building and tuning, dev-21 to dev-30 for the pilot only, written by `make_dev.py` and checked on live copies with the labelled fixes |
-| `replays/` | Claude | Recorded model answers, such as `replays/demo-frozen.jsonl` for the demo without a key (section 12), recorded on the laptop by Codex Session B after `freeze-1` (`codex/demo-replay`) |
+| `replays/` | Claude (Codex (B) adds `replays/demo-frozen.jsonl` only) | Recorded model answers, such as `replays/demo-frozen.jsonl` for the demo without a key (section 12), recorded on the laptop by Codex Session B after `freeze-1` (`codex/demo-replay`) |
 | `configs/models.json`, `configs/prices.json` | Claude | `models.json`: `{"default": "anthropic:claude-opus-5-5", "bulk": null, "swap": "anthropic:claude-haiku-5-5"}` (bulk is picked at the Friday pilot; swap is the `model_swap` condition's model and must differ from bulk). `prices.json`: `{"checked", "source", "rates": {"<provider:model>": {"input_usd_per_million", "output_usd_per_million"}}}`, read by `ic/llm.py`. Codex checks the prices on Friday and asks for changes in its pull request description |
 | `docs/`, `README.md`, `DECISIONS.md` | Claude (Omar approves) | Plan, contract, handoff, `docs/ADDING-A-SYSTEM.md`, decision log |
 | `tests/core/`, `tests/bank/`, `tests/agent/`, `tests/kit/` | Claude | Tests for Claude's code, including `tests/core/test_agnostic.py` and `tests/core/test_isolation.py` |
@@ -35,7 +35,7 @@ Each path has one owner. Nobody edits another owner's files; open an issue or as
 | `scenarios/heldout/` | Codex (A) | `heldout.jsonl` (the 60 exam cases) and `robustness.jsonl` (the robustness cases), both sealed; only `SEALED.json` is committed (section 14) |
 | `baselines/` | Codex (B) | The scripted runbook with no AI, frozen with the agent at `freeze-1`, and `baselines/FROZEN.json` (the runbook file's hash and freeze time). Claude's review of `baselines/` covers interface and contract conformance only |
 | `eval/`, `requirements-eval.txt` | Codex (B) | Evaluation harness, the `noop` and `oracle` arms, metrics, statistics, charts, report (ported from Codex's 29 Oct scaffold). `requirements-eval.txt` holds `matplotlib` |
-| `scripts/preflight.py` | Codex (A) | Windows setup check (section 12) |
+| `scripts/preflight.py`, `tests/preflight/` | Codex (A) | Windows setup check (section 12) |
 | `targets/dispatch/` except `faults/` | Claude, after `freeze-1` | The second system for the transfer test (platform, adapter, control, checker), built with `ic/kit` Fri 21:30 to Sat 02:00, after the freeze, so the frozen hashes show the agent never saw it |
 | `targets/dispatch/faults/`, `scenarios/transfer/` | Codex (A) | The dispatch faults and `dispatch.jsonl` (20 incidents), written Sat 09:00-12:00 from the dispatch adapter and control interfaces only, and sealed; only `scenarios/transfer/SEALED.json` is committed, before the transfer run. Claude never sees them before the run |
 | `tests/eval/`, `tests/baselines/`, `tests/dispatch/` | Codex | Tests for Codex's code |
@@ -232,8 +232,8 @@ Anything else is refused (`refused: true`), logged, and counted as a harmful-act
 2. The limits: at most 8 actions per incident, and the same action on the same target at most twice (`GUARD_MAX_ACTIONS` and `GUARD_MAX_REPEATS` in `ic/contract.py`), otherwise `refused_reason` `rate_limited`.
 3. The mode: `refused_reason` `advise_mode`, or `declined` in confirm mode.
 4. `Guard(..., dry_run=True)` runs in advise mode, for tests and rehearsals: nothing is sent.
-5. The step limit: a step is one adapter call (describe, observe, logs, probe or act). After `max_steps`, reads raise `StepLimit` and actions are refused with `refused_reason` `step_limit`.
-6. One audit line per action decision and per refused step, kept in memory and, when the harness gives `audit_path` (`runs/audit/<run>.jsonl`), in a JSON Lines file. The caller names the path; `ic/guard.py` names none.
+5. The step limit: a step is one adapter call (describe, observe, logs, probe or act). After `max_steps`, reads raise `StepLimit` (`from ic.guard import StepLimit`) and actions are refused with `refused_reason` `step_limit`.
+6. One audit line per action decision and per refused step, kept in memory and, when the harness gives `audit_path`, appended to that JSON Lines file. An action line is the section 9 action record plus `"event": "act"`, so a harmful attempt is a line with `"refused_reason": "not_allowlisted"`; a read refused after `max_steps` is `{"t", "event": "step_limit", "call": <method name>}`. The harness uses `runs/audit/<run>-<case>-<arm>.jsonl`, one file per case and arm. The caller names the path; `ic/guard.py` names none, and creates the file's folder if it is missing.
 7. A redaction pass on logs() records before the model reads them: bearer tokens, API keys, passwords and other secrets, email addresses, IBAN-shaped account numbers and card-length digit runs (13 to 19 digits) are masked.
 
 An adapter for a real system reads credentials only from environment variables (`IC_<SYSTEM>_*`). It uses a read-only credential for describe, observe, logs and probe and a separate one, limited to the allowlisted operations, for act, and it never returns a credential. In act(), `ok: true` means the system accepted and ran the command; only observe() and probe() confirm the effect, and an adapter may add `"pending": true` while a rollout runs.
@@ -265,7 +265,7 @@ Diagnoses are scored as a set of `(target, class)` pairs. `target` is the compon
 | `bad_config` | A setting is harmful | `revert_config` |
 | `lock_held` | A session holds a datastore lock | `release_lock` |
 | `dependency_slow` | A dependency is slow, dropping or timing out | `failover`; escalate if the component has no standby |
-| `poison_message` | A work item the worker cannot process | `quarantine`, then hand the item to people |
+| `poison_message` | A work item the worker cannot process | `quarantine` (then `restart` if the worker crashed), then hand the item to people |
 | `stale_cache` | A cache serves wrong data while its release and settings are unchanged | `restart` |
 | `resource_exhaustion` | CPU, memory, disk, connections or file handles used up | `restart` buys time, then escalate |
 | `external_outage` | Any fault on an `external` component, whether it is down, slow or dropping connections | Escalate |
@@ -312,7 +312,7 @@ p.stop()                   # stop everything; safe to call twice
 ```
 
 - Several copies can run at once on different `port_base` values. Each copy uses its own data folder, `runs/<system>-<port_base>/`, and its 10 ports must be free. Port bases: eval copies 8100, 8200, 8300; Codex's development copies 8400 to 8600; live bank tests 8700; `run.py up` and `demo` default to 8900; a second system's eval copies 9100, 9200, 9300.
-- `start()` deletes and recreates the data folder. The harness copies what it keeps (`actions.jsonl`, `changes.jsonl`, `customers.jsonl`, `logs/`) to `results/<run>/cases/<case-id>/` after `checker.verify()` and before `stop()`.
+- `start()` deletes and recreates the data folder. The harness copies what it keeps (`actions.jsonl`, `changes.jsonl`, `customers.jsonl`, `logs/`) to `results/<run>/cases/<case-id>/<arm>/` (every arm runs on its own fresh copy), together with the guard's audit file and the arm's result as `result.json`, after `checker.verify()` and before `stop()`.
 - `start()` raises `ValueError` for a condition the system does not implement, so a robustness run never runs the default system under another name. The bank implements `default`, `four_faults`, `log_format_v2` and `model_swap` tonight, and `extra_service` once the notifications component exists (Friday). `four_faults` and `model_swap` change the scenario and the model, not the system.
 
 Generic loaders in `ic/` so that harness code never names a system's modules:
@@ -323,7 +323,7 @@ p = systems.platform("bank", port_base=8200, seed=7, condition="default")   # ->
 checker = systems.checker("bank")                                           # -> module with verify()
 ```
 
-`eval/` uses Control only through `inject.apply()` and `checker.verify()`; a system without them runs with `run.py agent`, not `run.py eval`.
+`eval/` uses Control only through `inject.apply()` and `checker.verify()`; a system without them runs with `run.py agent`, not `run.py eval`. It passes `allow_sealed=True` to `inject.apply()` on `--split heldout` and `--split transfer` (never on `--split dev`), and gives each copy the case's condition, from which the platform sets `IC_LOG_FORMAT`.
 
 ### 6.1 Building a test system with `ic/kit`
 
@@ -361,7 +361,7 @@ def inject(control, params: dict, rng) -> dict:
 
 Faults may only use the Control channels in section 5: deploys, setting changes, process kills and stops, link delays and drops, direct datastore writes, helper processes and admin hooks. A fault never edits the agent, the checker or the customer log. A healthy distractor or a background change returns `target` and `class` as null.
 
-`inject.apply()` gives all the faults of one case one `random.Random(seed)`, in `at_s` order. Sealed cases pass explicit params (target and variant only, section 14), so the seed only picks the actor.
+`inject.apply()` gives all the faults of one case one `random.Random(seed)`, in `at_s` order. Sealed cases pass explicit params: a sealed plugin takes only `target` and `variant` (section 14), and a practice plugin takes the params in section 7.2. So the seed only picks the actor.
 
 ```python
 from ic import inject
@@ -395,11 +395,11 @@ Every `params` key is optional. Plugins that make a change (a deploy, a setting,
 
 | Type | `params` and defaults | Effect | Label (target, class) |
 |---|---|---|---|
-| `crash` | `target`: `payments`, `gateway`, `clearing` or `screening` (default: a random one of `payments` and `gateway`) | `Control.kill`; no change is recorded | (target, `process_down`) |
+| `crash` | `target`: `payments`, `gateway`, `clearing`, `screening`, or `notifications` under `extra_service` (default: a random one of `payments` and `gateway`) | `Control.kill`; no change is recorded | (target, `process_down`) |
 | `bad_update` | `target` (default `payments`), `release` (default 1.4) | Payments 1.4's fee preview fails on payments over 300.00 SAR, so about four in ten payments fail with HTTP 500 | (`payments`, `bad_release`) |
 | `bad_setting` | `variant`: `transfer_limit` (payments `max_transfer_minor` 5000), `screening_timeout` (payments `screening_timeout_s` 0.002) or `clearing_batch` (clearing `batch_size` 0), default a random one; or an explicit `target`, `key` and `value` | A versioned setting change | (target, `bad_config`) |
 | `locked_ledger` | `hold_s` (default 600) | Spawns `reconciliation --hold-lock`, which holds the ledger's write lock and registers in `ledger_locks.json` | (`ledger`, `lock_held`) |
-| `stopped_worker` | `target` (default `clearing`) | `Control.stop`, logged as a stop change | (`clearing`, `process_down`) |
+| `stopped_worker` | `target` (default `clearing`; `notifications` under `extra_service`) | `Control.stop`, logged as a stop change | (target, `process_down`) |
 | `slow_screening` | `latency_ms` (default 1500), `jitter_ms` (default 300) | Slows the `payments->screening` link | (`screening`, `dependency_slow`) |
 | `noise` | `variant`: `deploy` (gateway 2.0.1), `cpu` (a busy reconciliation run of `cpu_s`, default 120) or `both` (default) | Healthy distractor | none: target and class null |
 | `network_outage` | `drop_pct` (default 1.0) | The `clearing->network` link drops connections | (`network`, `external_outage`): must escalate |
@@ -420,7 +420,7 @@ These are facts about the bank, so the sealed faults can be written against it. 
 | Releases | A release module is a file that defines `class Release`, usually subclassing the current one (`from targets.bank.releases.payments.v1_3 import Release as Base`) and overriding methods from the Release API row. Sealed release files live in `targets/<system>/faults/heldout/` and are deployed with `control.deploy(component, "<new version>", module_path=<path>)`, which copies the file into the copy's data folder (section 5). `rollback` returns to the previous release. |
 | Release API (frozen at contract v1; any rename needs a version bump) | payments 1.3: `validate(body)`, `find_existing(conn, e2e)`, `screen(body, amount)`, `pay(request)`, `balance(request)`, `payment(request)`. gateway 2.0: `forward(method, path, payload=None)`, `pay(request)`, `balance(request)` (cached per account for `balance_cache_ttl_s`), `payment(request)`. clearing 3.2: `parse(item)`, `clear_one(item)`, `background()`. screening 4.1: `score(request)`. network 1.0: `clear(request)`. |
 | Settings | Section 7.1. Which screening service payments calls is not a setting: it is routing state that only `failover` changes (section 3.5). |
-| Work queue | Table `clearing_queue`; status is `pending`, `cleared` or `quarantined`. The clearing worker takes up to `batch_size` of the oldest pending items, in id order, and parses `payload_json`; an item it cannot parse crashes the worker process, by design. An item it cannot send stays pending, and its `attempts` count goes up. |
+| Work queue | Table `clearing_queue`; status is `pending`, `cleared` or `quarantined`. The clearing worker takes up to `batch_size` of the oldest pending items, in id order, and parses `payload_json`; an item it cannot parse crashes the worker process, by design. Only an item that `parse()` cannot read stops the worker: invalid JSON, a missing key, a currency other than SAR, or an `amount_minor` that `int()` cannot read; any other item is sent to the network. A crashed worker stays down until someone restarts it: the supervisor never restarts a process by itself. An item it cannot send stays pending, and its `attempts` count goes up. |
 | Idempotency | `end_to_end_id` in `payments` is indexed but not unique. Release 1.3 enforces idempotency in code: `find_existing(conn, e2e)` runs before screening and again inside the write transaction, so a release whose `find_existing` returns None posts a retried payment twice. |
 | Customer retries (`targets/bank/customers.py`) | Up to 3 attempts of 3 s each. A retry follows only a timeout, a refused connection or a 5xx, never a 4xx, after pauses of 0.3 s and 0.6 s, and no new attempt starts once 8 s have passed, so one payment takes at most about 10 s. Every attempt reuses the `end_to_end_id`. The gateway answers 504 after `payments_timeout_s`. |
 | Balance cache | The gateway caches balance reads for `balance_cache_ttl_s` (default 0.5 s). |
@@ -446,22 +446,23 @@ JSON Lines, one case per line, in the same shape as Codex's scaffold runner (`in
             "notes": "confusable: rejects vs backlog"}}
 ```
 
-- Each root cause carries its `fix` (`action`, `target`, `params`), and the root causes are listed in the order to apply the fixes. A runtime value, such as a queue item id, comes from the manifest.
+- Each root cause carries its `fix` (`action`, `target`, `params`, and an optional `then`: further actions of the same shape, applied right after it, default `[]`), and the root causes are listed in the order to apply the fixes. A runtime value, such as a queue item id, is written as `null` in the label (`"params": {"item": null}`). The fault plugin records it in its manifest entry's `detail` under the same name (`"detail": {"item": <clearing_queue id>}`), and the oracle fills each `null` param from the `detail` of the manifest entry with the same (target, class).
 - A must-escalate root cause has the fix `{"action": "escalate", "target": <its target>, "params": {}}`. `escalate` is not an act() action: the `oracle` arm skips it and ends `escalated`, naming that target. `must_escalate` is true exactly when a root cause's fix is `escalate`.
 - `blind` is true for a case that contains the blind fault type (section 14).
 - A case also lists its 1 to 3 background changes (section 7.2) among its faults; the example leaves them out.
-- `input.condition` is one of `default`, `four_faults`, `log_format_v2`, `extra_service`, `model_swap`. `--condition C` overrides `input.condition` for every case.
+- `input.condition` is one of `default`, `four_faults`, `log_format_v2`, `extra_service`, `model_swap`. `--condition C` overrides `input.condition` for every case. On `--split heldout`, a condition other than `default` runs only the robust20 ids, in `robust20` order: `log_format_v2` and `model_swap` take those cases from `heldout.jsonl`; `four_faults` and `extra_service` take the `robustness.jsonl` lines whose `input.condition` is that condition. On `--split dev` a condition applies to the cases given.
 
 **Robustness.** Codex writes it; `robustness.jsonl` is sealed at seal 1 (section 14).
 
-- robust20: 20 case ids drawn from the 60 with `random.Random(2026).sample`, with at least 2 healthy and 2 must-escalate cases, pre-registered in `SEALED.json`.
-- `four_faults`: `robustness.jsonl` also holds 20 four-fault cases, each one of the 20 with practice faults added on other components until it has four faults. `--condition four_faults` runs them. They are validated by `noop` and `oracle`, like the exam.
+- robust20: 20 case ids drawn from core40 with `random.Random(2026).sample(core40, 20)`, with at least 2 healthy and 2 must-escalate cases (if a draw has fewer, draw again from the same generator), pre-registered in `SEALED.json`. A cut to core40 therefore keeps every robustness pair.
+- `robustness.jsonl` has 40 lines, two per robust20 case: its four-fault case (id `<robust20 id>-ff`, `input.condition` `four_faults`) and its extra_service variant (id `<robust20 id>-xs`, `input.condition` `extra_service`). Every line has `"source_id"`, the robust20 id it was built from.
+- `four_faults`: `robustness.jsonl` also holds 20 four-fault cases, each one of the 20 keeping its faults and gaining fixable practice faults (never `network_outage`) on components its faults do not touch until it has four root causes: a healthy case gains four and becomes fixable; a must-escalate case gains three and stays must-escalate. `--condition four_faults` runs them. They are validated by `noop` and `oracle`, like the exam.
 - `log_format_v2`: robust20 with `IC_LOG_FORMAT=v2`. No practice scenario uses v2.
-- `extra_service`: robust20 with one component that no practice scenario uses, `notifications` (kind `worker`, depends_on `ledger`, impact_weight 0.1; actions `restart`, `rollback`, `revert_config`, `quarantine`; settings `batch_size` and `poll_interval_s`; port offset 8), which sends payment receipts from its own queue. Claude adds it before `freeze-1` and records its kind, impact_weight and actions in `DECISIONS.md`. `robustness.jsonl` also holds 20 extra_service variants: each moves one fault of a robust20 case onto `notifications`, where the fault type applies (`crash`, `bad_setting` or `stopped_worker`).
+- `extra_service`: robust20 with one component that no practice scenario uses, `notifications` (kind `worker`, depends_on `ledger`, impact_weight 0.1; actions `restart`, `rollback`, `revert_config`, `quarantine`; settings `batch_size` and `poll_interval_s`; port offset 8), which sends payment receipts from its own queue. Claude adds it before `freeze-1` and records its kind, impact_weight and actions in `DECISIONS.md`. `robustness.jsonl` also holds 20 extra_service variants: each moves one fault of a robust20 case onto `notifications`, where the fault type applies (`crash`, `bad_setting` or `stopped_worker`); a robust20 case with no such fault keeps its faults, and only the extra component is added. The variants are validated by `noop` and `oracle`, like the exam.
 - `model_swap`: robust20 with the frozen agent on a model it was not tuned on: the `swap` model in `configs/models.json` (default `anthropic:claude-haiku-5-5`; if the bulk model is Haiku, `anthropic:claude-sonnet-5-5`). AI arms only. LM Studio is an extra condition only if Friday's smoke test passes: it runs last, alone, on 1 copy, and LM Studio is quit before the final run.
 - `transfer`: not a condition of the bank. Transfer runs use system `dispatch` with condition `default`, on the 20 cases in `scenarios/transfer/dispatch.jsonl`, which Codex hashes in `scenarios/transfer/SEALED.json` before the run: the frozen agent, the `abcde` arm, 1 copy on port base 9100, Sat 12:00-13:00. The first 10 incidents are never cut.
 
-Arms: `abcde` and `runbook`; the runbook does not run under `model_swap`. Each arm's drop is its success under the condition minus its success on the same 20 cases in the main run, shown as paired counts. All of it is descriptive (n = 20, about ±20 points).
+Arms: `abcde` and `runbook`, plus `noop` and `oracle` under `four_faults` and `extra_service`; the runbook does not run under `model_swap`. Each arm's drop is its success under the condition minus its success on the same 20 cases in the main run, paired by `source_id` (or the case id) and shown as paired counts; `python run.py eval --report RUN --against final-1` makes the pairs. All of it is descriptive (n = 20, about ±20 points).
 
 ## 9. Agent and baseline API
 
@@ -490,7 +491,7 @@ It returns:
  "escalation": null,
  "sbar": {"situation": "", "background": "", "assessment": "", "recommendation": ""},
  "t_start": 1793278805.0, "t_first_action": 1793278812.4, "t_declared": 1793278850.1,
- "trace": [{"t": 0.0, "phase": "survey | triage | remediate | verify | hand_over", "kind": "tool | model | note", "name": "", "summary": ""}],
+ "trace": [{"t": 0.0, "phase": "survey | triage | remediate | verify | hand_over", "kind": "tool | model | action | survey | note", "name": "", "summary": ""}],
  "calls": []}
 ```
 
@@ -524,7 +525,7 @@ Arms:
 | `react` | Free-form, same tools, no fixed survey | `ic/agent/react.py` |
 | `runbook` | Scripted, no AI | `baselines/runbook.py` (Codex) |
 | `noop` | Harness only: does nothing, returns `no_incident` | `eval/` (Codex) |
-| `oracle` | Harness only: applies the labelled fixes in order through the adapter, waits `est_seconds` after each, returns `recovered` | `eval/` (Codex) |
+| `oracle` | Harness only: applies the labelled fixes in order through the adapter, each followed by its `then` actions, with `null` params filled from the manifest (section 8); waits `est_seconds` after each, returns `recovered` | `eval/` (Codex) |
 
 `from ic.agent import load_arm; run_incident = load_arm(name)` returns the run_incident of `abcde`, `naive_verify`, `fifo` or `react` (a `KeyError` for any other name). The harness maps `runbook` to `baselines.runbook.run_incident` and implements `noop` and `oracle` itself. Every AI arm exists from Thursday night, for the Friday pilot.
 
@@ -532,7 +533,7 @@ Each ablation differs from `abcde` in exactly one part. `react` drops the fixed 
 
 **Isolation.** An arm receives only the guarded adapter, `budget_s`, `max_steps`, `model`, `seed`, `mode`, `confirm` and a write-only log callable. The harness passes its own `Guard` as the adapter, and the arm uses it as it is (section 3.6). It never gets the case id, the scenario, the manifest, the control object or the data folder. `tests/core/test_isolation.py` fails if any file under `ic/agent/`, or `ic/guard.py` or `ic/llm.py`, imports `targets`, `eval`, `baselines`, `ic.inject`, `ic.systems`, `ic.kit.client`, `ic.kit.supervisor`, `ic.kit.store`, `psutil`, `sqlite3`, `subprocess` or `socket`. It also fails if any string literal there contains `control.token`, `customers.jsonl`, `ledger.db`, `changes.jsonl`, `releases.json`, `heldout`, `runs/`, `X-Control-Token`, `X-Admin-Token`, `/control/` or `IC_ADMIN_TOKEN`. The only file reads allowed are the replay reader and the model settings in `configs/`, both in `ic/llm.py`. It also fails if a file under `baselines/` imports `ic.agent`. `tests/core/test_agnostic.py` fails if the agent's files name a bank or dispatch component, and checks that the fake system passes the conformance check. `tests/baselines/test_isolation.py` (Codex) applies the same rules to `baselines/`.
 
-**Models.** Models are named `provider:model`, for example `anthropic:claude-opus-5-5`, `openai:<model>`, `lmstudio:<model>`, `replay:<file>` (a recorded run, no key needed) or `mock:<name>` (tests). An arm uses `model` if given, else `IC_MODEL`, else `anthropic:claude-opus-5-5` (the `default` in `configs/models.json`). Evaluation picks the model as `--model`, else `IC_MODEL`, else the `bulk` model in `configs/models.json`, and `eval/` refuses to start when all three are empty. Claude 5.5 models take no sampling parameters, so none are set. The one model call others may make (preflight's `--live` check) uses `ic.llm.complete(messages, *, system=None, model=None, max_tokens=16000, schema=None, effort=None, timeout=60.0, purpose="", retries=2)`, where `messages` is `[{"role": "user" | "assistant", "content": str}]`; it returns `{"text", "json", "call"}` and raises `ic.llm.ModelError` on failure.
+**Models.** Models are named `provider:model`, for example `anthropic:claude-opus-5-5`, `openai:<model>`, `lmstudio:<model>`, `replay:<file>` (a recorded run, no key needed) or `mock:<name>` (tests). An arm uses `model` if given, else `IC_MODEL`, else `anthropic:claude-opus-5-5` (the `default` in `configs/models.json`). Evaluation picks the model as `--model`, else `IC_MODEL`, else the `bulk` model in `configs/models.json`; under `--condition model_swap` the AI arms get the `swap` model instead, whatever `--model` and `IC_MODEL` say (section 8). `eval/` refuses to start only when an AI arm is asked for and no model is set; `noop`, `oracle` and `runbook` need none. Claude 5.5 models take no sampling parameters, so none are set. The one model call others may make (preflight's `--live` check) uses `ic.llm.complete(messages, *, system=None, model=None, max_tokens=16000, schema=None, effort=None, timeout=60.0, purpose="", retries=2)`, where `messages` is `[{"role": "user" | "assistant", "content": str}]`; it returns `{"text", "json", "call"}` and raises `ic.llm.ModelError` on failure. A reply cut off at `max_tokens` also raises `ModelError`, so the live check uses `max_tokens=1000` and asks for a one-word answer.
 
 ## 10. Checker: has it really recovered?
 
@@ -598,7 +599,7 @@ Per case we also report:
 - wasted actions: successful actions on components that are neither a labelled root cause nor an acceptable secondary;
 - model calls, tokens and cost.
 
-**Validity.** This rule is pre-registered and mechanical, and is applied without looking at any AI arm. A fault case is excluded if `noop` is green at the horizon, or if `oracle` is red on two runs. A healthy case is excluded if `noop` is red. A must-escalate case is excluded if `noop` is green. A case is also invalid if an inject() call raised, or if the manifest's (target, class) pairs differ from the labels. Scoring uses the sealed labels. The report lists every exclusion with its reason, and every N is 60 minus exclusions.
+**Validity.** This rule is pre-registered and mechanical, and is applied without looking at any AI arm. A fault case is excluded if `noop` is green at the horizon, or if `oracle` is red on two runs: the harness re-runs `oracle` once, at the end of the same run, on every fault case where it was red, and keeps both results. A healthy case is excluded if `noop` is red. A must-escalate case is excluded if `noop` is green. A case is also invalid if an inject() call raised, or if the manifest's (target, class) pairs differ from the labels. Scoring uses the sealed labels. The report lists every exclusion with its reason, and every N is 60 minus exclusions.
 
 Per arm: every rate as n/N with a 95% Wilson interval, overall and by stratum. Arms are compared only in pairs on identical seeds, by the analysis plan in section 16.
 
@@ -616,12 +617,13 @@ python run.py demo [--model provider:model | replay:<file>] [--mode auto|confirm
 python run.py down
 python run.py hash [--json]
 python run.py preflight [--live]
-python run.py eval --split dev|heldout --arms abcde,runbook[,react,naive_verify,fifo,noop,oracle] --name RUN
-                   [--ids a,b | --limit N] [--copies 3] [--condition C] [--model provider:model] [--final]
-python run.py eval --report RUN
+python run.py eval --split dev|heldout|transfer --arms abcde,runbook[,react,naive_verify,fifo,noop,oracle] --name RUN
+                   [--ids a,b | --limit N] [--copies 3] [--port-bases 8100,8200,8300] [--condition C]
+                   [--model provider:model] [--final]
+python run.py eval --report RUN [--against RUN]
 ```
 
-- `up` starts a copy in the background and writes `runs/current.json` (system and port base). Every command takes `--system` (default bank) and `--port-base` (default 8900), and otherwise uses the last `up`, so `python run.py demo --system dispatch` and `python run.py down --port-base 8200` work.
+- `up` starts a copy in the background and writes `runs/current.json` (system and port base). Every command except `eval` takes `--system` (default bank) and `--port-base` (default 8900), and otherwise uses the last `up`, so `python run.py demo --system dispatch` and `python run.py down --port-base 8200` work.
 - `status` prints a health table: every component as the agent sees it, and one probe.
 - `inject` loads practice faults. `--sealed` loads `faults/heldout/` and is for Codex's dry-runs and the final run only, never for an agent run before `freeze-1`.
 - `act` takes one allowlisted action through the adapter, as an operator would (the go/no-go checks and C5), for example `python run.py act failover screening to=standby`.
@@ -629,7 +631,8 @@ python run.py eval --report RUN
 - `demo` runs a 2-fault demo: a timeline labelled inject, survey, triage, remediate, verify, hand over; the SBAR; then the checker's verdict beside the agent's own. It runs live when a model key is set. With no key and no `--model` it replays `replays/demo-frozen.jsonl`, and first prints "REPLAY of a recorded run (no API key found)". With no key and no replay file, or for `run.py agent`, it stops with a one-line message naming the missing variable. A run is recorded by setting the `IC_RECORD` environment variable to a file: `ic/llm.py` appends every call to it.
 - `hash` prints the five freeze hashes (section 15); `--json` also prints the hash of each `SEALED.json`.
 - `preflight` hands over to `scripts/preflight.py` (Codex), which uses only the standard library and exposes `main(argv) -> int`. FAIL: Python below 3.11; a package from `requirements*.txt` missing; no API key for the provider of the model eval would use; a port of the eval copies (8100-8109, 8200-8209, 8300-8309) in use; less than 2 GB free. WARN: `IC_MODEL` unset (eval then falls back to the `bulk` model and refuses if that is null); LM Studio not answering. `--live` makes one tiny call with `ic.llm.complete` (section 9). `run.py` imports nothing outside the standard library before it hands over to preflight.
-- `eval` hands over to `eval/cli.py main(argv)` (Codex). A rerun with the same `--name` skips finished cases. `--final` checks the seals first (section 14). `--report RUN` writes the tables and charts.
+- `eval` hands over to `eval/cli.py main(argv)` (Codex). Copy k of `--copies N` uses the k-th of `--port-bases` (default 8100,8200,8300; 9100,9200,9300 for `--split transfer`); development runs pass 8400,8500,8600. A rerun with the same `--name` skips finished cases, and `eval` exits 0 only when every (case, arm) pair has a result. `--final` checks the seals first (section 14). `--report RUN` writes the tables and charts; `--against MAIN` pairs a robustness run with the main run (section 8).
+- `--split transfer` runs `scenarios/transfer/dispatch.jsonl`, each case on its `input.system`. With `--final` it checks `scenarios/transfer/SEALED.json`, and that the agent hash equals the agent hash at `freeze-1` (from `python run.py hash --json` run in a `git worktree add --detach` of the tag) instead of requiring HEAD to be the tag, because the dispatch pull request lands after the freeze.
 
 Python 3.11 or later. `requirements.txt` holds `psutil==7.2.2`, `rich==15.0.0` (the demo timeline) and `pytest==9.1.1`; `requirements-eval.txt` (Codex) holds `matplotlib`; everything else is the standard library. Tests run with `python -m pytest -q` from the repository root; every `tests/` subfolder has an `__init__.py`, and there is no shared `conftest.py`.
 
@@ -641,7 +644,7 @@ Start and stop about 8 s; warm-up 10 s; fault offsets up to 8 s; alert delay 5 s
 
 ## 14. Sealing the exam
 
-1. Codex writes the sealed files only in `%USERPROFILE%\Documents\HUMAIN-sealed\` and copies them into the repository paths (`scenarios/heldout/`, `targets/bank/faults/heldout/`) only for C5 and the final run. `.gitignore` (in place) is the second guard:
+1. Codex writes the sealed files only in `%USERPROFILE%\Documents\HUMAIN-sealed\` and copies them into the repository paths (`scenarios/heldout/`, `targets/bank/faults/heldout/`) only for C1's live check (the plugins only, deleted afterwards), C5 and the final run. `.gitignore` (in place) is the second guard:
 
    ```
    # sealed exam: never commit before the final run (CONTRACT.md section 14)
@@ -676,11 +679,11 @@ Start and stop about 8 s; warm-up 10 s; fault offsets up to 8 s; alert delay 5 s
    scenarios/transfer/** -text
    ```
 
-   The blind fault plugin has a neutral file name (for example `blind_1.py`), so no committed file names it.
+   Every sealed file except the three named types' plugins has a neutral name (for example `blind_1.py`, `sealed_2.py`), and case ids are neutral (`h-01` to `h-60`), because `SEALED.json` commits the file paths and the core40 and robust20 ids before `freeze-1`.
 3. Codex pushes `codex/sealed-exam` and opens its pull request as soon as `SEALED.json` exists (Omar pre-approves that push). The evidence is the time GitHub received the push, shown on the pull request, not the commit date, which the author's machine sets. `DECISIONS.md` records the push time. The claim is that the exam was sealed before any tuning run on Friday and before the pilot, while the agent's first version was written in parallel by a builder who never saw it.
-4. **Two seals.** Seal 1 (by 03:00 Fri) covers `heldout.jsonl` and `robustness.jsonl`; these never change. Sealed faults take only `{"target": ..., "variant": "v1" | "v2" | ...}` params, and a plugin fix must keep accepting every params value in `heldout.jsonl` as written. Seal 2 (by Fri 14:00, the end of C5) covers the plugin code, after a manual-fix dry run on merged `main`. Each seal is a new entry in `SEALED.json` with its time and reason; the scenario hashes are the same in every entry. Session A, which writes the sealed files, runs no agent arm (demo, agent or pilot) before seal 2 is on GitHub. Session B, which never sees the sealed files, runs the pilot and the morning key check. After seal 2 no sealed file changes; a case that fails the oracle check is handled by the exclusion rule in section 11.
+4. **Two seals.** Seal 1 (by 03:00 Fri, or 05:00 at the latest if the live check in C1 needs it) covers `heldout.jsonl` and `robustness.jsonl`; these never change. Sealed faults take only `{"target": ..., "variant": "v1" | "v2" | ...}` params, and a plugin fix must keep accepting every params value in `heldout.jsonl` as written. Seal 2 (by Fri 14:00, the end of C5) covers the plugin code, after a manual-fix dry run on merged `main`. Each seal is a new entry in `SEALED.json` with its time and reason; the scenario hashes are the same in every entry, and seal 2's entry lists every sealed file: the scenario files and every plugin file. Session A, which writes the sealed files, runs no agent arm (demo, agent or pilot) before seal 2 is on GitHub. Session B, which never sees the sealed files, runs the pilot and the morning key check. After seal 2 no sealed file changes; a case that fails the oracle check is handled by the exclusion rule in section 11.
 5. Nobody shows the sealed files to Claude before the freeze tag.
-6. The final run refuses to start if any listed file's hash differs, or if `scenarios/heldout/` or `targets/bank/faults/heldout/` holds a file that is not listed (ignoring `__pycache__`). The same function seals and verifies.
+6. The final run refuses to start if a file's hash differs from the newest entry in `seals`, or if `scenarios/heldout/` or `targets/bank/faults/heldout/` holds a file that the newest entry does not list (ignoring `SEALED.json` itself, `.gitkeep` and `__pycache__`). The newest entry lists every sealed file. The same function seals and verifies.
 7. After the final run, Codex commits the sealed files at their original paths with `git add -f`, in a pull request from `codex/reveal`, beside the final run's per-case evidence, so anyone can check them against `SEALED.json`.
 8. The dispatch transfer exam is sealed the same way: its fault plugins and its 20 incidents are hashed in `scenarios/transfer/SEALED.json`, which is pushed on its own before the transfer run.
 
