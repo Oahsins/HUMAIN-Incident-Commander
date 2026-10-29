@@ -4,7 +4,7 @@ Dated log of design decisions. Times are Riyadh (UTC+3). Codex records its hashe
 
 | Date | Decision | Why / consequence |
 |---|---|---|
-| 2026-10-29 | Challenge 1, idea C1-H1: the ABCDE incident commander | Highest-scoring idea after the full-marks hunt and Codex's independent run; Omar's own method (primary survey, triage, SBAR) is the design. |
+| 2026-10-29 | Challenge 1, idea C1-H1: the ABCDE incident commander | Our strongest idea after comparing the options, and Codex's independent comparison agreed; the design borrows the emergency-medicine method Omar brought to it (primary survey, triage, SBAR). |
 | 2026-10-29 | Banking is the main test system and carries the sealed exam; a second system is the transfer test; the lead story is chosen at Fri 14:00 | Banking gives an exact recovery check (the ledger must balance, every payment posts once). The transfer test shows the same frozen agent works on a system it was never tuned on. |
 | 2026-10-29 | The agent is system-agnostic: a 5-function adapter is all it needs; a test system adds a control layer and a checker | Omar's requirement: it must plug into any system, including one the organisers supply. |
 | 2026-10-29 | The agent's author never writes the exam | Claude builds the agent and the practice faults; Codex writes the held-out and blind faults, the sealed exam and the scripted runbook baseline. Removes the "tested on its own faults" objection. |
@@ -17,8 +17,11 @@ Dated log of design decisions. Times are Riyadh (UTC+3). Codex records its hashe
 | 2026-10-29 | Contract version 1.1: the bank profile and the review fixes | After 1.1, sections 3, 5, 7, 8 and 9 change only by adding optional fields with defaults until `freeze-1`. `CONTRACT_VERSION` in `ic/contract.py` stays 1 until something is published. |
 | 2026-10-29 | Deck-review trims adopted | No ECC-style record; English-only SBAR; "weighted shortest-job-first", not START; Smith's rule dropped as evidence; the first-come-first-served ablation is kept because it was cheap to build; deck cut to 10 slides. |
 | 2026-10-29 | 30 practice scenarios, written by `scenarios/dev/make_dev.py`: dev-01 to dev-20 for tuning, dev-21 to dev-30 for the pilot only | The agent and the runbook tune on the same 20 cases, and the pilot uses 10 that neither was tuned on. Each case has 1 to 3 harmless background changes from its own seed. Every case was run on a live copy with its labelled fixes before the push. |
+| 2026-10-29 | Contract 1.1 completed before Codex started: fixes may carry `then` actions, and runtime values come from the manifest | A poison item is quarantined and then the crashed worker restarted, both in the label. A runtime value such as a queue item id is `null` in the label and filled from the fault's manifest `detail`, so the sealed labels and the oracle agree without either side seeing the other (CONTRACT section 8). |
+| 2026-10-29 | Robustness cases come from core40 and name their source | `robust20` is drawn from `core40`, so a cut to core40 keeps every pair. Each `robustness.jsonl` line has the id of its robust20 case plus `-ff` or `-xs` and a `source_id`, and the new four-fault and extra-service cases are checked by `noop` and `oracle` like the exam (220 robustness runs instead of 140). |
+| 2026-10-29 | Codex commits under its own name | Each Codex session sets a repository-local git identity, "Codex (Session A)" or "Codex (Session B)", with Omar's GitHub no-reply address, and ends every commit message with "Made by Codex (Session A)" or "(Session B)". The history shows who made what, and no private address is published. |
 | 2026-10-29 | Standard-library services plus psutil, no Docker, no web framework | Fewer moving parts on Windows; each service is a small Python web server Omar can read. |
-| 2026-10-29 | Work started on 29 Oct, before the event | The organisers said in a pre-event session that an existing project can be a starting point. Disclosed here and in the README. |
+| 2026-10-29 | Work started on 29 Oct, before the event | Disclosed here and in the README; the commit history shows the dates. The basis is in Omar's private notes. |
 
 ## Freeze record
 

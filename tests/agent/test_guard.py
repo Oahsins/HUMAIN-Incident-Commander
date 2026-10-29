@@ -71,7 +71,7 @@ def test_logs_are_redacted():
 
 
 def test_audit_file(tmp_path):
-    path = tmp_path / "audit.jsonl"
+    path = tmp_path / "runs" / "audit" / "run-case-arm.jsonl"   # the folder does not exist yet
     guard = Guard(FakeSystem(), audit_path=str(path))
     guard.act("restart", "web")
     guard.act("restart", "partner")

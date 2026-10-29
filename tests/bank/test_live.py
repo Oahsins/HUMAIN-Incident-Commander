@@ -1,4 +1,4 @@
-"""One real copy of the bank, end to end (about a minute; runs when IC_SLOW=1, as CI does).
+"""One live copy of the test bank, end to end (about a minute; runs when IC_SLOW=1, as CI does).
 
 A bad payments setting and slow screening at once. Failing screening over and
 then undoing the setting must restore the limit and keep the standby serving:
@@ -13,7 +13,7 @@ import pytest
 from ic import contract, inject, systems
 from ic.kit.conformance import check_adapter
 
-pytestmark = pytest.mark.skipif(os.environ.get("IC_SLOW") != "1", reason="starts a real bank; set IC_SLOW=1")
+pytestmark = pytest.mark.skipif(os.environ.get("IC_SLOW") != "1", reason="starts a live copy of the test bank; set IC_SLOW=1")
 
 
 @pytest.fixture()

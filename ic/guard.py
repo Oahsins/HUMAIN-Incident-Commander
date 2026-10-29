@@ -22,6 +22,7 @@ Nothing here knows which system it is guarding.
 """
 
 import json
+import os
 import re
 import time
 
@@ -163,5 +164,6 @@ class Guard:
         entry = {"t": self.clock(), **entry} if "t" not in entry else entry
         self.audit.append(entry)
         if self.audit_path:
+            os.makedirs(os.path.dirname(os.path.abspath(self.audit_path)), exist_ok=True)   # e.g. runs/audit/
             with open(self.audit_path, "a", encoding="utf-8") as handle:
                 handle.write(json.dumps(entry, default=str) + "\n")

@@ -322,7 +322,7 @@ def main(argv=None):
 
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--system", help="the test system (default: the last `up`, else bank)")
-    common.add_argument("--port-base", type=int, help="first of the copy's 10 ports (default: the last `up`, else 8100)")
+    common.add_argument("--port-base", type=int, help="first of the copy's 10 ports (default: the last `up`, else 8900)")
     parser = argparse.ArgumentParser(prog="run.py", description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
 

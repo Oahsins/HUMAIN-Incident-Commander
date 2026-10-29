@@ -195,6 +195,7 @@ def _record(model_name, purpose, system, messages, text, call):
     if not path:
         return
     with _LOCK:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)   # e.g. replays/ in a fresh clone
         with open(path, "a", encoding="utf-8") as handle:
             handle.write(json.dumps({"t": time.time(), "model": model_name, "purpose": purpose, "text": text,
                                      "call": call, "system_chars": len(system or ""),

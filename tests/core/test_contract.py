@@ -55,3 +55,12 @@ def test_empty_result_has_the_documented_fields():
     for key in ("arm", "mode", "outcome", "actions", "proposed_actions", "trace", "calls", "escalation"):
         assert key in result, key
     assert result["mode"] == "confirm"
+
+
+def test_recording_creates_its_folder(tmp_path, monkeypatch):
+    from ic import llm
+    llm.register_mock("ok", lambda system, messages, schema, purpose: "OK")
+    path = tmp_path / "replays" / "demo.jsonl"   # a fresh clone has no replays/ folder
+    monkeypatch.setenv("IC_RECORD", str(path))
+    assert llm.complete([{"role": "user", "content": "Reply with the single word OK."}], model="mock:ok")["text"] == "OK"
+    assert path.exists() and len(path.read_text(encoding="utf-8").splitlines()) == 1
