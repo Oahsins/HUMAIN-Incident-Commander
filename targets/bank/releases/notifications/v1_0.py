@@ -4,10 +4,11 @@ Only the extra_service condition runs it. A trigger in the ledger queues one
 receipt per posted payment in the same transaction as the postings (table
 receipt_queue). The worker takes up to batch_size of the oldest pending
 receipts, hands them to the customers' inbox (receipts.jsonl in the copy's
-data folder) and marks them sent. It re-reads its settings while it waits
-between polls, so a corrected value applies at once. A value it cannot use
-(batch_size below 1, poll_interval_s not above 0, or not a number) leaves the
-queue alone and is logged as an error until someone changes it.
+data folder) and marks them sent; no receipt can stop it. It re-reads its
+settings while it waits between polls, so a corrected value applies at once.
+A value it cannot use (batch_size below 1 or above 10,000, poll_interval_s not
+above 0, or not a number) leaves the queue alone and is logged as an error
+until someone changes it.
 """
 
 import json
@@ -18,6 +19,8 @@ import time
 from ic.kit.service import ServiceBase
 from ic.kit.stats import Window
 from targets.bank import ledger
+
+MAX_BATCH = 10_000
 
 
 class Release(ServiceBase):
@@ -32,9 +35,9 @@ class Release(ServiceBase):
         try:
             batch = int(self.setting("batch_size", 50))
             interval = float(self.setting("poll_interval_s", 0.2))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return None
-        if batch < 1 or not interval > 0:
+        if not 1 <= batch <= MAX_BATCH or not interval > 0:
             return None
         return batch, interval
 
@@ -61,7 +64,7 @@ class Release(ServiceBase):
             try:
                 items = self.conn.execute(
                     "SELECT q.id, q.payment_id, p.end_to_end_id, p.from_acct, p.amount_minor, p.currency "
-                    "FROM receipt_queue q JOIN payments p ON p.id = q.payment_id WHERE q.status = 'pending' "
+                    "FROM receipt_queue q LEFT JOIN payments p ON p.id = q.payment_id WHERE q.status = 'pending' "
                     "ORDER BY q.id LIMIT ?", (batch,)).fetchall()
             except sqlite3.OperationalError as exc:
                 self.log_every("queue_read", 2.0, "WARN", "queue_read_failed", f"could not read queue: {exc}")

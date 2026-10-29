@@ -149,10 +149,12 @@ def worker(tmp_path, **settings):
 
 def test_the_worker_uses_only_settings_it_can_use(tmp_path):
     assert worker(tmp_path).settings() == (50, 0.2)
-    for bad in ({"batch_size": 0}, {"batch_size": -1}, {"batch_size": "many"}, {"poll_interval_s": 0},
+    for bad in ({"batch_size": 0}, {"batch_size": -1}, {"batch_size": "many"}, {"batch_size": 20_000},
+                {"batch_size": 10 ** 20}, {"batch_size": float("inf")}, {"poll_interval_s": 0},
                 {"poll_interval_s": -2}, {"poll_interval_s": None}, {"poll_interval_s": float("nan")}):
         assert worker(tmp_path, **bad).settings() is None, bad
     assert worker(tmp_path, poll_interval_s=600).settings() == (50, 600.0)
+    assert worker(tmp_path, batch_size=10_000).settings() == (10_000, 0.2)
 
 
 def test_a_corrected_setting_ends_the_wait_between_polls(tmp_path):
@@ -162,6 +164,21 @@ def test_a_corrected_setting_ends_the_wait_between_polls(tmp_path):
     started = time.time()
     release.wait(600)
     assert time.time() - started < 3
+
+
+def test_a_receipt_without_its_payment_row_is_still_sent(tmp_path):
+    conn = fresh_ledger(tmp_path)
+    post(conn, "p-1")
+    post(conn, "p-2")
+    conn.execute("DELETE FROM payments WHERE id = 'p-1'")
+    release = worker(tmp_path)
+    release.conn = ledger.connect(str(tmp_path))
+    items = release.conn.execute(
+        "SELECT q.id, q.payment_id, p.end_to_end_id, p.from_acct, p.amount_minor, p.currency FROM receipt_queue q "
+        "LEFT JOIN payments p ON p.id = q.payment_id WHERE q.status = 'pending' ORDER BY q.id LIMIT 50").fetchall()
+    release.send(items)
+    assert {row[0]: row[1] for row in conn.execute("SELECT payment_id, status FROM receipt_queue")} == \
+        {"p-1": "sent", "p-2": "sent"}
 
 
 def test_the_worker_sends_the_oldest_receipts_and_marks_them(tmp_path):
