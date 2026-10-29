@@ -16,9 +16,9 @@ class Platform(PlatformBase):
     system = "bank"
     adapter_cls = Adapter
     control_cls = Control
-    # four_faults and model_swap change the scenario and the agent, not the bank. extra_service arrives
-    # with the notifications component.
-    conditions = ("default", "four_faults", "log_format_v2", "model_swap")
+    # four_faults and model_swap change the scenario and the agent, not the bank. extra_service adds the
+    # notifications component (spec.py).
+    conditions = ("default", "four_faults", "log_format_v2", "model_swap", "extra_service")
     # `python run.py demo`: a bad transfer limit pushed by the pipeline, and slow fraud screening.
     demo_faults = [{"type": "bad_setting", "at_s": 0, "params": {"variant": "transfer_limit", "actor": "pipeline"}},
                    {"type": "slow_screening", "at_s": 0, "params": {}}]

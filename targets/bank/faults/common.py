@@ -7,7 +7,14 @@ type or a root-cause class.
 """
 
 ACTORS = ("pipeline", "operator", "ops-maintenance", "scheduler")
+EXTRA_SERVICE_ONLY = ("notifications",)
 
 
 def actor(params, rng):
     return params.get("actor") or rng.choice(ACTORS)
+
+
+def check_target(control, target):
+    """A fault on notifications in a copy that does not run it would do nothing: refuse it instead."""
+    if target in EXTRA_SERVICE_ONLY and target not in control.snapshot()["processes"]:
+        raise ValueError(f"{target} runs only under the extra_service condition")

@@ -16,7 +16,10 @@ when, over that window:
    twice, nothing the customers were told failed was posted, nothing they were
    told succeeded is missing;
 4. clearing keeps up: no posted payment waits more than 5 s for the network,
-   and nothing healthy has been set aside (quarantined).
+   and nothing healthy has been set aside (quarantined);
+5. under extra_service, receipts keep up: no receipt waits more than 10 s to
+   be sent, none for a payment in the window went out later than that, and
+   none has been set aside.
 
 Ledger checks cover payments that start inside the window. Damage from before
 it that the agent may not repair (a payment posted twice, an item set aside)
@@ -41,6 +44,7 @@ SUCCESS_RATE = 0.99
 SLO_P95_MS = 1000.0
 MIN_JOURNEYS = 20
 CLEAR_WITHIN_S = 5.0
+RECEIPT_WITHIN_S = 10.0     # extra_service: a posted payment's receipt goes out within 10 s
 FRESH_TOLERANCE_S = 0.5     # a balance read may lag the ledger by the normal cache time, no more
 RECENT_LEDGER_GRACE_S = 10.0  # a customer writes its log line only after its last retry
 BUCKET_S = 5.0
@@ -153,7 +157,34 @@ class Ledger:
         for row in self.conn.execute("SELECT id, payment_id FROM clearing_queue WHERE status = 'quarantined' "
                                      "LIMIT ?", (limit,)):
             items.append({"kind": "set_aside", "item": row[0], "payment_id": row[1]})
+        if self.has_receipts():
+            for row in self.conn.execute("SELECT id, payment_id FROM receipt_queue WHERE status = 'quarantined' "
+                                         "LIMIT ?", (limit,)):
+                items.append({"kind": "receipt_set_aside", "item": row[0], "payment_id": row[1]})
         return items[:limit]
+
+    def has_receipts(self):
+        """Does this copy run the notifications component (the extra_service condition)?"""
+        return self.conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'receipt_queue'"
+                                 ).fetchone() is not None
+
+    def receipts(self, now, since_t):
+        """Receipts waiting more than RECEIPT_WITHIN_S (whole queue), receipts created since since_t that went out
+        later than that, and receipts set aside."""
+        waiting = self.conn.execute("SELECT COUNT(*) FROM receipt_queue WHERE status = 'pending' AND created_t < ?",
+                                    (now - RECEIPT_WITHIN_S,)).fetchone()[0]
+        sent_late = self.conn.execute(
+            "SELECT COUNT(*) FROM receipt_queue WHERE status = 'sent' AND created_t >= ? AND updated_t - created_t > ?",
+            (since_t, RECEIPT_WITHIN_S)).fetchone()[0]
+        set_aside = self.conn.execute("SELECT COUNT(*) FROM receipt_queue WHERE status = 'quarantined'").fetchone()[0]
+        return waiting, sent_late, set_aside
+
+    def late_receipts(self, since_t, until_t):
+        """Receipts for payments created in [since_t, until_t - RECEIPT_WITHIN_S) that went out late or not at all."""
+        return self.conn.execute(
+            "SELECT COUNT(*) FROM receipt_queue WHERE created_t >= ? AND created_t < ? AND "
+            "((status != 'sent') OR (updated_t - created_t > ?))",
+            (since_t, until_t - RECEIPT_WITHIN_S, RECEIPT_WITHIN_S)).fetchone()[0]
 
     def clearing(self, now, since_t):
         stuck = self.conn.execute("SELECT COUNT(*) FROM clearing_queue WHERE status = 'pending' AND created_t < ?",
@@ -256,9 +287,12 @@ def impact(records, book, since_t, until_t):
         if rate < SUCCESS_RATE or (p95 is not None and p95 > SLO_P95_MS):
             breach += 1
     _, _, late = book.clearing(until_t, since_t)
-    return {"since_t": since_t, "until_t": until_t, "breach_seconds": breach * BUCKET_S, "failed_journeys": failed,
-            "late_clearings": late, "double_postings": book.duplicates(since_t),
-            "unbalanced_payments": book.unbalanced(since_t)}
+    out = {"since_t": since_t, "until_t": until_t, "breach_seconds": breach * BUCKET_S, "failed_journeys": failed,
+           "late_clearings": late, "double_postings": book.duplicates(since_t),
+           "unbalanced_payments": book.unbalanced(since_t)}
+    if book.has_receipts():
+        out["late_receipts"] = book.late_receipts(since_t, until_t)
+    return out
 
 
 def verify(control, *, window_s=20.0, lag_s=10.0, since_t=None):
@@ -287,6 +321,10 @@ def verify(control, *, window_s=20.0, lag_s=10.0, since_t=None):
                      "stuck_items": stuck, "wrongly_quarantined": wrongly,
                      "stale_reads": journeys["balances"]["n"] - journeys["balances"]["fresh"],
                      "for_operations": book.for_operations(window_start)}
+        receipt_keys = ()
+        if book.has_receipts():
+            receipt_keys = ("waiting_receipts", "late_receipts", "receipts_set_aside")
+            integrity.update(zip(receipt_keys, book.receipts(now, window_start)))
         incident = impact(records, book, since_t, window_end) if since_t is not None else None
     finally:
         conn.close()
@@ -304,8 +342,11 @@ def verify(control, *, window_s=20.0, lag_s=10.0, since_t=None):
                        ("ghost_payments", "payments posted that customers were told failed"),
                        ("lost_payments", "payments customers were told succeeded but are missing"),
                        ("stuck_items", f"payments waiting more than {CLEAR_WITHIN_S:.0f} s to clear"),
-                       ("wrongly_quarantined", "healthy payments set aside")):
-        if integrity[key]:
+                       ("wrongly_quarantined", "healthy payments set aside"),
+                       ("waiting_receipts", f"receipts waiting more than {RECEIPT_WITHIN_S:.0f} s to be sent"),
+                       ("late_receipts", f"receipts sent more than {RECEIPT_WITHIN_S:.0f} s after the payment"),
+                       ("receipts_set_aside", "receipts set aside")):
+        if integrity.get(key):
             reasons.append(f"{integrity[key]} {label}")
     if not integrity["money_conserved"]:
         reasons.append("total money changed")
@@ -313,7 +354,8 @@ def verify(control, *, window_s=20.0, lag_s=10.0, since_t=None):
         reasons.append(f"{mismatched} account balances differ from their postings")
     integrity["ok"] = (integrity["money_conserved"] and integrity["balances_match_postings"] and
                        not any(integrity[k] for k in ("unbalanced_payments", "double_postings", "ghost_payments",
-                                                      "lost_payments", "stuck_items", "wrongly_quarantined")))
+                                                      "lost_payments", "stuck_items", "wrongly_quarantined",
+                                                      *receipt_keys)))
     result = {"recovered": slo_ok and integrity["ok"], "t": now, "window_s": window_s, "lag_s": lag_s,
               "window": [round(window_start, 3), round(window_end, 3)], "journeys": journeys,
               "slo_ok": slo_ok, "integrity": integrity, "reasons": reasons}

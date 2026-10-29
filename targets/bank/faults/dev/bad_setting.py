@@ -4,11 +4,12 @@ The change is versioned and appears in the change log. The right fix is to
 revert the component's last setting change.
 
 params: {"target": ..., "key": ..., "value": ...}, or {"variant": name} for one of VARIANTS.
+Under extra_service the target may be notifications (batch_size, poll_interval_s).
 """
 
 import time
 
-from targets.bank.faults.common import actor
+from targets.bank.faults.common import actor, check_target
 
 TYPE = "bad_setting"
 CLASSES = ["bad_config"]
@@ -28,6 +29,7 @@ def inject(control, params, rng):
         change = {"target": params.get("target", "payments"), "key": params["key"], "value": params["value"]}
     else:
         change = VARIANTS[params.get("variant") or rng.choice(sorted(VARIANTS))]
+    check_target(control, change["target"])
     control.set_config(change["target"], change["key"], change["value"], actor=actor(params, rng))
     return {"type": TYPE, "target": change["target"], "class": "bad_config",
             "detail": {"key": change["key"], "value": change["value"]}, "t": time.time()}
