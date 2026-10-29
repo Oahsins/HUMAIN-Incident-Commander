@@ -12,7 +12,8 @@
     python run.py eval ... | preflight        hand over to eval/ and scripts/preflight.py (Codex)
 
 Every command takes --system and --port-base. Without them, a command uses the
-copy that `up` started last (runs/current.json), else the bank on 8100.
+copy that `up` started last (runs/current.json), else the bank on 8900. (Evaluation copies use
+8100, 8200 and 8300, so a copy started by hand never takes their ports.)
 
 This file imports nothing outside the standard library at the top, so
 `preflight` works before the requirements are installed.
@@ -30,6 +31,7 @@ import time
 ROOT = os.path.dirname(os.path.abspath(__file__))
 RUNS = os.path.join(ROOT, "runs")
 CURRENT = os.path.join(RUNS, "current.json")
+DEFAULT_PORT_BASE = 8900   # eval copies use 8100, 8200, 8300; tests 8700; Codex's development copies 8400-8600
 
 # What `hash` covers (CONTRACT.md section 15). Paths are relative to the repository root.
 HASH_GROUPS = {
@@ -37,7 +39,7 @@ HASH_GROUPS = {
     "system": ["ic/kit", "ic/inject.py", "ic/systems.py", "targets/bank"],
     "baseline": ["baselines"],
     "scorer": ["eval"],
-    "settings": ["configs", "run.py"],
+    "settings": ["configs", "run.py", "ic/demo.py"],
 }
 HASH_SKIP_DIRS = {"__pycache__", "heldout"}   # sealed fault plugins are hashed through SEALED.json
 SEALED_FILES = ["scenarios/heldout/SEALED.json", "scenarios/transfer/SEALED.json"]
@@ -57,10 +59,11 @@ def _read_current():
 
 
 def _target(args):
-    """(system, port_base) from the flags, else the last `up`, else the bank on 8100."""
+    """(system, port_base) from the flags, else the last `up`, else the bank on 8900."""
     current = _read_current()
     system = args.system or current.get("system") or "bank"
-    port_base = args.port_base or (current.get("port_base") if system == current.get("system") else None) or 8100
+    port_base = (args.port_base or (current.get("port_base") if system == current.get("system") else None)
+                 or DEFAULT_PORT_BASE)
     return system, int(port_base)
 
 
@@ -290,8 +293,8 @@ def cmd_agent(args):
     except ImportError:
         print("The incident commander arrives with the agent's pull request; this checkout does not have it yet.")
         return 2
-    from ic.agent import cli
-    return cli.main(args)
+    from ic import demo
+    return demo.main(args)
 
 
 def _hand_over(path, module_name, argv):

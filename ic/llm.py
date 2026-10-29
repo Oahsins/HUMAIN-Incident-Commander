@@ -215,7 +215,7 @@ def complete(messages, *, system=None, model=None, max_tokens=16000, schema=None
     provider, name = parse_model(model_name)
     effort = os.environ.get("IC_EFFORT") or effort
     call = {"provider": provider, "model": name, "purpose": purpose, "input_tokens": None, "output_tokens": None,
-            "latency_s": None, "estimated_cost_usd": None, "status": "failed",
+            "latency_s": None, "estimated_cost_usd": None, "status": "failed", "error": None,
             "cost_basis": "standard API token prices; excludes hardware and other services"}
     started = time.perf_counter()
     text = None
@@ -237,12 +237,14 @@ def complete(messages, *, system=None, model=None, max_tokens=16000, schema=None
                 time.sleep(min(float(retry_after or 2 ** (attempt + 1)), 8.0))
                 continue
             call["latency_s"] = round(time.perf_counter() - started, 3)
+            call["error"] = f"http_{exc.code}"
             raise ModelError(f"Provider HTTP {exc.code}; check the key, the model name and limits.", call) from None
         except (URLError, TimeoutError, OSError) as exc:
             if attempt < retries and not isinstance(exc, TimeoutError):
                 time.sleep(2 ** attempt)
                 continue
             call["latency_s"] = round(time.perf_counter() - started, 3)
+            call["error"] = "timeout" if isinstance(exc, TimeoutError) else "unavailable"
             raise ModelError("Provider unavailable or the request timed out.", call) from None
         except ModelError as exc:
             call["latency_s"] = round(time.perf_counter() - started, 3)
@@ -250,6 +252,7 @@ def complete(messages, *, system=None, model=None, max_tokens=16000, schema=None
             raise
         except (KeyError, IndexError, TypeError, ValueError, AttributeError):
             call["latency_s"] = round(time.perf_counter() - started, 3)
+            call["error"] = "unexpected_shape"
             raise ModelError("The provider's answer had an unexpected shape.", call) from None
     call.update(model=used, input_tokens=tokens_in, output_tokens=tokens_out,
                 latency_s=round(time.perf_counter() - started, 3),
@@ -261,6 +264,7 @@ def complete(messages, *, system=None, model=None, max_tokens=16000, schema=None
         parsed = extract_json(text)
         if parsed is None:
             call["status"] = "invalid_output"
+            call["error"] = "invalid_json"
             _record(model_name, purpose, system, messages, text, call)
             raise ModelError("The model did not answer with valid JSON.", call)
     _record(model_name, purpose, system, messages, text, call)

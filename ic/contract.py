@@ -43,7 +43,7 @@ ESCALATION_URGENCY = ("now", "soon")
 
 PHASES = ("survey", "triage", "remediate", "verify", "hand_over")
 
-CONDITIONS = ("default", "four_faults", "log_format_v2", "extra_service", "cheap_model")
+CONDITIONS = ("default", "four_faults", "log_format_v2", "extra_service", "model_swap")
 
 # Timing defaults (CONTRACT.md section 13), in seconds.
 WARMUP_S = 10.0
