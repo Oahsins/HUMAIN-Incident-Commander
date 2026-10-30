@@ -5,6 +5,7 @@ import json
 import pytest
 
 from ic.guard import Guard, StepLimit, redact
+from ic.kit.net import CallError
 from tests.agent.fake_system import FakeSystem
 
 
@@ -78,3 +79,17 @@ def test_audit_file(tmp_path):
     lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [(e["action"], e["sent"]) for e in lines] == [("restart", True), ("restart", False)]
     assert lines == guard.audit
+
+
+def test_a_read_that_cannot_reach_the_system_is_audited_then_raised(tmp_path):
+    class Unreachable(FakeSystem):
+        def observe(self, window_s=10.0):
+            raise CallError("timeout", detail="no answer within 10.0s")
+    path = tmp_path / "audit.jsonl"
+    guard = Guard(Unreachable(), audit_path=str(path))
+    guard.describe()
+    with pytest.raises(CallError):
+        guard.observe(5.0)
+    line = json.loads(path.read_text(encoding="utf-8").splitlines()[-1])
+    assert (line["event"], line["call"], line["kind"]) == ("read_error", "observe", "timeout")
+    assert "no answer" in line["detail"] and guard.steps == 2   # the failed read still used its step

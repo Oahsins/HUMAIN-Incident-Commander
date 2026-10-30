@@ -10,13 +10,13 @@ def test_the_bank_offers_exactly_the_six_actions():
 
 
 def test_every_bank_component_uses_the_shared_kinds_and_actions():
-    for component in spec.COMPONENTS:
+    for component in spec.EXTRA_SERVICE_COMPONENTS:   # every component, notifications included
         assert component["kind"] in contract.COMPONENT_KINDS, component["name"]
         assert set(component["actions"]) <= set(contract.ACTIONS), component["name"]
 
 
 def test_only_components_with_a_standby_can_fail_over():
-    for component in spec.COMPONENTS:
+    for component in spec.EXTRA_SERVICE_COMPONENTS:
         assert ("failover" in component["actions"]) == bool(component.get("standby")), component["name"]
 
 
@@ -40,14 +40,14 @@ def test_sealed_fault_types_need_permission(tmp_path, monkeypatch):
     assert inject.load("bank", "secret", allow_sealed=True).TYPE == "secret"
 
 
-def test_the_bank_refuses_conditions_it_does_not_implement():
-    assert set(Platform.conditions) <= set(contract.CONDITIONS)
+def test_the_bank_implements_every_condition_and_refuses_others():
+    assert set(Platform.conditions) == set(contract.CONDITIONS)
     try:
-        Platform(port_base=8990, condition="extra_service").start()
+        Platform(port_base=8990, condition="no_such_condition").start()
     except ValueError:
         pass
     else:
-        raise AssertionError("extra_service should be refused until the bank implements it")
+        raise AssertionError("a condition the bank does not implement must be refused before anything starts")
 
 
 def test_empty_result_has_the_documented_fields():

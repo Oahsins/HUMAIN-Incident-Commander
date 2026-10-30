@@ -38,6 +38,21 @@ CREATE TABLE IF NOT EXISTS clearing_queue (
 CREATE INDEX IF NOT EXISTS queue_status ON clearing_queue(status, id);
 """
 
+# extra_service only: the notifications component's own queue. A trigger queues one receipt for every posted
+# payment, in the same transaction as its postings, so payments' code does not change.
+RECEIPTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS receipt_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, payment_id TEXT NOT NULL, status TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0, created_t REAL NOT NULL, updated_t REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS receipt_status ON receipt_queue(status, id);
+CREATE TRIGGER IF NOT EXISTS receipt_for_payment AFTER INSERT ON payments WHEN NEW.status = 'posted'
+BEGIN
+    INSERT INTO receipt_queue (payment_id, status, attempts, created_t, updated_t)
+    VALUES (NEW.id, 'pending', 0, NEW.created_t, NEW.created_t);
+END;
+"""
+QUEUE_TABLES = ("clearing_queue", "receipt_queue")
+
 
 def path(data_dir):
     return os.path.join(data_dir, "ledger.db")
@@ -70,6 +85,13 @@ def create(data_dir, customers):
     with open(os.path.join(data_dir, "ledger_meta.json"), "w", encoding="utf-8") as handle:
         json.dump({"total_minor": total, "created_t": time.time()}, handle)
     return total
+
+
+def add_receipts(data_dir):
+    """Give the ledger the notifications component's receipt queue (the extra_service condition)."""
+    conn = sqlite3.connect(path(data_dir), isolation_level=None)
+    conn.executescript(RECEIPTS_SCHEMA)
+    conn.close()
 
 
 def post_payment(conn, payment_id, e2e, from_acct, bank, beneficiary, amount, currency, release):
@@ -105,12 +127,14 @@ def integrity(conn, since_s=600.0):
     return {"unbalanced_payments": unbalanced, "duplicate_payments": duplicates}
 
 
-def queue_state(conn):
-    """The clearing queue as the operations team sees it: depth, oldest item, the item at the head, items set aside."""
-    pending = conn.execute("SELECT COUNT(*), MIN(created_t) FROM clearing_queue WHERE status = 'pending'").fetchone()
-    head = conn.execute("SELECT id, created_t, attempts FROM clearing_queue WHERE status = 'pending' "
+def queue_state(conn, table="clearing_queue"):
+    """A work queue as the operations team sees it: depth, oldest item, the item at the head, items set aside."""
+    if table not in QUEUE_TABLES:
+        raise ValueError(f"no work queue {table}")
+    pending = conn.execute(f"SELECT COUNT(*), MIN(created_t) FROM {table} WHERE status = 'pending'").fetchone()
+    head = conn.execute(f"SELECT id, created_t, attempts FROM {table} WHERE status = 'pending' "
                         "ORDER BY id LIMIT 1").fetchone()
-    quarantined = conn.execute("SELECT COUNT(*) FROM clearing_queue WHERE status = 'quarantined'").fetchone()[0]
+    quarantined = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE status = 'quarantined'").fetchone()[0]
     now = time.time()
     return {"queue_depth": pending[0],
             "oldest_pending_s": round(now - pending[1], 1) if pending[1] else 0.0,

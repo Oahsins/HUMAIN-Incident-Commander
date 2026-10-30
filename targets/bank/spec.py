@@ -52,6 +52,16 @@ COMPONENTS = [
      "description": "batch reconciliation job; runs on demand"},
 ]
 
+# The extra_service condition adds one component that no practice scenario uses (CONTRACT.md section 8).
+NOTIFICATIONS = {
+    "name": "notifications", "kind": "worker", "port_offset": 8, "version": "1.0",
+    "config": {"poll_interval_s": 0.2, "batch_size": 50},
+    "depends_on": ["ledger"], "impact_weight": 0.1, "actions": ["restart", "rollback", "revert_config", "quarantine"],
+    "description": "notifications worker: sends each customer a receipt for every posted payment, from its own queue"}
+EXTRA_SERVICE_COMPONENTS = COMPONENTS[:5] + [NOTIFICATIONS] + COMPONENTS[5:]   # listed after clearing
+
+QUEUES = {"clearing": "clearing_queue", "notifications": "receipt_queue"}   # the work queue behind quarantine
+
 LINKS = {"payments->screening": {"listen_offset": 6, "upstream": "screening"},
          "clearing->network": {"listen_offset": 7, "upstream": "network"}}
 
@@ -81,16 +91,19 @@ class Spec:
     system = "bank"
 
     def components(self, condition="default"):
-        return COMPONENTS
+        return EXTRA_SERVICE_COMPONENTS if condition == "extra_service" else COMPONENTS
 
     def links(self):
         return LINKS
 
     def start_order(self, condition="default"):
-        return ["network", "screening", "screening-standby", "payments", "clearing", "gateway"]
+        workers = ["clearing", "notifications"] if condition == "extra_service" else ["clearing"]
+        return ["network", "screening", "screening-standby", "payments", *workers, "gateway"]
 
     def init_data(self, sup):
         ledger.create(sup.data_dir, CUSTOMERS)
+        if sup.condition == "extra_service":
+            ledger.add_receipts(sup.data_dir)
         write_json(ledger.locks_path(sup.data_dir), {"holders": []})
         write_json(os.path.join(sup.data_dir, "probe.json"), {"seq": 0})
 
@@ -128,12 +141,14 @@ class Spec:
     def observe_extra(self, sup, out, window_s):
         # The ledger: a datastore with no process of its own, watched the way a DBA would.
         entry = out["ledger"]
-        queue = None
+        queue = receipts = None
         try:
             conn = ledger.connect(sup.data_dir, busy_timeout_ms=300)
             try:
                 entry["extra"]["integrity"] = ledger.integrity(conn)
                 queue = ledger.queue_state(conn)
+                if "notifications" in out:
+                    receipts = ledger.queue_state(conn, QUEUES["notifications"])
             finally:
                 conn.close()
             entry["up"] = True
@@ -150,6 +165,8 @@ class Spec:
         # The clearing queue, read from the ledger itself, so it shows even while the worker is down.
         if queue is not None:
             out["clearing"]["extra"].update(queue)
+        if receipts is not None:
+            out["notifications"]["extra"].update(receipts)
         # The reconciliation job: how hard it works while it runs.
         jobs = sup.jobs_named("reconciliation")
         if jobs:
@@ -276,18 +293,21 @@ class Spec:
             item = (params or {}).get("item")
             if item is None:
                 return False, "quarantine needs params {\"item\": <queue item id>}"
+            table = QUEUES.get(target)
+            if table is None:
+                return False, f"{target} has no work queue"
             conn = ledger.connect(sup.data_dir, busy_timeout_ms=2000)
             try:
-                changed = conn.execute("UPDATE clearing_queue SET status = 'quarantined', updated_t = ? "
+                changed = conn.execute(f"UPDATE {table} SET status = 'quarantined', updated_t = ? "
                                        "WHERE id = ? AND status = 'pending'", (time.time(), int(item))).rowcount
             except (sqlite3.Error, ValueError) as exc:
                 return False, f"could not quarantine item {item}: {exc}"
             finally:
                 conn.close()
             if not changed:
-                return False, f"no pending clearing item {item}"
-            sup.changes.add("clearing", "quarantine", actor, item=int(item))
-            return True, f"clearing item {item} set aside for the operations team"
+                return False, f"no pending {target} item {item}"
+            sup.changes.add(target, "quarantine", actor, item=int(item))
+            return True, f"{target} item {item} set aside for the operations team"
         return False, f"unknown action {action}"
 
     # ----- ground truth for the checker and the harness (privileged) -----
@@ -297,9 +317,13 @@ class Spec:
         try:
             total = conn.execute("SELECT COALESCE(SUM(balance_minor), 0) FROM accounts").fetchone()[0]
             queue = {row[0]: row[1] for row in conn.execute("SELECT status, COUNT(*) FROM clearing_queue GROUP BY status")}
+            receipts = ({row[0]: row[1] for row in conn.execute("SELECT status, COUNT(*) FROM receipt_queue "
+                                                                "GROUP BY status")}
+                        if sup.condition == "extra_service" else None)
         finally:
             conn.close()
         meta = read_json(os.path.join(sup.data_dir, "ledger_meta.json"), {})
+        extra = {"receipts": receipts} if receipts is not None else {}
         return {"t": time.time(), "processes": {name: sup.is_up(name) for name in sup.procs},
                 "releases": sup.releases.load()["current"],
                 "config": {c["name"]: ConfigStore(sup.data_dir, c["name"]).load()["values"]
@@ -307,4 +331,4 @@ class Spec:
                 "links": sup.links, "routing": Routing(sup.data_dir).load(),
                 "lock_holders": read_json(ledger.locks_path(sup.data_dir), {"holders": []})["holders"],
                 "money_total_minor": total, "money_expected_minor": meta.get("total_minor"), "queue": queue,
-                "data_dir": sup.data_dir}
+                **extra, "data_dir": sup.data_dir}
