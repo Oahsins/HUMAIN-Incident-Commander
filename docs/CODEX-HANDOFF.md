@@ -338,7 +338,7 @@ C5a The extra_service variants and the strata check (Fri 10:00-12:00, after
       match" or the names of the strata whose counts differ. Never a case id,
       a fault or a value.
 
-C6  The final run (prepare at the freeze, Fri about 17:30-18:00; it runs
+C6  The final run (prepare at the freeze, Fri about 18:30-19:00; it runs
     overnight)
     - After Omar merges every open pull request and says go: tag that main
       commit freeze-1 and push the tag.
@@ -363,16 +363,34 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       incidents (scenarios/transfer/dispatch.jsonl) from the dispatch adapter and
       control interfaces only. At least 2 fault types should show symptoms that
       no bank practice fault shows. Use only made-up callers and addresses.
+    - Among the 20, include at least one incident of each of these three shapes
+      (agreed on 30 Oct before freeze-1, CONTRACT.md section 8), through any
+      channel docs/DISPATCH.md lists, with the component, mechanism, class and
+      values of your choosing: a caller told help is coming but no incident
+      created; work dropped or closed without reaching a unit during a call
+      surge (extra calls only from the dispatch burst helper); a sync that
+      gradually writes wrong unit records. The first mirrors the bank's
+      unrecorded_payments practice fault; the other two can count toward the 2
+      types above. Write at least one more type of your own that you never
+      name to Claude.
+    - As in the bank's exam (CONTRACT.md section 8), give every incident 1 to
+      3 harmless background changes from a benign plugin of your own, sealed
+      with the rest, and make at least 2 of the 20 healthy (background changes
+      only, no fault).
     - Seal them in scenarios/transfer/SEALED.json and push only that file
       before the run. Claude never sees them before the run.
+    - Write them against the dispatch tree id that DECISIONS.md records for the
+      dispatch merge, and copy that id into the seal entry as "dispatch_tree".
+      If DECISIONS.md records a newer id before the run, re-check every
+      incident's noop and oracle on it and seal again.
     - Just before the run, check its ports: python run.py up --system dispatch
       --port-base 9100, then python run.py down --port-base 9100, and the same
       for 9200 and 9300. If a base will not start, run on 8100, 8200 and 8300
       instead (--port-bases 8100,8200,8300; free once the bank runs end).
-    - The run (Sat 12:00-13:00, about 50 minutes): python run.py eval --split
-      transfer --final --arms abcde,noop,oracle --copies 3 --name transfer-1
-      (the frozen agent, with noop and oracle for validity, on port bases 9100,
-      9200 and 9300). Stop at 14:15 whatever its state. Run the first 10
+    - The run (Sat 12:00-13:10, about 65 minutes): python run.py eval --split
+      transfer --final --arms abcde,runbook,noop,oracle --copies 3 --name
+      transfer-1 (the frozen agent and the frozen runbook, with noop and oracle
+      for validity, on port bases 9100, 9200 and 9300). Stop at 14:15 whatever its state. Run the first 10
       incidents first: those 10 are never cut. Report the agent hash beside
       the results.
     - If an organiser system replaces dispatch as the transfer test, do the same
@@ -683,11 +701,11 @@ C3a Contract 1.2 in eval/ and the runbook (Fri 12:00-14:00, before the 16:30
       future with a timeout so Ctrl+C is noticed on Windows.
 
 Friday, also yours (follow-up prompts give the times; the freeze moved to
-about 18:00): the model-key check and the harness end to end, C3a, the
+about 19:00): the model-key check and the harness end to end, C3a, the
 runbook tuning (about 11:00-13:00), the pilot (about 13:00), the prices check
 and a resume test (about 14:30), the dry run and checker calibration (about
 15:00-16:00), baselines/FROZEN.json and a backup demo take (at the freeze,
-about 17:30-18:00). Saturday: the results report and charts from the final
+about 18:30-19:00). Saturday: the results report and charts from the final
 run.
 
 8. WHEN YOU REPORT BACK TO OMAR
@@ -697,7 +715,7 @@ not test; anything that needs his decision.
 
 ## Follow-up prompts for Omar
 
-Paste these into the named session when the time comes. On Friday morning the day moved earlier (BUILD-PLAN.md section 5): GO/NO-GO 1 passed on the rehearsal, and the freeze is at about 18:00. The times below are the new ones.
+Paste these into the named session when the time comes. On Friday morning the day moved earlier (BUILD-PLAN.md section 5): GO/NO-GO 1 passed on the rehearsal, and the freeze is at about 18:00. At 16:29 Omar added a bank practice fault for silent drops, so the freeze moved to about 19:00 and the times from 16:00 on moved with it. The times below are the new ones.
 
 - **Fri 09:00-09:30 (Omar first):** read both NIGHT-REPORT.md files, review and merge the overnight pull requests and Claude's agent pull request once the tests workflow is green, in the order pull request #8 gives. If the morning is lost, do the same from 14:00. Before the 10:00 prompts, make the model key visible to every new process: add `ANTHROPIC_API_KEY` under "Edit environment variables for your account" in Windows, then restart Codex and any open PowerShell window. Session B's model runs and the final run both need it; never paste the key into a chat.
 - **Fri 09:30, Session A:** "Pull main and start C4 as a rehearsal: run the tests as C4 says, then GO/NO-GO 1 steps 1-4 in BUILD-PLAN.md section 7, and report each step's result."
@@ -709,10 +727,10 @@ Paste these into the named session when the time comes. On Friday morning the da
 - **Fri about 13:00, Session B:** "Run the pilot: `python run.py eval --split dev --ids dev-21,dev-22,dev-23,dev-24,dev-25,dev-26,dev-27,dev-28,dev-29,dev-30 --arms abcde,react,runbook --copies 3 --model anthropic:claude-opus-5-5 --name pilot-1` (to try another candidate model, run it again with that `--model` and its own name). Send me the results table; its numbers stay internal."
 - **Fri about 14:30, Session B:** "Check configs/prices.json against the provider's price page and send Claude any differences. Then test resume: stop a run and rerun it with the same name."
 - **Fri about 15:00, Session B:** "Pull main first. Dry run: `python run.py eval --split dev --limit 6 --arms abcde,runbook,react,naive_verify,fifo,noop,oracle --copies 3 --name dry-1`, plus 1 practice scenario under `log_format_v2` and `extra_service` with the runbook arm, and 1 under `model_swap` with the abcde arm (check that its calls name the swap model). Report the mean minutes per incident and how many copies ran without interference. Checker calibration: run noop on the healthy practice cases dev-09, dev-18 and dev-24, four times each across 3 copies (names `calib-1` to `calib-4`); tell Claude if more than 1 of the 12 is red."
-- **Fri about 16:00, Session A:** "Pull main and run C5's sealed self-test again on it. Report pass or fail per fault only."
-- **Fri about 17:30, Session B:** "Commit baselines/FROZEN.json (the runbook file's hash and the freeze time) and open its pull request. After the freeze tag, record one backup demo take on the frozen agent: `git fetch --tags; git switch -c codex/demo-replay freeze-1`, then `New-Item -ItemType Directory -Force replays | Out-Null; $env:IC_RECORD='replays\demo-frozen.jsonl'; python run.py demo --port-base 8400; Remove-Item Env:IC_RECORD`. Open a pull request from codex/demo-replay with only replays/demo-frozen.jsonl in it. Finish before the final run starts at about 18:00."
-- **Fri about 17:30, Session A (after Omar merges every open pull request):** "Start C6: tag freeze-1 and push the tag, then clean-clone pass 1 into %USERPROFILE%\Documents\HUMAIN-final with the sealed files copied in."
-- **Fri about 18:00, Omar in a new PowerShell window (arms as set by GO/NO-GO 3; for the core40 cut add `--limit 40` and skip `robust-v2` and `robust-xs`):**
+- **Fri about 17:30, Session A (after Omar merges the silent-drop pull request):** "Pull main and run C5's sealed self-test again on it. Report pass or fail per fault only."
+- **Fri about 18:30, Session B:** "Commit baselines/FROZEN.json (the runbook file's hash and the freeze time) and open its pull request. After the freeze tag, record one backup demo take on the frozen agent: `git fetch --tags; git switch -c codex/demo-replay freeze-1`, then `New-Item -ItemType Directory -Force replays | Out-Null; $env:IC_RECORD='replays\demo-frozen.jsonl'; python run.py demo --port-base 8400; Remove-Item Env:IC_RECORD`. Open a pull request from codex/demo-replay with only replays/demo-frozen.jsonl in it. Finish before the final run starts at about 19:00."
+- **Fri about 18:30, Session A (after Omar merges every open pull request):** "Start C6: tag freeze-1 and push the tag, then clean-clone pass 1 into %USERPROFILE%\Documents\HUMAIN-final with the sealed files copied in."
+- **Fri about 19:00, Omar in a new PowerShell window (arms as set by GO/NO-GO 3; for the core40 cut add `--limit 40` and skip `robust-v2` and `robust-xs`):**
 
   Paste the whole block once: it runs the main exam, then the robustness runs, one after another in the same window, each with up to 5 tries.
 
@@ -729,7 +747,7 @@ Paste these into the named session when the time comes. On Friday morning the da
   ```
 
   For the core40 cut, add `--limit 40` to the final-1 line and delete the robust-v2 and robust-xs lines. Check progress with `Get-Content results\final.log -Tail 20`.
-- **Sat 09:00, Session A:** "Start C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, seal them, push only scenarios/transfer/SEALED.json, and report."
+- **Sat 09:00, Session A:** "Start C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, with at least one incident of each of the three shapes C7 lists, seal them, push only scenarios/transfer/SEALED.json, and report."
 - **Sat 11:00, Session A:** "If the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N."
 - **Sat 12:00, Session B:** "The final run is over, so you may now open %USERPROFILE%\Documents\HUMAIN-final; change nothing there outside results/. In that folder run `python run.py eval --report final-1`, then `--report robust-ff --against final-1` (and the same for robust-v2, robust-xs and robust-ms), with n/N, intervals, and where the runbook ties or wins, and send Omar the tables for Claude." **Session A:** "Run the transfer test (C7), then open the codex/reveal pull request with the sealed files."
 - **Sat 16:00, Session A:** "Scan the full git history for secrets and report. After Omar makes the repository public, clean-clone pass 2: `$env:GIT_TERMINAL_PROMPT=0; git -c credential.helper= clone https://github.com/Oahsins/HUMAIN-Incident-Commander ic-clean`, follow the README exactly, run `python run.py demo`, then run it again in the same window with the key unset (`Remove-Item Env:ANTHROPIC_API_KEY`, which affects only that window): it must print 'REPLAY of a recorded run (no API key found)' and replay replays/demo-frozen.jsonl. Report anything that fails." Repeat the check at 18:00.

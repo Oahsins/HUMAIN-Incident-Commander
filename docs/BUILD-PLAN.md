@@ -35,7 +35,7 @@ An independent checker then decides whether the system really recovered, using e
 | Who | Owns | Does not do |
 |---|---|---|
 | **Omar** | Every decision; the lead story; merging pull requests; the freeze go-ahead; starting the final run in his own PowerShell window; making the repository public; the video, the deck, the project page and the free-text answer, in his own voice | Write code |
-| **Claude (cloud)** | The plan, the test design, the contract; the test kit, the bank, its 6 practice faults and its checker; the agent, its three ablation arms, the safety wrapper and the model client; the demo; 30 practice scenarios; the dispatch system (except its faults), after `freeze-1`; reviews of Codex's pull requests; drafts of the deck (from the banking deck draft, kept outside the repository), the page and the video script | See the sealed exam or the dispatch faults before the run |
+| **Claude (cloud)** | The plan, the test design, the contract; the test kit, the bank, its 7 practice faults and its checker; the agent, its three ablation arms, the safety wrapper and the model client; the demo; 32 practice scenarios; the dispatch system (except its faults), after `freeze-1`; reviews of Codex's pull requests; drafts of the deck (from the banking deck draft, kept outside the repository), the page and the video script | See the sealed exam or the dispatch faults before the run |
 | **Codex Session A** (laptop, `%USERPROFILE%\Documents\HUMAIN-Incident-Commander`) | C0 setup check; C1 the sealed exam (3 named held-out fault types, 1 blind type, 60 incidents); C4 Windows bring-up; C5 sealed-fault dry run and seal 2; C6 the freeze tag and clean-clone pass 1; C7 the dispatch faults, 20 sealed incidents and the transfer run; the secret scan and clean-clone pass 2 | Run any agent arm before seal 2 is on GitHub; edit Claude's files |
 | **Codex Session B** (laptop, `%USERPROFILE%\Documents\HUMAIN-IC-baseline`) | C2 the scripted runbook; C2b its check on the merged bank; C3 the evaluation harness, statistics and charts; the model-key check, the pilot, the dry run, `baselines/FROZEN.json`, the backup demo take and the results report | See the sealed files; edit Claude's files |
 
@@ -69,7 +69,7 @@ Each Codex session pushes each finished task to its `codex/*` branch, opens a dr
 
 ## 5. Friday 30 Oct
 
-Moved earlier on Friday morning (`DECISIONS.md`, 30 Oct): GO/NO-GO 1 passed on the morning rehearsal, and the freeze is at about 18:00 so the full exam fits overnight. Times after 10:30 are targets; each step still waits for the one before it. "Green" means the tests workflow passes on ubuntu-latest and windows-latest.
+Moved earlier on Friday morning (`DECISIONS.md`, 30 Oct): GO/NO-GO 1 passed on the morning rehearsal, and the freeze is at about 18:00 so the full exam fits overnight. Moved again at 16:29: Omar added a bank practice fault for silent drops before the freeze (`unrecorded_payments`, dev-31 and dev-32), which changes the system hash, so Session A runs C5's sealed self-test again on the new `main` and the freeze is at about 19:00. Times after 10:30 are targets; each step still waits for the one before it. "Green" means the tests workflow passes on ubuntu-latest and windows-latest.
 
 | Time | Omar | Claude | Codex Session A | Codex Session B |
 |---|---|---|---|---|
@@ -83,9 +83,9 @@ Moved earlier on Friday morning (`DECISIONS.md`, 30 Oct): GO/NO-GO 1 passed on t
 | 14:30-15:00 | - | The bulk model in `configs/models.json`; tests green on Windows | - | Check `configs/prices.json`; test resume |
 | 15:00-16:00 | 20-minute explain-back: Claude walks Omar through every file | `DECISIONS.md` (ablation diffs, analysis plan) | - | Dry run `dry-1` on 6 practice scenarios on 3 copies, plus 1 scenario under `log_format_v2` and `extra_service` (runbook) and 1 under `model_swap` (abcde); checker calibration with noop, 4 runs each of the 3 healthy practice cases (dev-09, dev-18, dev-24) |
 | **16:00 GO/NO-GO 3** | Set the run size (section 7) | | | |
-| 16:00-17:30 | Start the video script outline with Claude | The last agent pull request green by 17:00; demo polish; regression tests | C5's sealed self-test again, on `main` | - |
-| **17:30-18:00 FREEZE** | Merge every open pull request (including `baselines/FROZEN.json`); approve the tag | Record the tag, the commit and the five group hashes in `DECISIONS.md` | C6: tag `freeze-1`, push the tag, clean-clone pass 1 into `%USERPROFILE%\Documents\HUMAIN-final` with the sealed files copied in | `baselines/FROZEN.json`; after the tag, the backup demo take into `replays/demo-frozen.jsonl` (pull request `codex/demo-replay`) |
-| about 18:00 | Start the final run in his own PowerShell window in `HUMAIN-final`, with the 5-try auto-resume loop from the handoff; leave the laptop on mains power. Then the second explain-back while it runs | Build the dispatch platform, adapter, control and checker with `ic/kit`, following `docs/ADDING-A-SYSTEM.md` (18:00 to about 23:00) | - | - |
+| 16:00-18:00 | Start the video script outline with Claude; merge the bank fault pull request once green | The last agent pull request green by 17:00; the silent-drop practice fault and its pull request; regression tests | C5's sealed self-test again, on `main` once the bank fault pull request has merged; report pass or fail per fault only | - |
+| **18:30-19:00 FREEZE** | Merge every open pull request (including `baselines/FROZEN.json`); approve the tag | Record the tag, the commit and the five group hashes in `DECISIONS.md` | C6: tag `freeze-1`, push the tag, clean-clone pass 1 into `%USERPROFILE%\Documents\HUMAIN-final` with the sealed files copied in | `baselines/FROZEN.json`; after the tag, the backup demo take into `replays/demo-frozen.jsonl` (pull request `codex/demo-replay`) |
+| about 19:00 | Start the final run in his own PowerShell window in `HUMAIN-final`, with the 5-try auto-resume loop from the handoff; leave the laptop on mains power. Then the second explain-back while it runs | Build the dispatch platform, adapter, control and checker with `ic/kit`, following `docs/ADDING-A-SYSTEM.md`, with integrity counts for the three transfer shapes (CONTRACT section 8) (19:00 to about 01:00) | - | - |
 
 The final run goes case-major in the line order of `heldout.jsonl` (its first 40 ids are `core40`) (case 1 under every arm, then case 2), so a partial run is still paired: the main exam first, then the robustness subset. It must finish by 06:00 Sat. Progress: `Get-Content results\final.log -Tail 20`.
 
@@ -93,8 +93,8 @@ The final run goes case-major in the line order of `heldout.jsonl` (its first 40
 
 | Time | Omar | Claude | Codex Session A | Codex Session B |
 |---|---|---|---|---|
-| 09:00-12:00 | Check the final run finished; merge the dispatch pull request once green | Fix anything in dispatch | C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces; push only `scenarios/transfer/SEALED.json`. At 11:00, if the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N | - |
-| **12:00-13:00** | Read the results | Results write-up: tables with intervals, paired tests, where the script ties or wins | The transfer run: the frozen agent's `abcde` arm with `noop` and `oracle` for validity, 3 copies on port bases 9100, 9200 and 9300; stop at 14:15 whatever its state | Results table and charts in `HUMAIN-final`: `python run.py eval --report final-1` |
+| 09:00-12:00 | Check the final run finished; merge the dispatch pull request once green | Fix anything in dispatch | C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, with at least one of each of the three shapes in CONTRACT section 8; push only `scenarios/transfer/SEALED.json`. At 11:00, if the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N | - |
+| **12:00-13:00** | Read the results | Results write-up: tables with intervals, paired tests, where the script ties or wins | The transfer run: the frozen agent's `abcde` arm and the frozen `runbook`, with `noop` and `oracle` for validity, 3 copies on port bases 9100, 9200 and 9300; stop at 14:15 whatever its state | Results table and charts in `HUMAIN-final`: `python run.py eval --report final-1` |
 | 13:00-14:30 | Choose the demo seed with Claude | Fill the deck's results slide from real runs only | The `codex/reveal` pull request with the sealed files and the per-case evidence | Charts for the deck |
 | **14:30-16:00** | Record the 3 to 4 minute video (demo plus results), then upload it to a public link | The video script and the 75-second demo scenario | Keep the demo machine clean | - |
 | 16:00-17:30 | Make the repository public after Codex's secret scan; write the free-text answer in his own words; check the deck | Deck cut to 10 slides plus PDF; page text (sections as in Omar's private notes); README final | Secret scan of the full history; then clean-clone pass 2: an anonymous clone, the README steps, `python run.py demo` live and again with the key unset (it must print the REPLAY line) | - |
@@ -119,7 +119,7 @@ If step 1, 2 or 3 fails and isn't fixed by 16:30, take the cut path. It keeps ev
 2. A is at least R + 2: keep the pitch as planned.
 3. Otherwise: keep the build and reframe it honestly. The script handles known faults; the agent is for held-out, compound and changed-condition faults, and it writes the handover. The sealed exam then tests exactly that claim.
 
-**GO/NO-GO 3, Fri about 16:00 (run size).** From the dry run, m = mean minutes per incident and c = the number of copies that ran without interference. Hours = (60 × arms + 220) × m / (60 × c). The run must end by 05:30 Sat, half an hour before the 06:00 deadline, counted from its planned start (about 18:00, so about 11.5 hours). If it fits, run 60. Otherwise cut to the pre-registered core40 and keep only `four_faults` and `model_swap`, so hours = (40 × arms + 100) × m / (60 × c). If that still does not fit, also cut `naive_verify`. If the start slips, recompute from the actual start: the run must finish by 06:00.
+**GO/NO-GO 3, Fri about 16:00 (run size).** From the dry run, m = mean minutes per incident and c = the number of copies that ran without interference. Hours = (60 × arms + 220) × m / (60 × c). The run must end by 05:30 Sat, half an hour before the 06:00 deadline, counted from its planned start (about 19:00 since the 16:29 change, so about 10.5 hours). If it fits, run 60. Otherwise cut to the pre-registered core40 and keep only `four_faults` and `model_swap`, so hours = (40 × arms + 100) × m / (60 × c). If that still does not fit, also cut `naive_verify`. If the start slips, recompute from the actual start: the run must finish by 06:00.
 
 ## 8. Cut lines
 
@@ -136,7 +136,7 @@ Each cut belongs to a decision point. Never cut the bottom block.
 
 ## 9. Test design
 
-**Practice set (Claude, 30 scenarios, dev-01 to dev-30):** the 6 practice fault types, single and compound, plus healthy distractors (`noise`) and must-escalate cases (`network_outage`). Used for building and tuning only: dev-01 to dev-20 for tuning the agent and the runbook, dev-21 to dev-30 for the pilot.
+**Practice set (Claude, 32 scenarios, dev-01 to dev-32):** the 7 practice fault types, single and compound, plus healthy distractors (`noise`) and must-escalate cases (`network_outage`). Used for building and tuning only: dev-01 to dev-20 for tuning the agent and the runbook, dev-21 to dev-30 for the pilot. dev-31 and dev-32 (payments answered as posted but never written, alone and beside a stopped worker) were added after the pilot, so no tuning or pilot run used them.
 
 **Sealed exam (Codex Session A, 60 scenarios):**
 

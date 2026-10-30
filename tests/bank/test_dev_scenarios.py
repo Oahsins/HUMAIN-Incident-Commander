@@ -1,4 +1,4 @@
-"""The 30 practice scenarios keep the section 8 format (CONTRACT.md) and match their generator."""
+"""The 32 practice scenarios keep the section 8 format (CONTRACT.md) and match their generator."""
 
 import importlib
 import json
@@ -17,8 +17,8 @@ def _cases():
         return [json.loads(line) for line in f]
 
 
-def test_thirty_cases_in_order():
-    assert [c["id"] for c in _cases()] == [f"dev-{n:02d}" for n in range(1, 31)]
+def test_thirty_two_cases_in_order():
+    assert [c["id"] for c in _cases()] == [f"dev-{n:02d}" for n in range(1, 33)]
 
 
 def test_every_case_keeps_the_format():
