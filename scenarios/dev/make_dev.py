@@ -1,8 +1,9 @@
 """Write scenarios/dev/dev.jsonl: the 32 practice scenarios (CONTRACT.md section 8).
 
 dev-01 to dev-20 are for building and tuning; dev-21 to dev-30 are kept for the
-Friday pilot only; dev-31 and dev-32 were added after the pilot for silent drops. Each case lists its real faults by hand, with the fixes in
-the order to apply them (upstream first, then the most impact per second), and
+Friday pilot only; dev-31 and dev-32 were added after the pilot for silent
+drops. Each case lists its real faults by hand, with the fixes in the order to
+apply them: upstream first, then the most impact per second. Each case also
 gets 1 to 3 harmless background changes picked from its own seed. Run it again
 and the file comes out byte for byte the same:
 
@@ -92,9 +93,9 @@ CASES = [
     ([fault("unrecorded_payments")], [BAD_RELEASE],
      "single: about half of payments are answered as posted but never reach the ledger; nothing errors"),
     ([fault("unrecorded_payments"), fault("stopped_worker", at_s=4)],
-     [BAD_RELEASE, CLEARING_DOWN],
-     "double: the stopped worker is loud, the unwritten payments are not; roll back first, since an unwritten "
-     "payment is lost for good while the clearing backlog only waits"),
+     [CLEARING_DOWN, BAD_RELEASE],
+     "double: the stopped worker is loud, the unwritten payments are not; restart clearing, then roll back "
+     "payments"),
 ]
 
 
