@@ -2,24 +2,33 @@
 
 import pytest
 
-from ic.agent import common, sbar, verify
+from ic.agent import common, sbar, survey, verify
 from ic.contract import empty_result
 
 
 class StubIncident:
-    """Just enough of common.Incident for verify.sustained: a clock that never runs out and a trace."""
+    """Just enough of common.Incident for verify.sustained: a clock that runs out only when told to, and a trace."""
 
-    def __init__(self):
+    def __init__(self, remaining=1000.0):
         self.trace = []
+        self.left = remaining
+        self.waits = []
+        self.result = {"actions": [], "root_causes": []}
 
     def describe(self):
         return {"actions": {"restart": {"est_seconds": 1}}}
 
+    def remaining(self):
+        return self.left
+
     def wait(self, seconds, keep_s=0.0):
-        pass
+        seconds = min(seconds, self.left - keep_s)
+        self.waits.append(seconds)
+        self.left -= seconds + 0.001          # a sleep always overshoots a little
 
     def need(self, seconds):
-        pass
+        if self.left < seconds:
+            raise common.OutOfTime()
 
     def note(self, phase, kind, name, summary, **data):
         self.trace.append({"t": float(len(self.trace)), "phase": phase, "kind": kind, "name": name,
@@ -143,3 +152,81 @@ def test_a_page_becomes_a_follow_up_once_the_fix_held():
     assert cache["urgency"] == "soon"       # failed over and quiet now: the slow primary is follow-up work
     assert web["urgency"] == "now"          # the restart did not go through
     assert partner["urgency"] == "now"      # nothing could be done there, and it is still down
+
+
+def test_the_gap_shrinks_so_the_confirming_look_still_fits(monkeypatch):
+    scripted_looks(monkeypatch, "CC")
+    roomy = StubIncident()
+    assert verify.sustained(roomy, [], keep_s=12.0)[0] and roomy.waits[-1] == verify.CHECK_GAP_S
+    scripted_looks(monkeypatch, "CC")
+    short = StubIncident(remaining=19.4)    # 18.4 s left after the 1 s settle and the first look
+    assert verify.sustained(short, [], keep_s=12.0)[0]
+    assert short.waits[-1] == pytest.approx(19.4 - 1.001 - 4 - 12 - verify.TIME_MARGIN_S)
+    scripted_looks(monkeypatch, "CC")
+    with pytest.raises(common.OutOfTime):  # not even the shortest gap and a look fit: stop, do not overrun
+        verify.sustained(StubIncident(remaining=17.5), [], keep_s=12.0)
+
+
+RESTARTED = {"up": True, "error_rate": 0.0, "extra": {"exits_15m": 3, "last_exit_s_ago": 20, "last_exit_code": 0}}
+
+
+def test_exits_from_before_the_action_are_history_not_a_crash_loop():
+    def signal(acted_ago):
+        [(letter, severity, text)] = survey.component_signals("web", RESTARTED, {}, {"kind": "service"}, {},
+                                                              acted_ago=acted_ago)
+        return severity, text
+    assert signal(None)[0] == "fault"                   # exiting again and again, and nothing done yet
+    severity, text = signal(5.0)                        # restarted 5 s ago, after the last exit
+    assert severity == "info" and "none since the action taken on it 5 s ago" in text
+    assert signal(30.0)[0] == "fault"                   # exited again after the action: still a crash loop
+
+
+def test_the_survey_knows_when_each_component_was_last_acted_on():
+    profile = {"components": [{"name": "web", "kind": "service"}]}
+    obs = {"t": 1000.0, "components": {"web": RESTARTED}, "baseline": {}}
+    assert survey.faults(survey.survey(profile, obs, None)["findings"])
+    assert not survey.faults(survey.survey(profile, obs, None, acted_ago={"web": 5.0})["findings"])
+    assert verify.acted_ago([{"target": "web", "t": 990.0, "sent": True, "ok": True},
+                             {"target": "web", "t": 995.0, "sent": True, "ok": True},
+                             {"target": "db", "t": 996.0, "sent": True, "ok": False}], now=1000.0) == {"web": 5.0}
+
+
+def test_a_page_for_a_component_that_recovered_with_the_other_fixes_is_dropped():
+    def page(component, urgency="now"):
+        return {"components": [component], "class": None, "reason": "", "urgency": urgency, "to": "x", "ask": ""}
+    incident = StubIncident()
+    incident.profile = {"components": [{"name": "worker", "depends_on": ["partner", "vendor"]}, {"name": "partner"},
+                                       {"name": "vendor"}, {"name": "other", "depends_on": ["remote"]},
+                                       {"name": "remote"}]}
+    incident.result = empty_result("abcde", mode="auto")
+    incident.result["actions"] = [{"action": "revert_config", "target": "worker", "sent": True, "ok": True}]
+    incident.result["root_causes"] = [{"target": "partner", "class": "external_outage"},
+                                      {"target": "worker", "class": "bad_config"}]
+    last_look = [{"id": "D1", "letter": "D", "component": "vendor", "severity": "fault", "text": "down"},
+                 {"id": "D2", "letter": "D", "component": "partner", "severity": "info", "text": "served normally"}]
+    partner, vendor, worker, note, remote = (page("partner"), page("vendor"), page("worker"),
+                                             page("partner", "soon"), page("remote"))
+    escalations = [partner, vendor, worker, note, remote]
+    assert sbar.withdraw_cleared(incident, escalations, last_look) == ["partner"]
+    # still down / acted on (settle_urgency's job) / a follow-up / quiet, but nothing that calls it was fixed
+    assert escalations == [vendor, worker, note, remote]
+    assert incident.result["root_causes"] == [{"target": "worker", "class": "bad_config"}]
+    incident.result["trace"] = incident.trace
+    assert "Not escalated after all: no page for partner" in sbar.facts(incident.result, {"system": "fake"})
+
+
+def test_when_nothing_is_left_to_try_and_users_get_through_it_checks_again(monkeypatch):
+    from tests.agent import mock_model
+    from tests.agent.fake_system import FakeSystem
+    from ic.agent import load_arm
+    monkeypatch.setattr(common, "SLEEP", lambda seconds: None)
+    real, checks = verify.sustained, []
+
+    def sustained(incident, actions, **kw):    # the first check fails on symptoms that are fading
+        checks.append(1)
+        return (False, []) if len(checks) == 1 else real(incident, actions, **kw)
+    monkeypatch.setattr(verify, "sustained", sustained)
+    fake = FakeSystem({"web_down"})
+    result = load_arm("abcde")(fake, model=mock_model.install(), budget_s=90.0)
+    assert len(checks) == 2 and result["outcome"] == "recovered" and result["escalation"] is None
+    assert any(e["summary"].startswith("nothing new to try") for e in result["trace"])

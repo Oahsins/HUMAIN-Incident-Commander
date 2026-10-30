@@ -7,7 +7,8 @@
                profile and orders the fixes upstream first, then by WSJF
     remediate  each fix through the safety wrapper
     verify     sustained: clean looks in a row. If not clean, reassess once or twice with what is
-               known now, while the budget allows
+               known now, while the budget allows; when a reassessment finds nothing new to try but
+               the main journey passes, check again rather than hand over
     hand over  the outcome, the escalation for anything a person must do, and the SBAR note
 
 Two ablations share this module and change one switch each:
@@ -23,6 +24,7 @@ SURVEY_WINDOW_S = 8.0
 REASSESS_ROUNDS = 2
 HANDOVER_KEEP_S = 12.0      # budget kept for the handover once the work is done
 REASSESS_MIN_S = 26.0       # a reassessment, one more fix and a sustained check fit in this, on top of the handover
+RECHECK_MIN_S = 18.0        # a sustained check alone: settle, look, gap, look
 ASSESS_EFFORT = "medium"
 
 ARMS = {
@@ -68,7 +70,7 @@ def _survey(incident, phase="survey"):
     profile = incident.describe()
     obs = incident.tool(phase, "observe", SURVEY_WINDOW_S)
     probe = incident.tool(phase, "probe") if (profile.get("capabilities") or {}).get("probe", True) else None
-    found = abcde_survey.survey(profile, obs, probe)
+    found = abcde_survey.survey(profile, obs, probe, acted_ago=verify.acted_ago(incident.result["actions"]))
     incident.note(phase, "survey", "abcde", f"{len(abcde_survey.faults(found['findings']))} fault findings, "
                                             f"{len(found['findings'])} findings in all, "
                                             f"{found['components_checked']} components checked",
@@ -221,6 +223,7 @@ def _respond(incident, settings, state):
                              keep_s=HANDOVER_KEEP_S)
         if ok:
             sbar.settle_urgency(state["escalations"], incident.result["actions"], findings)
+            sbar.withdraw_cleared(incident, state["escalations"], findings)
             state["handoffs"] = sbar.damage_handoffs(verify.damage(findings, ignore), profile)
             incident.declare("escalated" if any(e["urgency"] == "now" for e in state["escalations"]) else "recovered")
             return
@@ -239,7 +242,13 @@ def _respond(incident, settings, state):
         fresh = [(fault, fix) for fault, fix in triage.plan(faults, profile, settings["order"])
                  if fix["action"] == "escalate" or incident.guard.check(fix["action"], fix["target"]) is None]
         if not fresh:
-            break
+            room = incident.remaining() >= HANDOVER_KEEP_S + RECHECK_MIN_S and \
+                incident.guard.steps + 2 * verify.CLEAN_CHECKS <= incident.guard.max_steps
+            if not verify.probe_passed(probe) or not room:
+                break
+            # Nothing new to try, but the main journey passes: what failed the check may be fading. Look again.
+            incident.note("triage", "note", "check", "nothing new to try and the main journey passes: checking again")
+            continue
         _remediate(incident, fresh, obs, state, found["journey_down"])
 
     if not state["escalations"]:

@@ -1,10 +1,14 @@
 """Verify: is the system really back, and does it stay back?
 
 Sustained (the method): wait for the actions to settle, then require
-CLEAN_CHECKS clean looks in a row, CHECK_GAP_S apart. A clean look is a
-passing probe and a survey with no fault findings, apart from faults already
+CLEAN_CHECKS clean looks in a row, CHECK_GAP_S apart (closer, down to
+MIN_GAP_S, when only that fits the next look into the budget). A clean look is
+a passing probe and a survey with no fault findings, apart from faults already
 handed to a person. One bad look resets the count; MISSES_TO_STOP bad looks in
 a row end the check, so the time left goes to a reassessment.
+
+Each look reads the survey knowing when the commander last acted on each
+component, so a crash loop that ended with its restart is history, not a fault.
 
 A failed data check counts over a trailing window, so it stays up after its
 cause is fixed. From the second look on, a data check whose count has not grown
@@ -14,11 +18,15 @@ recovery, and the arm hands it to a person (damage()).
 Naive (an ablation): one look straight after the last action.
 """
 
+import time
+
 from ic.agent import survey as abcde_survey
 
 CLEAN_CHECKS = 2
 MISSES_TO_STOP = 2         # not clean this many looks in a row: stop and reassess
 CHECK_GAP_S = 4.0
+MIN_GAP_S = 1.0            # the shortest gap, when only that fits the next look into the budget
+TIME_MARGIN_S = 0.5        # left over after a shortened gap, so the next look still clears need()
 LOOK_WINDOW_S = 4.0        # metrics window for each look: only what happened after the fix
 SETTLE_MAX_S = 6.0
 
@@ -47,14 +55,24 @@ def damage(findings, ignore_components=()):
     return [f for f in findings if abcde_survey.data_check(f) and f.get("component") not in ignore_components]
 
 
+def acted_ago(actions, now=None):
+    """{component: seconds since the incident commander last acted on it successfully}, by the commander's clock."""
+    now = time.time() if now is None else now
+    return {a["target"]: now - a["t"] for a in actions or [] if a.get("sent") and a.get("ok") and a.get("target")}
+
+
+def probe_passed(probe):
+    return probe is None or bool(probe.get("ok", all(s.get("ok") for s in probe.get("steps", []))))
+
+
 def look(incident, phase="verify", window_s=LOOK_WINDOW_S, ignore_components=(), tolerate=None):
     """One observe and one probe. Returns (clean, findings, probe)."""
     profile = incident.describe()
     obs = incident.tool(phase, "observe", window_s)
     probe = incident.tool(phase, "probe") if (profile.get("capabilities") or {}).get("probe", True) else None
-    result = abcde_survey.survey(profile, obs, probe)
+    result = abcde_survey.survey(profile, obs, probe, acted_ago=acted_ago(incident.result["actions"]))
     remaining = open_faults(result["findings"], ignore_components, tolerate)
-    probe_ok = probe is None or bool(probe.get("ok", all(s.get("ok") for s in probe.get("steps", []))))
+    probe_ok = probe_passed(probe)
     if probe is not None and not probe_ok:
         failing = next((s for s in probe.get("steps", []) if not s.get("ok")), {})
         if failing.get("component") in ignore_components:
@@ -97,7 +115,8 @@ def sustained(incident, actions, ignore_components=(), keep_s=0.0):
         # while there is budget left for it.
         if misses >= MISSES_TO_STOP or (not clean and attempts >= CLEAN_CHECKS + 1):
             return False, findings
-        incident.wait(CHECK_GAP_S, keep_s=keep_s)
+        gap = min(CHECK_GAP_S, incident.remaining() - LOOK_WINDOW_S - keep_s - TIME_MARGIN_S)
+        incident.wait(max(MIN_GAP_S, gap), keep_s=keep_s)
     return True, findings
 
 
