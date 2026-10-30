@@ -1,6 +1,7 @@
 """Exercise real spawned workers using a wholly invented target system."""
 
 import json
+from concurrent.futures import Future
 import multiprocessing as mp
 from pathlib import Path
 import sys
@@ -131,6 +132,71 @@ def test_red_oracle_validation_retained_and_not_repeated(tmp_path, monkeypatch):
     declared = records[-1]["result"]["t_declared"]
     assert run_cases(**kwargs)
     assert load_records(run_dir, effective=False)[-1]["result"]["t_declared"] == declared
+
+
+def test_must_escalate_oracle_is_never_rechecked(tmp_path, monkeypatch):
+    case = fakes.case(1)
+    case["target"]["must_escalate"] = True
+    kwargs = options(tmp_path, monkeypatch, names=("oracle",), cases=[case])
+    kwargs["hooks"] = Hooks(platform=fakes.platform, checker=fakes.red_checker, inject=fakes.inject, load_arm=fakes.load_arm)
+    assert run_cases(**kwargs)
+    records = load_records(tmp_path / "results/fixture-run", effective=False)
+    assert len(records) == 1
+    assert records[0]["checker"]["recovered"] is False
+
+
+@pytest.mark.parametrize("arm", ["unreachable", "caught_read", "bare_callerror"])
+def test_unreachable_read_is_harness_error_even_when_caught(tmp_path, monkeypatch, arm):
+    kwargs = options(tmp_path, monkeypatch, names=(arm,), cases=[fakes.case(1)])
+    kwargs["hooks"] = Hooks(platform=fakes.unreadable_platform, checker=fakes.checker,
+                            inject=fakes.inject, load_arm=fakes.load_arm)
+    assert run_cases(**kwargs)
+    run_dir = tmp_path / "results/fixture-run"
+    records = load_records(run_dir, effective=False)
+    assert [r["purpose"] for r in records] == ["main", "retry"]
+    assert all(r["result"]["outcome"] == "harness_error" for r in records)
+    assert all(r["error"]["type"] == "CallError" and r["error"]["kind"] == "refused" for r in records)
+    assert all(any(a.get("event") == "read_error" for a in r["audit"]) == (arm != "bare_callerror") for r in records)
+    if arm == "caught_read":
+        assert all(r["result"]["calls"][0]["input_tokens"] == 3 for r in records)
+    mtimes = {p: p.stat().st_mtime_ns for p in run_dir.rglob("record.json")}
+    assert run_cases(**kwargs)
+    assert mtimes == {p: p.stat().st_mtime_ns for p in mtimes}
+
+
+def test_ctrl_c_kills_inflight_tree_stops_queue_and_resumes_first_attempt(tmp_path, monkeypatch):
+    kwargs = options(tmp_path, monkeypatch, names=("noop",), cases=[fakes.case(i) for i in range(1, 5)])
+    kwargs["hooks"] = Hooks(platform=fakes.interrupt_platform, checker=fakes.checker,
+                            inject=fakes.inject, load_arm=fakes.load_arm)
+    original_result = Future.result
+    captured = []
+
+    def interrupt_result(future, timeout=None):
+        assert timeout is not None and timeout <= 0.2
+        paths = [tmp_path / f"runs/invented-{port}/interrupt-pids.json" for port in (8400, 8500)]
+        deadline = time.monotonic() + 10
+        while not all(path.exists() for path in paths) and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert all(path.exists() for path in paths), "invented descendant processes did not start"
+        for path in paths:
+            captured.extend(json.loads(path.read_text()))
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(Future, "result", interrupt_result)
+    with pytest.raises(KeyboardInterrupt):
+        run_cases(**kwargs)
+    run_dir = tmp_path / "results/fixture-run"
+    assert json.loads((run_dir / "manifest.json").read_text())["complete"] is False
+    assert not list(run_dir.glob("cases/*/*/record.json"))
+    assert not (run_dir / "cases/fixture-3").exists()
+    assert not (run_dir / "cases/fixture-4").exists()
+    assert all(not psutil.pid_exists(pid) or psutil.Process(pid).status() == psutil.STATUS_ZOMBIE for pid in captured)
+    monkeypatch.setattr(Future, "result", original_result)
+    kwargs["hooks"] = Hooks(platform=fakes.platform, checker=fakes.checker, inject=fakes.inject, load_arm=fakes.load_arm)
+    assert run_cases(**kwargs)
+    records = load_records(run_dir, effective=False)
+    assert len(records) == 4
+    assert all(r["attempt"] == 1 and r["purpose"] == "main" for r in records)
 
 
 def test_injection_error_is_distinct_and_retried_once(tmp_path, monkeypatch):

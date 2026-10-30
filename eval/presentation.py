@@ -32,6 +32,8 @@ RATE_METRICS = {
     "root_precision": ("Root-cause precision", "reported (target, class) pairs"),
     "root_recall": ("Root-cause recall", "labelled root causes"),
     "harmful_attempts": ("Harmful-action attempts (lower is better)", "as defined by the scorer"),
+    "mitigation_censored": ("Mitigation still unresolved at the horizon (lower is better)",
+                            "cases with a known mitigation censor status"),
 }
 MEAN_METRICS = {
     "user_impact_s": ("User-impact seconds (lower is better)", "seconds"),
@@ -48,6 +50,7 @@ MEAN_METRICS = {
     "successful_actions": ("Successful actions per case", "count"),
     "wasted_actions": ("Wasted actions per case (lower is better)", "count"),
     "harmful_attempts": ("Harmful-action attempts per case (lower is better)", "count"),
+    "harmful_quarantines": ("Harmful quarantines per case (lower is better)", "count"),
 }
 STRATUM_ORDER = ["healthy", "must_escalate", "practice_only", "practice", "practice_types", "named_heldout",
                  "heldout_named", "blind", "single", "double", "triple", "four_plus"]
@@ -60,7 +63,7 @@ STRATUM_LABELS = {
     "named_heldout": "Named held-out fault types",
     "heldout_named": "Named held-out fault types",
     "blind": "Blind fault type",
-    "single": "Single-fault cases",
+    "single": "Single-fault and healthy cases",
     "double": "Two-fault cases",
     "triple": "Three-fault cases",
     "four_plus": "Four or more faults",
@@ -310,8 +313,13 @@ def results_tables(arms, get_block, n_label):
         for key in mean_keys:
             label = MEAN_METRICS.get(key, (key.replace("_", " "),))[0]
             for arm, b in blocks:
+                cells = mean_cells((b.get("means") or {}).get(key), mean_kind(key))
+                if key == "time_to_mitigate_s":
+                    censor = (b.get("rates") or {}).get("mitigation_censored")
+                    counts, estimate, interval = rate_cells(censor)
+                    cells[1] += f"; censored {counts} ({estimate}; Wilson 95% {interval})"
                 rows.append([label, arm_label(arm.get("name", "?")),
-                             *mean_cells((b.get("means") or {}).get(key), mean_kind(key))])
+                             *cells])
         lines += ["**Means** (mean per case, 95% bootstrap interval)", ""]
         lines += table(["Metric", "Arm", n_label, "Mean", "Bootstrap 95%"], rows) + [""]
     if not rate_keys and not mean_keys:

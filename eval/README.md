@@ -50,25 +50,33 @@ the report applies validity exclusions. Reports write `report.md`,
 (the arm response), `record.json` (checker, injection manifest and audit),
 and copied logs. The harness copies customer logs without reading them.
 
-## Measurement limits awaiting contract clarification
+## Contract 1.2 scoring and interruption
 
-[Contract issue #4](https://github.com/Oahsins/HUMAIN-Incident-Commander/issues/4)
-records three gaps in version 1.1:
+The generic checker supplies harmful-quarantine counts and time to mitigation.
+The report puts the censored count and Wilson interval beside the mitigation
+mean. A missing harm count makes success unknown only after a successful
+quarantine; an allowlist refusal remains harmful regardless of that count.
 
-- The generic checker exposes aggregate impact, but no ordered SLO buckets
-  from which to calculate time to mitigation. This metric stays unavailable.
-- The generic checker has no permitted field for deciding whether a quarantine
-  was harmful. Such harm and the affected case-success verdict stay unknown;
-  allowlist refusals remain measurable from the guard audit.
-- Oracle recovery is intentionally impossible for a must-escalate case, yet
-  the validity wording also excludes fault cases after two red oracle runs.
-  These cases stay explicitly pending until that rule is clarified.
+Must-escalate validity uses only the noop verdict. The oracle is never re-run
+for these cases. Fixable cases still need their oracle check. Development
+runs that omit both controls retain injection and manifest checks and say
+"not validated: no controls in this run". Held-out and transfer runs require
+controls. Missing required evidence stays pending.
 
-Missing validity controls are also shown as pending. `--report RUN --against MAIN`
-inherits matching source-case validity for log-format and model-swap conditions.
-Four-fault and extra-service variants need their own noop/oracle results.
-An ABCDE-only transfer run is descriptive and has pending validity under the
-current contract. No pending case is silently presented as a valid exam result.
+`--report RUN --against MAIN` pairs robustness cases by source id, system and
+arm, and notes differing seeds. Log-format and model-swap conditions inherit
+main-run validity; four-fault and extra-service variants need their own controls.
+The full held-out report compares label-derived strata with the sealed counts.
+
+An unreachable read is a harness error even when the arm catches it: the
+harness retains the guard's `read_error` audit entry and retries once. The
+oracle continues the remaining fixes after a failed action, retaining the
+failure. Both oracle and runbook send action reasons to the guard.
+
+Ctrl+C stops new work and kills the case processes in flight. Interrupted
+pairs get no completed record, and the manifest stays incomplete. Repeating
+the same command resumes those pairs as first attempts while preserving
+completed pairs.
 
 Every rate retains its numerator, denominator and Wilson interval. Missing
 telemetry is unavailable, not zero. Practice, pilot and synthetic fixtures carry

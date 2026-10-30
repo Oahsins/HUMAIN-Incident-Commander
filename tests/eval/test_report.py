@@ -5,7 +5,7 @@ import csv
 import struct
 
 from eval.report import build_summary, update_run_index, write_report
-from eval.storage import write_json
+from eval.storage import read_json, write_json
 
 
 def fixture_run(folder, *, condition="default", reference_ids=False, controls=True):
@@ -105,3 +105,102 @@ def test_partial_run_indexes_without_completed_records(tmp_path):
         "configuration": {"split": "dev", "arms": ["runbook"], "case_ids": ["fixture-0"]}})
     assert build_summary(folder)["arms"] == []
     assert update_run_index(folder).exists()
+
+
+def test_dev_without_controls_has_full_tables_and_explicit_limit(tmp_path):
+    folder = fixture_run(tmp_path / "results" / "practice", controls=False)
+    summary = build_summary(folder)
+    assert all(arm["n"] == 4 for arm in summary["arms"])
+    assert "not validated: no controls in this run" in summary["notes"]
+    # Control omission does not excuse a known injection failure.
+    path = folder / "cases" / "fixture-0" / "abcde" / "record.json"
+    row = read_json(path)
+    row["error"] = {"stage": "inject", "type": "RuntimeError"}
+    write_json(path, row)
+    summary = build_summary(folder)
+    assert all(arm["n"] == 3 for arm in summary["arms"])
+    assert summary["exclusions"] == [{"case_id": "fixture-0", "reason": "fault injection raised"}]
+
+
+def test_heldout_without_controls_never_uses_dev_exemption(tmp_path):
+    folder = fixture_run(tmp_path / "results" / "exam", controls=False)
+    manifest = read_json(folder / "manifest.json")
+    manifest["configuration"]["split"] = "heldout"
+    write_json(folder / "manifest.json", manifest)
+    summary = build_summary(folder)
+    assert all(arm["n"] == 0 for arm in summary["arms"])
+    assert "not validated: no controls in this run" not in summary["notes"]
+
+
+def test_mitigation_and_censor_rate_reach_presentation_schema(tmp_path):
+    folder = fixture_run(tmp_path / "results" / "mitigation", controls=False)
+    for index in range(4):
+        path = folder / "cases" / f"fixture-{index}" / "abcde" / "record.json"
+        row = read_json(path)
+        row["checker"]["impact"].update(time_to_mitigate_s=index * 10, mitigation_censored=index == 3)
+        write_json(path, row)
+    arm = next(arm for arm in build_summary(folder)["arms"] if arm["name"] == "abcde")
+    assert arm["means"]["time_to_mitigate_s"]["mean"] == 15
+    censor = arm["rates"]["mitigation_censored"]
+    assert (censor["n"], censor["N"], censor["missing"]) == (1, 4, 0)
+    assert censor["estimate"] == 0.25
+
+
+def test_robustness_pairs_keep_changed_seeds_and_report_them(tmp_path):
+    main = fixture_run(tmp_path / "results" / "main")
+    changed = fixture_run(tmp_path / "results" / "changed", condition="four_faults", reference_ids=True)
+    for path in (changed / "cases").glob("*/*/record.json"):
+        row = read_json(path)
+        row["case"]["input"]["seed"] += 100
+        write_json(path, row)
+    summary = build_summary(changed, against=main)
+    pairs = [item for item in summary["comparisons"] if "condition vs main" in item["label"]]
+    assert all(item["n"] == 4 and len(item["seed_differences"]) == 4 for item in pairs)
+    assert any("seeds differ" in note and "condition 100, main 0" in note for note in summary["notes"])
+    # A different target system still cannot be paired.
+    for path in (changed / "cases").glob("*/*/record.json"):
+        row = read_json(path)
+        row["case"]["input"]["system"] = "another-system"
+        write_json(path, row)
+    summary = build_summary(changed, against=main)
+    assert all(item["n"] == 0 for item in summary["comparisons"] if "condition vs main" in item["label"])
+
+
+def test_log_validity_inherits_main_even_when_seeds_differ(tmp_path):
+    main = fixture_run(tmp_path / "results" / "main")
+    changed = fixture_run(tmp_path / "results" / "changed", condition="log_format_v2", controls=False)
+    manifest = read_json(changed / "manifest.json")
+    manifest["configuration"]["split"] = "heldout"
+    write_json(changed / "manifest.json", manifest)
+    for path in (changed / "cases").glob("*/*/record.json"):
+        row = read_json(path)
+        row["case"]["input"]["seed"] += 10
+        write_json(path, row)
+    summary = build_summary(changed, against=main)
+    assert all(arm["n"] == 4 for arm in summary["arms"])
+    assert all(value["inherited_from"].startswith("fixture-") for value in summary["measurements"]["validity"].values())
+
+
+def test_full_heldout_compares_label_counts_with_public_composition(tmp_path):
+    from tests.eval.test_metrics import record
+    folder = tmp_path / "results" / "full"
+    case_ids = [f"invented-{index}" for index in range(60)]
+    for case_id in case_ids:
+        write_json(folder / "cases" / case_id / "abcde" / "record.json", record(case_id=case_id))
+    manifest = {"name": "full", "synthetic": True,
+                "configuration": {"split": "heldout", "arms": ["abcde"], "case_ids": case_ids}}
+    write_json(folder / "manifest.json", manifest)
+    # No sealed scenario file exists: these are invented retained records.
+    # A mistaken public total must not hide the composition discrepancy.
+    write_json(tmp_path / "scenarios" / "heldout" / "SEALED.json", {
+        "composition": {"total": 59, "singles": 60, "doubles": 0, "triples": 0,
+                        "healthy": 1, "must_escalate": 0, "named_heldout": 0, "blind": 0, "practice_only": 60}})
+    summary = build_summary(folder)
+    differences = [note for note in summary["notes"] if "composition difference" in note]
+    assert differences == ["SEALED.json composition difference — healthy: labels 0, seal 1.",
+                           "SEALED.json composition difference — total: labels 60, seal 59."]
+    assert "composition difference" in write_report(folder).read_text(encoding="utf-8")
+    # A partial selected exam does not claim a full composition comparison.
+    manifest["configuration"]["case_ids"] = manifest["configuration"]["case_ids"][:3]
+    write_json(folder / "manifest.json", manifest)
+    assert not any("composition difference" in note for note in build_summary(folder)["notes"])

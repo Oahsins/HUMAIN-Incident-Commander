@@ -258,7 +258,7 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
                         result["actions"].append(record)
                         escalate("The proposed correction was not confirmed.")
                         break
-                response = call("act", proposal["action"], proposal["target"], proposal["params"])
+                response = call("act", proposal["action"], proposal["target"], proposal["params"], proposal["reason"])
                 refused = bool(response.get("refused"))
                 declined = bool(response.get("declined")) or response.get("refused_reason") == "declined"
                 record.update({k: response[k] for k in ("ok", "refused", "refused_reason", "detail") if k in response})

@@ -1,6 +1,7 @@
 """Invented target systems exercise rules without any scenario labels or private state."""
 
 from copy import deepcopy
+import json
 
 import pytest
 
@@ -214,6 +215,27 @@ def test_supplied_guard_receives_actions_and_audit(tmp_path, clock):
     result = runbook.run_incident(Guard(adapter, audit_path=str(audit)))
     assert result["outcome"] == "recovered"
     assert '"restart"' in audit.read_text()
+
+
+@pytest.mark.parametrize("signature", ["crash", "bad_update", "bad_setting", "locked_ledger",
+                                       "stopped_worker", "slow_screening"])
+def test_rule_reason_reaches_confirmation_and_audit(signature, tmp_path, clock):
+    """The operator and retained evidence receive the same reason as the handover."""
+    adapter = FakeAdapter(signature)
+    audit = tmp_path / "audit.jsonl"
+    proposals = []
+    guarded = Guard(adapter, mode="confirm", audit_path=str(audit),
+                    confirm=lambda proposal: proposals.append(proposal) or True)
+
+    result = runbook.run_incident(guarded)
+
+    decisions = [json.loads(line) for line in audit.read_text().splitlines()]
+    actions = [entry for entry in decisions if entry.get("event") == "act"]
+    assert result["outcome"] == "recovered"
+    assert len(proposals) == len(actions) == len(result["actions"]) == 1
+    reason = result["actions"][0]["reason"]
+    assert reason
+    assert proposals[0]["reason"] == actions[0]["reason"] == reason
 
 
 def test_repeating_failed_fix_is_escalated(clock):

@@ -5,23 +5,46 @@ uses a new system. Two process boundaries let us stop an over-budget arm
 while its system remains alive for the independent verdict.
 """
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import asdict, dataclass
 import multiprocessing as mp
 import os
 from pathlib import Path
 import random
 import shutil
+import threading
 import time
 
 import psutil
 
 from ic import contract, inject, systems
+from ic.kit.net import CallError
 from . import arms
 from .storage import (RETRY_OUTCOMES, effective_record, fingerprint, pair_dir,
                       read_json, read_jsonl, run_lock, safe_name, write_json)
 
 API_ERRORS = {"http_429", "http_500", "http_502", "http_503", "http_529", "timeout", "unavailable"}
+
+
+class RunStop:
+    """Make requesting a stop and starting a new pair mutually exclusive."""
+    def __init__(self):
+        self.event = threading.Event()
+        self.launch_lock = threading.Lock()
+
+    def is_set(self):
+        return self.event.is_set()
+
+    def set(self):
+        with self.launch_lock:
+            self.event.set()
+
+    def start(self, process):
+        with self.launch_lock:
+            if self.is_set():
+                return False
+            process.start()
+            return True
 
 
 @dataclass(frozen=True)
@@ -77,6 +100,15 @@ def replace_outcome(record, outcome, start=None):
     record["result"] = replacement
 
 
+def classify_read_errors(record):
+    """The wrapper records failed reads even when an arm catches the error."""
+    read_errors = [entry for entry in record["audit"] if entry.get("event") == "read_error"]
+    if read_errors:
+        replace_outcome(record, "harness_error", record["timing"].get("t_alert"))
+        record["error"] = {"stage": "arm", "type": "CallError", "kind": read_errors[0].get("kind"),
+                           "message": "The guard recorded a target-system read failure."}
+
+
 def kill_tree(process):
     """Kill only descendants of the process this harness started."""
     if process.pid is None:
@@ -128,6 +160,10 @@ def _arm_worker(adapter, arm, model, seed, timing, audit, output, hooks, oracle_
         if not isinstance(result, dict) or "outcome" not in result:
             raise ValueError("arm did not return a result")
         payload = {"result": classify_result(result), "error": None}
+    except CallError as exc:
+        payload = {"result": failed_result(arm, "harness_error", started),
+                   "error": {"stage": "arm", "type": "CallError", "kind": exc.kind,
+                             "message": "The target system could not be read."}}
     except Exception as exc:
         payload = {"result": failed_result(arm, "arm_error", started),
                    "error": {"stage": "arm", "type": type(exc).__name__, "message": "Arm raised an exception."}}
@@ -236,6 +272,8 @@ def _case_worker(root, name, case, arm, port, split, model, timing, hooks, desti
         replace_outcome(record, "harness_error", record["timing"].get("t_alert"))
         record["error"] = {"stage": stage, "type": type(exc).__name__,
                            "message": f"Harness failed during {stage}; inspect the retained system evidence."}
+        if isinstance(exc, CallError):
+            record["error"]["kind"] = exc.kind
     finally:
         if arm_process is not None and arm_process.is_alive():
             kill_tree(arm_process)
@@ -251,12 +289,15 @@ def _case_worker(root, name, case, arm, port, split, model, timing, hooks, desti
                 if record["error"] is None:
                     record["error"] = {"stage": "stop", "type": type(exc).__name__, "message": "System cleanup failed."}
                     replace_outcome(record, "harness_error")
+    classify_read_errors(record)
     write_json(destination / "result.json", record["result"])
     write_json(destination / "record.json", record)
 
 
-def run_pair(root, name, case, arm, port, split, model, timing, hooks, destination, attempt=1, purpose="main"):
+def run_pair(root, name, case, arm, port, split, model, timing, hooks, destination, attempt=1, purpose="main", stop=None):
     destination = Path(destination)
+    if stop is not None and stop.is_set():
+        return
     if read_json(destination / "record.json") is not None:
         return
     destination.mkdir(parents=True, exist_ok=True)
@@ -273,8 +314,35 @@ def run_pair(root, name, case, arm, port, split, model, timing, hooks, destinati
         shutil.rmtree(logs)
     process = mp.get_context("spawn").Process(target=_case_worker,
         args=(str(root), name, case, arm, port, split, model, timing, hooks, str(destination), attempt, purpose))
-    process.start()
-    process.join(timeout=timing.watchdog_s)
+    if stop is None:
+        process.start()
+    elif not stop.start(process):
+        return
+    cancelled = False
+    try:
+        deadline = time.monotonic() + timing.watchdog_s
+        while process.is_alive():
+            if stop is not None and stop.is_set():
+                cancelled = True
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            process.join(timeout=min(0.1, remaining))
+        cancelled = cancelled or (stop is not None and stop.is_set())
+    except BaseException:
+        cancelled = True
+        raise
+    finally:
+        if cancelled:
+            if process.is_alive():
+                kill_tree(process)
+            # A child may have reached its atomic write while Ctrl+C arrived.
+            # It is still in flight until this parent accepts its result.
+            for filename in ("result.json", "record.json"):
+                (destination / filename).unlink(missing_ok=True)
+    if cancelled:
+        return
     if process.is_alive():
         kill_tree(process)
         outcome, message = "harness_timeout", "Per-case watchdog expired."
@@ -294,6 +362,7 @@ def run_pair(root, name, case, arm, port, split, model, timing, hooks, destinati
                 record["actions"], record["audit"] = _copy_paths(evidence["paths"], destination, evidence["audit"])
             except (OSError, ValueError):
                 pass
+        classify_read_errors(record)
         write_json(destination / "result.json", record["result"])
         write_json(destination / "record.json", record)
     completed = read_json(destination / "record.json")
@@ -341,12 +410,16 @@ def run_cases(root, *, name, cases, arm_names, split, models, copies, port_bases
                                 "git_commit": provenance.get("git_commit"), "hashes": provenance.get("hashes", {}),
                                 "split": split, "arms": list(arm_names),
                                 "condition": cases[0]["input"].get("condition", "default") if len({c["input"].get("condition", "default") for c in cases}) == 1 else "mixed"}
+        manifest["complete"] = False
         write_json(run_dir / "manifest.json", manifest)
         plan = case_order(cases, arm_names)
+        stop = RunStop()
 
         def copy_work(copy, phase):
             for case, ordered_arms in plan[copy::copies]:
                 for arm in ordered_arms:
+                    if stop.is_set():
+                        return
                     directory = pair_dir(run_dir, case["id"], arm)
                     primary = read_json(directory / "record.json")
                     destination, attempt, purpose = directory, 1, "main"
@@ -356,7 +429,8 @@ def run_cases(root, *, name, cases, arm_names, split, models, copies, port_bases
                         destination, attempt, purpose = directory / "retry", 2, "retry"
                     elif phase == "oracle":
                         effective = effective_record(directory)
-                        if (arm != "oracle" or not case["target"].get("root_causes") or effective is None
+                        if (arm != "oracle" or case["target"].get("must_escalate")
+                            or not case["target"].get("root_causes") or effective is None
                             or effective["result"]["outcome"] in RETRY_OUTCOMES | {"harness_error"}
                             or not isinstance(effective.get("checker"), dict)
                             or effective["checker"].get("recovered") is not False
@@ -365,16 +439,33 @@ def run_cases(root, *, name, cases, arm_names, split, models, copies, port_bases
                         destination, attempt, purpose = directory / "oracle-validation", 3, "oracle_recheck"
                     model = models.get(case["id"])
                     run_pair(root, name, case, arm, ports[copy], split, model, timing, hooks,
-                             destination, attempt, purpose)
+                             destination, attempt, purpose, stop)
 
         try:
             for phase in ("main", "retry", "oracle"):
-                with ThreadPoolExecutor(max_workers=copies) as pool:
+                pool = ThreadPoolExecutor(max_workers=copies)
+                try:
                     futures = [pool.submit(copy_work, copy, phase) for copy in range(copies)]
                     for future in futures:
-                        future.result()
+                        while True:
+                            try:
+                                # An unlimited wait can hide Ctrl+C on Windows.
+                                future.result(timeout=0.1)
+                                break
+                            except FutureTimeout:
+                                if future.done():
+                                    # Distinguish a worker's TimeoutError from
+                                    # a timed wait that raced its completion.
+                                    future.result(timeout=0)
+                                    break
+                                continue
+                except BaseException:
+                    stop.set()
+                    raise
+                finally:
+                    pool.shutdown(wait=True, cancel_futures=True)
         finally:
-            complete = all(read_json(pair_dir(run_dir, c["id"], a) / "record.json") is not None for c in cases for a in arm_names)
+            complete = not stop.is_set() and all(read_json(pair_dir(run_dir, c["id"], a) / "record.json") is not None for c in cases for a in arm_names)
             manifest["complete"] = complete
             manifest["updated_t"] = time.time()
             write_json(run_dir / "manifest.json", manifest)

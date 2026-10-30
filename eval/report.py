@@ -30,6 +30,7 @@ def _presentation_group(group):
         "root_precision": "reported root-cause pairs after acceptable secondary pairs are ignored",
         "root_recall": "labelled root-cause pairs",
         "harmful_attempts": "guard-audited action attempts",
+        "mitigation_censored": "valid cases with an observed mitigation censoring flag",
     }
     return {
         "n": group["N"],
@@ -45,12 +46,14 @@ def _condition(records):
     return next(iter(conditions)) if len(conditions) == 1 else "mixed"
 
 
-def _validity(records, reference=None):
-    validity = metrics.assess_validity(records)
+def _validity(records, reference=None, *, split="heldout", arms=None, reference_configuration=None):
+    validity = metrics.assess_validity(records, split=split, arms=arms)
     if reference is None:
         return validity
-    reference_validity = metrics.assess_validity(reference)
-    reference_cases = {(r["case"]["id"], r["case"]["input"]["seed"], r["case"]["input"]["system"])
+    reference_configuration = reference_configuration or {}
+    reference_validity = metrics.assess_validity(reference,
+        split=reference_configuration.get("split", "heldout"), arms=reference_configuration.get("arms"))
+    reference_cases = {(r["case"]["id"], r["case"]["input"]["system"])
                        for r in reference}
     for record in records:
         case, data = record["case"], record["case"]["input"]
@@ -59,7 +62,7 @@ def _validity(records, reference=None):
         if data.get("condition") not in {"model_swap", "log_format_v2"}:
             continue
         source = case.get("source_id", case["id"])
-        if (source, data["seed"], data["system"]) not in reference_cases:
+        if (source, data["system"]) not in reference_cases:
             continue
         own = validity[case["id"]]
         inherited = reference_validity.get(source)
@@ -96,28 +99,54 @@ def _robustness(records, validity, reference, reference_validity):
                if validity.get(r["case"]["id"], {}).get("valid") is True]
     previous = [metrics.score_record(r) for r in metrics.select_records(reference)
                 if reference_validity.get(r["case"]["id"], {}).get("valid") is True]
-    reference_map = {(r["case_id"], r["seed"], r["system"], r["arm"]): r for r in previous}
+    reference_map = {(r["source_id"], r["system"], r["arm"]): r for r in previous}
     out = []
     for arm in dict.fromkeys(r["arm"] for r in current):
-        left, right = [], []
+        left, right, seed_differences = [], [], []
         for row in current:
             if row["arm"] != arm or row["infrastructure_error"]:
                 continue
-            matched = reference_map.get((row["source_id"], row["seed"], row["system"], arm))
+            matched = reference_map.get((row["source_id"], row["system"], arm))
             if (matched is None or matched["infrastructure_error"]
                     or row["case_success"] is None or matched["case_success"] is None):
                 continue
             left.append(row["case_success"])
             right.append(matched["case_success"])
+            if row["seed"] != matched["seed"]:
+                seed_differences.append({"source_id": row["source_id"], "system": row["system"],
+                                         "condition_seed": row["seed"], "main_seed": matched["seed"]})
         # Paired change is descriptive; do not add another hypothesis test.
         out.append({**stats.paired_bootstrap(left, right), "label": f"{arm}: condition vs main",
                     "endpoint": "case success", "family": "descriptive", "p": None,
-                    "p_adjusted": None, "method": "Paired bootstrap, paired by source_id/seed/system",
+                    "p_adjusted": None, "method": "Paired bootstrap, paired by source_id/system/arm",
+                    "seed_differences": seed_differences,
                     "b": sum(a and not b for a, b in zip(left, right)),
                     "c": sum(not a and b for a, b in zip(left, right)),
                     "current_rate": stats.rate(sum(left), len(left)),
                     "reference_rate": stats.rate(sum(right), len(right))})
     return out
+
+
+def _composition_notes(run_dir, configuration, records, condition):
+    """Compare full main-exam labels with public seal counts, never case files."""
+    if configuration.get("split") != "heldout" or condition != "default":
+        return []
+    metadata = read_json(Path(run_dir).parent.parent / "scenarios" / "heldout" / "SEALED.json")
+    composition = (metadata or {}).get("composition") or {}
+    case_ids = configuration.get("case_ids", [])
+    if len(case_ids) != 60:
+        return []  # A core40 or other partial selection is not the full exam.
+    cases = {record["case"]["id"]: record["case"] for record in records}
+    if set(cases) != set(case_ids):
+        return ["SEALED.json composition comparison pending: not every selected case has a retained result."]
+    if not composition:
+        return ["SEALED.json composition comparison unavailable: public composition metadata is missing."]
+    counts = {name: sum(name in metrics.case_strata(case) for case in cases.values()) for name in metrics.STRATA}
+    counts["total"] = len(cases)
+    aliases = {"singles": "single", "doubles": "double", "triples": "triple"}
+    return [f"SEALED.json composition difference — {name}: labels {counts[aliases.get(name, name)]}, seal {expected}."
+            for name, expected in composition.items()
+            if aliases.get(name, name) in counts and counts[aliases.get(name, name)] != expected]
 
 
 def _baseline_text(summary, validity):
@@ -146,12 +175,15 @@ def build_summary(run_dir, against=None):
         raise ValueError("run manifest does not exist")
     records = load_records(run_dir, effective=False)
     reference = load_records(against, effective=False) if against is not None else None
-    if against is not None and read_json(Path(against) / "manifest.json") is None:
+    reference_manifest = read_json(Path(against) / "manifest.json") if against is not None else None
+    if against is not None and reference_manifest is None:
         raise ValueError("comparison run manifest does not exist")
-    validity = _validity(records, reference)
-    measured = metrics.summarise(records, validity)
     configuration = manifest.get("configuration", {})
     split = configuration.get("split", "unknown")
+    reference_configuration = (reference_manifest or {}).get("configuration", {})
+    validity = _validity(records, reference, split=split, arms=configuration.get("arms"),
+                         reference_configuration=reference_configuration)
+    measured = metrics.summarise(records, validity)
     case_ids = configuration.get("case_ids", [])
     scope = {"heldout": "Held-out evaluation", "transfer": "Transfer evaluation"}.get(split, "Practice evaluation — not exam evidence")
     if split == "dev" and case_ids:
@@ -162,6 +194,9 @@ def build_summary(run_dir, against=None):
         scope = "Synthetic fixture — not experiment evidence"
     arms = []
     notes = set()
+    configured_arms = set(configuration.get("arms", {record["arm"] for record in records}))
+    if split == "dev" and not configured_arms.intersection({"noop", "oracle"}):
+        notes.add("not validated: no controls in this run")
     for arm, group in measured["overall"].items():
         arms.append({"name": arm, **_presentation_group(group),
                      "strata": {key: _presentation_group(value) for key, value in measured["strata"][arm].items()}})
@@ -185,6 +220,7 @@ def build_summary(run_dir, against=None):
                             "retry": metrics.outcome(selected["result"]) if selected is not record else "not completed"})
     comparisons = _comparisons(records, validity)
     condition = _condition(records)
+    notes.update(_composition_notes(run_dir, configuration, records, condition))
     if split != "heldout" or condition != "default":
         rows = [row for row in measured["cases"] if validity[row["case_id"]]["valid"] is True]
         for comparison in comparisons:
@@ -193,7 +229,13 @@ def build_summary(run_dir, against=None):
                     rows, "abcde", "runbook", "user_impact_seconds")))
             comparison.update(p=None, p_adjusted=None, family="descriptive", method="Paired bootstrap")
     if against is not None:
-        comparisons += _robustness(records, validity, reference, metrics.assess_validity(reference))
+        robustness = _robustness(records, validity, reference, metrics.assess_validity(reference,
+            split=reference_configuration.get("split", "heldout"), arms=reference_configuration.get("arms")))
+        comparisons += robustness
+        for comparison in robustness:
+            for pair in comparison["seed_differences"]:
+                notes.add(f"Robustness pair seeds differ — {comparison['label']}, {pair['source_id']} "
+                          f"({pair['system']}): condition {pair['condition_seed']}, main {pair['main_seed']}.")
         notes.add("Robustness changes are descriptive; positive difference means higher success under the condition.")
     if split != "heldout" or condition != "default":
         notes.add("Comparisons here are descriptive; the registered hypothesis tests concern the main valid sealed cases.")
