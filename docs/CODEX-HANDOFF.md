@@ -338,7 +338,8 @@ C5a The extra_service variants and the strata check (Fri 10:00-12:00, after
       match" or the names of the strata whose counts differ. Never a case id,
       a fault or a value.
 
-C6  The final run (prepare Fri 21:00-21:30; it runs overnight)
+C6  The final run (prepare at the freeze, Fri about 17:30-18:00; it runs
+    overnight)
     - After Omar merges every open pull request and says go: tag that main
       commit freeze-1 and push the tag.
     - Clean-clone pass 1: clone tag freeze-1 into
@@ -681,11 +682,13 @@ C3a Contract 1.2 in eval/ and the runbook (Fri 12:00-14:00, before the 16:30
       attempts) and leave the manifest marked incomplete. Wait on each
       future with a timeout so Ctrl+C is noticed on Windows.
 
-Friday, also yours (follow-up prompts give the times): the model-key check and
-the harness end to end (10:00-11:00), C3a (12:00-14:00), the pilot (17:30),
-the prices check and a resume test (18:30-20:00), the dry run and checker
-calibration (20:00-21:00), baselines/FROZEN.json and a backup demo take
-(21:00-21:30). Saturday: the results report and charts from the final run.
+Friday, also yours (follow-up prompts give the times; the freeze moved to
+about 18:00): the model-key check and the harness end to end, C3a, the
+runbook tuning (about 11:00-13:00), the pilot (about 13:00), the prices check
+and a resume test (about 14:30), the dry run and checker calibration (about
+15:00-16:00), baselines/FROZEN.json and a backup demo take (at the freeze,
+about 17:30-18:00). Saturday: the results report and charts from the final
+run.
 
 8. WHEN YOU REPORT BACK TO OMAR
 Keep it short: what you built; the commands to run; test results; what you did
@@ -694,7 +697,7 @@ not test; anything that needs his decision.
 
 ## Follow-up prompts for Omar
 
-Paste these into the named session when the time comes.
+Paste these into the named session when the time comes. On Friday morning the day moved earlier (BUILD-PLAN.md section 5): GO/NO-GO 1 passed on the rehearsal, and the freeze is at about 18:00. The times below are the new ones.
 
 - **Fri 09:00-09:30 (Omar first):** read both NIGHT-REPORT.md files, review and merge the overnight pull requests and Claude's agent pull request once the tests workflow is green, in the order pull request #8 gives. If the morning is lost, do the same from 14:00. Before the 10:00 prompts, make the model key visible to every new process: add `ANTHROPIC_API_KEY` under "Edit environment variables for your account" in Windows, then restart Codex and any open PowerShell window. Session B's model runs and the final run both need it; never paste the key into a chat.
 - **Fri 09:30, Session A:** "Pull main and start C4 as a rehearsal: run the tests as C4 says, then GO/NO-GO 1 steps 1-4 in BUILD-PLAN.md section 7, and report each step's result."
@@ -702,14 +705,14 @@ Paste these into the named session when the time comes.
 - **Fri 10:00, Session B:** "Pull main. Run `python run.py demo --port-base 8400` once to check the model key (practice faults only). Then run the harness end to end on 3 practice scenarios with `--model anthropic:claude-opus-5-5`, first on 1 copy, then on 3 copies, with `--port-bases 8400,8500,8600`. At 11:00 start C2b."
 - **Fri 12:00, Session A:** "Start C5: dry-run the sealed faults without the agent, then push seal 2. Report pass/fail per fault only."
 - **Fri 12:00, Session B:** "Pull main and do C3a in docs/CODEX-HANDOFF.md: contract 1.2 in eval/ and the runbook, one pull request with a test for each change. Finish before the 16:30 runbook tuning."
-- **Fri 14:30, Session A:** "C4 for real: GO/NO-GO 1 steps 1-4 on eval port bases 8100, 8200, 8300. Report each step's result."
-- **Fri 16:30, Session B (after GO/NO-GO 1):** "Tune the runbook on dev-01 to dev-20 only; it freezes with the agent at freeze-1."
-- **Fri 17:30, Session B:** "Run the pilot: `python run.py eval --split dev --ids dev-21,dev-22,dev-23,dev-24,dev-25,dev-26,dev-27,dev-28,dev-29,dev-30 --arms abcde,react,runbook --copies 3 --model anthropic:claude-opus-5-5 --name pilot-1` (to try another candidate model, run it again with that `--model` and its own name). Send me the results table; its numbers stay internal."
-- **Fri 18:30, Session B:** "Check configs/prices.json against the provider's price page and send Claude any differences. Then test resume: stop a run and rerun it with the same name."
-- **Fri 20:00, Session B:** "Pull main first. Dry run: `python run.py eval --split dev --limit 6 --arms abcde,runbook,react,naive_verify,fifo,noop,oracle --copies 3 --name dry-1`, plus 1 practice scenario under `log_format_v2` and `extra_service` with the runbook arm, and 1 under `model_swap` with the abcde arm (check that its calls name the swap model). Report the mean minutes per incident and how many copies ran without interference. Checker calibration: run noop on the healthy practice cases dev-09, dev-18 and dev-24, four times each across 3 copies (names `calib-1` to `calib-4`); tell Claude if more than 1 of the 12 is red."
-- **Fri 21:00, Session B:** "Commit baselines/FROZEN.json (the runbook file's hash and the freeze time) and open its pull request. After the freeze tag, record one backup demo take on the frozen agent: `git fetch --tags; git switch -c codex/demo-replay freeze-1`, then `New-Item -ItemType Directory -Force replays | Out-Null; $env:IC_RECORD='replays\demo-frozen.jsonl'; python run.py demo --port-base 8400; Remove-Item Env:IC_RECORD`. Open a pull request from codex/demo-replay with only replays/demo-frozen.jsonl in it. Finish before the final run starts at 21:30."
-- **Fri 21:00, Session A (after Omar merges every open pull request):** "Start C6: tag freeze-1 and push the tag, then clean-clone pass 1 into %USERPROFILE%\Documents\HUMAIN-final with the sealed files copied in."
-- **Fri 21:30, Omar in a new PowerShell window (arms as set by GO/NO-GO 3; for the core40 cut add `--limit 40` and skip `robust-v2` and `robust-xs`):**
+- **Fri about 11:00, Session B (after pull requests #9 and #10 are merged):** "Tune the runbook on dev-01 to dev-20 only; it freezes with the agent at freeze-1."
+- **Fri about 13:00, Session B:** "Run the pilot: `python run.py eval --split dev --ids dev-21,dev-22,dev-23,dev-24,dev-25,dev-26,dev-27,dev-28,dev-29,dev-30 --arms abcde,react,runbook --copies 3 --model anthropic:claude-opus-5-5 --name pilot-1` (to try another candidate model, run it again with that `--model` and its own name). Send me the results table; its numbers stay internal."
+- **Fri about 14:30, Session B:** "Check configs/prices.json against the provider's price page and send Claude any differences. Then test resume: stop a run and rerun it with the same name."
+- **Fri about 15:00, Session B:** "Pull main first. Dry run: `python run.py eval --split dev --limit 6 --arms abcde,runbook,react,naive_verify,fifo,noop,oracle --copies 3 --name dry-1`, plus 1 practice scenario under `log_format_v2` and `extra_service` with the runbook arm, and 1 under `model_swap` with the abcde arm (check that its calls name the swap model). Report the mean minutes per incident and how many copies ran without interference. Checker calibration: run noop on the healthy practice cases dev-09, dev-18 and dev-24, four times each across 3 copies (names `calib-1` to `calib-4`); tell Claude if more than 1 of the 12 is red."
+- **Fri about 16:00, Session A:** "Pull main and run C5's sealed self-test again on it. Report pass or fail per fault only."
+- **Fri about 17:30, Session B:** "Commit baselines/FROZEN.json (the runbook file's hash and the freeze time) and open its pull request. After the freeze tag, record one backup demo take on the frozen agent: `git fetch --tags; git switch -c codex/demo-replay freeze-1`, then `New-Item -ItemType Directory -Force replays | Out-Null; $env:IC_RECORD='replays\demo-frozen.jsonl'; python run.py demo --port-base 8400; Remove-Item Env:IC_RECORD`. Open a pull request from codex/demo-replay with only replays/demo-frozen.jsonl in it. Finish before the final run starts at about 18:00."
+- **Fri about 17:30, Session A (after Omar merges every open pull request):** "Start C6: tag freeze-1 and push the tag, then clean-clone pass 1 into %USERPROFILE%\Documents\HUMAIN-final with the sealed files copied in."
+- **Fri about 18:00, Omar in a new PowerShell window (arms as set by GO/NO-GO 3; for the core40 cut add `--limit 40` and skip `robust-v2` and `robust-xs`):**
 
   Paste the whole block once: it runs the main exam, then the robustness runs, one after another in the same window, each with up to 5 tries.
 
