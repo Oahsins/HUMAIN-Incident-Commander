@@ -71,8 +71,11 @@ def select_validation(records):
 
 
 def _control_recovered(record):
-    """A retained checker verdict cannot validate an interrupted control run."""
-    if record is None or record.get("error") or outcome(record.get("result") or {}) in RETRY_OUTCOMES | {"arm_error"}:
+    """Infrastructure failures supply no validity evidence; arm crashes still do."""
+    if record is None:
+        return None
+    error = record.get("error") or {}
+    if outcome(record.get("result") or {}) in RETRY_OUTCOMES or error.get("type") == "CallError":
         return None
     return _checker_recovered(record)
 

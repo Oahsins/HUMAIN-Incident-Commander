@@ -158,12 +158,37 @@ def test_harness_error_oracle_recheck_is_pending_not_exclusion():
     assert assess_validity(rows)["invented-1"]["valid"] is False
 
 
+def test_two_red_crashed_oracle_runs_exclude_case():
+    rows = valid_fixture()
+    main = rows[3]
+    main["result"]["outcome"] = "arm_error"
+    main["checker"]["recovered"] = False
+    main["error"] = {"stage": "arm", "type": "ValueError", "message": "missing labelled fix parameter"}
+    recheck = deepcopy(main)
+    recheck.update(purpose="oracle_recheck", attempt=3)
+    rows.append(recheck)
+    value = assess_validity(rows)["invented-1"]
+    assert value["valid"] is False
+    assert value["reasons"] == ["oracle is red on both validity runs"]
+
+
 @pytest.mark.parametrize("arm, green", [("noop", True), ("oracle", False)])
-@pytest.mark.parametrize("verdict", ["harness_error", "harness_timeout", "api_error", "arm_error"])
-def test_errored_primary_controls_never_validate_or_exclude(arm, green, verdict):
+@pytest.mark.parametrize("verdict", ["harness_error", "harness_timeout", "api_error"])
+def test_infrastructure_failed_primary_controls_never_validate_or_exclude(arm, green, verdict):
     rows = valid_fixture()
     control = next(row for row in rows if row["arm"] == arm)
     control["result"]["outcome"] = verdict
+    control["checker"]["recovered"] = green
+    value = assess_validity(rows)["invented-1"]
+    assert value["valid"] is None and value["reasons"] == []
+
+
+@pytest.mark.parametrize("arm, green", [("noop", True), ("oracle", False)])
+def test_control_callerror_remains_unavailable_even_before_outcome_classification(arm, green):
+    rows = valid_fixture()
+    control = next(row for row in rows if row["arm"] == arm)
+    control["result"]["outcome"] = "arm_error"
+    control["error"] = {"stage": "arm", "type": "CallError", "kind": "refused"}
     control["checker"]["recovered"] = green
     value = assess_validity(rows)["invented-1"]
     assert value["valid"] is None and value["reasons"] == []
