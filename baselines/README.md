@@ -14,15 +14,25 @@ checks these rules in a fixed order and takes the first eligible correction:
 5. An operator stopped a worker: restart it.
 6. Callers see a slow or failing dependency with a usable standby: fail over.
 
-The next pass starts after the action's advertised settling time. A rule cannot
+The next pass waits for the action's advertised settling time and at least the
+adapter's minimum observation window. After an action, observations include
+only traffic since that action returned, capped at the usual ten-second window
+(or the adapter's longer minimum). This stops old downstream errors being blamed
+on an unrelated change after a repair. A rule cannot
 repeat the same action on the same target consecutively. A release change alone,
 a small configuration change alone or a busy scheduled job does not trigger a
 correction. The runbook checks component action lists before sending commands.
+It defers a caller's configuration change when a failing dependency edge is
+corroborated by the dependency's own symptoms. A failing edge to a healthy
+dependency still permits a local configuration fix, such as a timeout change.
 Quarantine remains available in the common safety wrapper, but none of these
 six practice signatures justifies using it.
 
 Recovery requires three consecutive passing probes spanning at least ten
 seconds, with no remaining matching rule. A healthy survey returns `no_incident`.
+If a probe fails and the earlier observations match no rule, the runbook takes
+one fresh observation before escalating. A queue may have stalled while that
+probe waited. This extra read uses the same step and time budgets.
 An unresolved failed journey goes to a human with a short SBAR. Advise mode
 returns the proposed actions without calling `act`; confirm mode honours the
 confirmation decision. Time and step limits still return an SBAR.

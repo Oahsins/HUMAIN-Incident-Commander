@@ -245,6 +245,229 @@ def test_config_chooses_severe_change_over_later_benign_change(clock):
     assert runbook.run_incident(adapter)["outcome"] == "recovered"
 
 
+class RollingHistoryAdapter(FakeAdapter):
+    """A repaired release leaves old downstream errors in a rolling window."""
+    def __init__(self, clock, remaining_config=False):
+        super().__init__("bad_update")
+        self.clock = clock
+        self.remaining_config = remaining_config
+        self.repaired_at = None
+        self.observations = []
+
+    def observe(self, window_s=10):
+        observation = super().observe(window_s)
+        self.observations.append((self.clock.monotonic(), window_s))
+        front = observation["components"]["front"]
+        # The front's recent errors came from its dependency's broken release.
+        old_errors_visible = (self.repaired_at is None
+                              or self.clock.monotonic() - window_s < self.repaired_at)
+        front.update(error_rate=0.4 if old_errors_visible else 0,
+                     reject_rate=0.6 if self.remaining_config else 0, config_version=2)
+        observation["changes"].append({"component": "front", "kind": "config", "t": 1,
+                                       "detail": {"key": "request_cap", "from": 1000,
+                                                  "to": 1 if self.remaining_config else 900}})
+        return observation
+
+    def act(self, action, target, params=None):
+        selected = action, target, params or {}
+        self.taken.append(selected)
+        if selected == ("rollback", "logic", {}):
+            self.signature = None
+            self.repaired_at = self.clock.monotonic()
+        else:
+            assert selected == ("revert_config", "front", {"key": "request_cap"})
+            self.remaining_config = False
+        return {"ok": True, "refused": False, "detail": "Done."}
+
+
+@pytest.mark.parametrize("min_window", [2, 30])
+def test_repaired_dependency_does_not_blame_benign_downstream_change(clock, min_window):
+    adapter = RollingHistoryAdapter(clock)
+    adapter.min_window = min_window
+
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == [("rollback", "logic", {})]
+    assert [(r["target"], r["class"]) for r in result["root_causes"]] == [("logic", "bad_release")]
+    assert adapter.observations[0][1] == max(10, min_window)
+    assert all(at - window >= adapter.repaired_at for at, window in adapter.observations[1:])
+
+
+def test_fresh_observation_keeps_a_genuine_remaining_config_fault(clock):
+    adapter = RollingHistoryAdapter(clock, remaining_config=True)
+
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == [("rollback", "logic", {}),
+                             ("revert_config", "front", {"key": "request_cap"})]
+    assert not any(action["refused"] for action in result["actions"])
+
+
+def test_post_action_window_respects_minimum_and_time_budget(clock):
+    adapter = RollingHistoryAdapter(clock)
+    adapter.min_window = 30
+
+    result = runbook.run_incident(adapter, budget_s=20)
+
+    assert result["outcome"] == "budget_exhausted"
+    assert adapter.taken == [("rollback", "logic", {})]
+    assert adapter.observations == [(0, 30)]
+    assert clock.now == 20
+    assert all(result["sbar"].values())
+
+
+@pytest.mark.parametrize("front_fault", [False, True])
+def test_config_rule_fixes_upstream_before_blame_from_propagated_rejects(clock, front_fault):
+    class PropagatedRejects(FakeAdapter):
+        def __init__(self):
+            super().__init__("bad_setting")
+            self.front_fault = front_fault
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            upstream_rejects = 0.7 if self.signature == "bad_setting" else 0
+            observation["components"]["front"].update(
+                reject_rate=max(upstream_rejects, 0.6 if self.front_fault else 0), config_version=2,
+                extra={"dependencies": {"logic": {"error_rate": 0, "reject_rate": upstream_rejects}}})
+            observation["changes"].append({"component": "front", "kind": "config", "t": 2,
+                "detail": {"key": "front_cap", "from": 1000, "to": 1 if self.front_fault else 900}})
+            return observation
+
+        def act(self, action, target, params=None):
+            self.taken.append((action, target, params or {}))
+            assert action == "revert_config"
+            if target == "logic":
+                self.signature = None
+            else:
+                assert target == "front"
+                self.front_fault = False
+                self.extra_changes.append({"component": "front", "kind": "config", "t": 3,
+                    "detail": {"key": "front_cap", "revert": True}})
+            return {"ok": True, "refused": False, "detail": "Done."}
+
+    adapter = PropagatedRejects()
+    result = runbook.run_incident(adapter)
+
+    expected = [("revert_config", "logic", {"key": "request_cap"})]
+    if front_fault:
+        expected.append(("revert_config", "front", {"key": "front_cap"}))
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == expected
+    assert not any(action["refused"] for action in result["actions"])
+
+
+def test_local_timeout_config_remains_eligible_when_dependency_is_healthy(clock):
+    class LocalTimeout(FakeAdapter):
+        def __init__(self):
+            super().__init__("bad_setting")
+            self.expected = ("revert_config", "logic", {"key": "lookup_wait_s"})
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            if self.signature:
+                observation["components"]["logic"].update(error_rate=0.8, reject_rate=0,
+                    extra={"dependencies": {"lookup": {"error_rate": 0.8, "reject_rate": 0}}})
+                observation["changes"][0]["detail"] = {"key": "lookup_wait_s", "from": 1, "to": 0.002}
+            return observation
+
+    adapter = LocalTimeout()
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == [adapter.expected]
+    assert result["root_causes"][0]["class"] == "bad_config"
+
+
+def test_external_outage_is_not_blame_for_a_benign_caller_config(clock):
+    class ExternalFailure(FakeAdapter):
+        def __init__(self):
+            super().__init__("external")
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            observation["components"]["consumer"].update(error_rate=0.8, config_version=2,
+                extra={"dependencies": {"outside": {"error_rate": 0.8}}})
+            observation["changes"].append({"component": "consumer", "kind": "config", "t": 2,
+                "detail": {"key": "batch_count", "from": 50, "to": 60}})
+            return observation
+
+    adapter = ExternalFailure()
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "escalated"
+    assert result["escalation"]["components"] == ["outside"]
+    assert adapter.taken == result["actions"] == []
+    assert result["root_causes"][0]["class"] == "external_outage"
+
+
+class QueueDuringProbe(FakeAdapter):
+    """The failed journey creates work; its queue ages while the probe waits."""
+    def __init__(self, clock):
+        super().__init__()
+        self.clock = clock
+        self.queue_started = None
+        self.fixed = False
+        self.expected = ("revert_config", "consumer", {"key": "batch_count"})
+
+    def observe(self, window_s=10):
+        observation = super().observe(window_s)
+        if not self.fixed:
+            observation["components"]["consumer"].update(config_version=2, extra={
+                "queue_depth": 0 if self.queue_started is None else 1,
+                "oldest_pending_s": 0 if self.queue_started is None else self.clock.monotonic() - self.queue_started,
+                "processed_per_s": 0})
+            observation["changes"].append({"component": "consumer", "kind": "config", "t": 1,
+                "detail": {"key": "batch_count", "from": 50, "to": 0}})
+        return observation
+
+    def probe(self, journey=None):
+        if not self.fixed:
+            self.queue_started = self.clock.monotonic()
+            self.clock.sleep(3.5)
+        self.probes.append(self.fixed)
+        return {"ok": self.fixed, "steps": [{"component": "consumer", "ok": self.fixed}]}
+
+    def act(self, action, target, params=None):
+        response = super().act(action, target, params)
+        self.fixed = True
+        return response
+
+
+def test_failed_probe_refreshes_queue_before_escalation(clock):
+    adapter = QueueDuringProbe(clock)
+
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == [adapter.expected]
+    assert adapter.probes == [False, True, True, True]
+    assert result["root_causes"][0]["target"] == "consumer"
+
+
+@pytest.mark.parametrize("limits", [{"max_steps": 3}, {"budget_s": 3}])
+def test_refresh_after_failed_probe_respects_budgets(clock, limits):
+    adapter = QueueDuringProbe(clock)
+
+    result = runbook.run_incident(adapter, **limits)
+
+    assert result["outcome"] == "budget_exhausted"
+    assert adapter.taken == result["actions"] == []
+    assert all(result["sbar"].values())
+
+
+def test_failed_probe_without_a_rule_refreshes_only_once(clock):
+    adapter = FakeAdapter("unrecognised")
+
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "escalated"
+    assert adapter.taken == result["actions"] == []
+    assert adapter.probes == [False]
+    assert sum(entry["name"] == "observe" for entry in result["trace"]) == 2
+
+
 def test_several_faults_are_reobserved_and_fixed_without_refusals(clock):
     class Compound(FakeAdapter):
         def __init__(self):

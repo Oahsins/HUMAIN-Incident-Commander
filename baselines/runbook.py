@@ -61,6 +61,26 @@ def _upstream_bad(component, observation):
     return False
 
 
+def _propagated_failure(component, observation):
+    """Defer a caller's config change when the dependency itself is failing.
+
+    A bad caller edge alone is insufficient: its own timeout setting may be
+    wrong while the dependency is healthy.
+    """
+    metrics = observation.get("components", {})
+    edges = (metrics.get(component["name"], {}).get("extra") or {}).get("dependencies", {})
+    for name in component.get("depends_on", []):
+        edge = edges.get(name) or {}
+        if not any(_number(edge.get(key)) > 0.05 for key in ("error_rate", "reject_rate")):
+            continue
+        upstream = metrics.get(name, {})
+        extra = upstream.get("extra") or {}
+        if (upstream.get("up") is False or extra.get("not_answering") or extra.get("lock_holders")
+                or _bad(upstream, observation.get("baseline", {}).get(name, {}))):
+            return True
+    return False
+
+
 def _candidate(action, component, cause, reason, params=None):
     return {"action": action, "target": component["name"], "params": params or {},
             "class": cause, "reason": reason}
@@ -98,7 +118,8 @@ def _rules(profile, observation):
         name = comp["name"]
         m, base = metrics.get(name, {}), baseline.get(name, {})
         changes = _changes(observation, name, "config")
-        if "revert_config" not in comp.get("actions", []) or not _bad(m, base):
+        if ("revert_config" not in comp.get("actions", []) or not _bad(m, base)
+                or _propagated_failure(comp, observation)):
             continue
         if changes:
             # A drastic reduction or zero is more suspicious than a small harmless change.
@@ -173,6 +194,7 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
     profile, observation, probe = {}, {}, {}
     steps, streak, streak_start = 0, 0, None
     previous, attempts = None, {}
+    last_action_end = None
 
     def trace(phase, kind, name, summary):
         entry = {"t": time() - result["t_start"], "phase": phase, "kind": kind, "name": name, "summary": summary}
@@ -198,6 +220,13 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
                 sleep(remaining)
             raise _BudgetReached
         sleep(max(0.0, seconds))
+
+    def observe():
+        # Old downstream errors can outlive a repair in a rolling window.
+        # Judge the next rule using only traffic since the action returned.
+        fresh_window = window_s if last_action_end is None else min(
+            window_s, max(min_window_s, monotonic() - last_action_end))
+        return call("observe", window_s=fresh_window)
 
     def diagnose(proposal):
         pair = (proposal["target"], proposal["class"])
@@ -229,11 +258,17 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
         if profile.get("capabilities", {}).get("act") is False:
             mode = "advise"
         result["mode"] = mode
-        window_s = max(10.0, profile.get("capabilities", {}).get("min_window_s", 2.0))
+        min_window_s = profile.get("capabilities", {}).get("min_window_s", 2.0)
+        window_s = max(10.0, min_window_s)
         while True:
-            observation = call("observe", window_s=window_s)
+            observation = observe()
             probe = call("probe")
             candidates = _rules(profile, observation)
+            if not candidates and probe.get("ok") is False:
+                # A slow failed probe can expose a queue that was young or
+                # empty in the earlier snapshot. Check once before escalating.
+                observation = observe()
+                candidates = _rules(profile, observation)
             if mode == "advise":
                 for order, proposal in enumerate(candidates, 1):
                     diagnose(proposal)
@@ -276,9 +311,11 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
                     escalate("The proposed correction was declined or refused; human attention is required.")
                     break
                 streak, streak_start = 0, None
+                last_action_end = monotonic()
                 comp = next(c for c in profile["components"] if c["name"] == proposal["target"])
                 seconds = comp.get("action_seconds", {}).get(proposal["action"], profile.get("actions", {}).get(proposal["action"], {}).get("est_seconds", 1.0))
-                wait(float(seconds))
+                # Collect at least the adapter's minimum window of new traffic.
+                wait(max(float(seconds), min_window_s))
                 continue
             if probe.get("ok") is True and not candidates:
                 if not result["actions"]:
