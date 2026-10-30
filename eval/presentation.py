@@ -367,12 +367,16 @@ def exclusions_section(summary):
     return lines + table(["Case", "Reason(s)"], [[case, "; ".join(r)] for case, r in reasons.items()]) + [""]
 
 
-def retry_counts_as(initial):
+def retry_counts_as(initial, retry):
+    if retry in (None, "not completed"):
+        return "Retry not completed: unresolved; not counted as a failure"
+    if retry in INFRASTRUCTURE_ERRORS or (retry == "harness_error" and initial != "harness_error"):
+        return "Retry remains unresolved; not counted as a failure"
+    if initial == "harness_error" and retry == "harness_error":
+        return "Retried once; the second harness error counts as a failure"
     if initial in INFRASTRUCTURE_ERRORS:
-        return "Infrastructure re-run: reported separately, not counted as a system failure"
-    if initial == "harness_error":
-        return "Retried once; the retry is scored, and a second harness error counts as a failure"
-    return "As scored by the harness"
+        return "Initial infrastructure error reported separately; the completed retry is scored by its outcome"
+    return "The completed retry is scored by its outcome"
 
 
 def retries_section(summary):
@@ -381,11 +385,12 @@ def retries_section(summary):
              "Two kinds of retry are listed. A harness timeout (`harness_timeout`) or a model-provider error "
              "(`api_error`) is re-run once at the end and reported separately; it is never counted as a "
              "failure of the system. An ordinary harness error (`harness_error`) is also retried once, but if "
-             "it errors again it counts as a failure. Listed cases are not excluded.", ""]
+             "it errors again it counts as a failure. Until its retry completes it remains unresolved. "
+             "Listed cases are not validity exclusions.", ""]
     if not retries:
         return lines + ["No cases were retried.", ""]
     rows = [[r.get("case_id", "?"), arm_label(r.get("arm", "?")), r.get("initial") or "unavailable",
-             r.get("retry") or "unavailable", retry_counts_as(r.get("initial"))] for r in retries]
+             r.get("retry") or "unavailable", retry_counts_as(r.get("initial"), r.get("retry"))] for r in retries]
     return lines + table(["Case", "Arm", "First attempt", "Retry", "How it counts"], rows) + [""]
 
 

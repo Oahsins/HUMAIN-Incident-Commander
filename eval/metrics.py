@@ -13,8 +13,8 @@ from collections import defaultdict
 from . import stats
 
 TRANSIENT_ERRORS = {"http_429", "http_500", "http_502", "http_503", "http_529", "timeout", "unavailable"}
-INFRASTRUCTURE_OUTCOMES = {"api_error", "harness_timeout"}
-RETRY_OUTCOMES = INFRASTRUCTURE_OUTCOMES | {"harness_error"}
+INFRASTRUCTURE_OUTCOMES = {"api_error", "harness_timeout", "harness_error"}
+RETRY_OUTCOMES = INFRASTRUCTURE_OUTCOMES.copy()
 VALIDATION_PURPOSES = {"oracle_recheck", "oracle_recheck_retry"}
 NAMED_TYPES = {"poison_payment", "stale_balances", "double_posting"}
 STRATA = ("healthy", "must_escalate", "practice_only", "named_heldout", "blind", "single", "double", "triple")
@@ -54,8 +54,10 @@ def select_records(records):
     for entries in grouped.values():
         entries = sorted(entries, key=lambda row: row.get("attempt", 1))
         first = entries[0]
-        if outcome(first.get("result") or {}) in RETRY_OUTCOMES and len(entries) > 1:
-            first = entries[1]
+        initial_outcome = outcome(first.get("result") or {})
+        if initial_outcome in RETRY_OUTCOMES and len(entries) > 1:
+            # Keep retry evidence without changing either saved attempt.
+            first = {**entries[1], "retry_of_outcome": initial_outcome}
         selected.append(first)
     return selected
 
@@ -105,13 +107,14 @@ def assess_validity(records, *, split="heldout", arms=None):
         complete_manifests = 0
         for record in entries:
             error = record.get("error") or {}
-            if isinstance(error, dict) and error.get("stage") == "inject":
+            if (isinstance(error, dict) and error.get("stage") == "inject"
+                    and record.get("injection_complete") is not True):
                 reasons.append("fault injection raised")
             complete = record.get("injection_complete", record.get("manifest") is not None and not error)
             complete_manifests += bool(complete)
             if complete and _pairs(record.get("manifest") or []) != truth:
                 reasons.append("manifest root causes differ from labels")
-        if not complete_manifests:
+        if not no_controls and not complete_manifests:
             pending.append("complete injection manifest unavailable")
         if not no_controls:
             noop = selected.get((case_id, "noop"))
@@ -165,10 +168,10 @@ def case_strata(case):
         found.append("named_heldout")
     if target.get("blind"):
         found.append("blind")
-    size = 1 if target.get("healthy") else len(roots)
+    size = 1 if target.get("healthy") else len(target.get("root_causes") or [])
     if size in (1, 2, 3):
         found.append({1: "single", 2: "double", 3: "triple"}[size])
-    if len(roots) > 3:
+    if size > 3:
         found.append("four_plus")
     return found
 
@@ -198,6 +201,10 @@ def _item_named(item, text):
 
 def score_record(record):
     """Compute one case's metrics; unknown values are None, never invented zeros."""
+    # Storage's effective view also retains the original attempts. Use them to
+    # distinguish a first harness error from the same error after its retry.
+    if record.get("attempts"):
+        record = select_records(record["attempts"])[0]
     case = record["case"]
     target = case.get("target") or {}
     result = record.get("result") or {}
@@ -228,6 +235,9 @@ def score_record(record):
     fixable = bool(roots) and not healthy and not must_escalate
     recovered = _checker_recovered(record)
     verdict = outcome(result)
+    repeated_harness_error = (verdict == "harness_error"
+                              and record.get("retry_of_outcome") == "harness_error")
+    infrastructure_error = verdict in INFRASTRUCTURE_OUTCOMES and not repeated_harness_error
     escalation = result.get("escalation") or {}
     escalated_targets = set(escalation.get("components") or [])
     required_targets = {root["target"] for root in target.get("root_causes", [])
@@ -236,7 +246,7 @@ def score_record(record):
         required_targets = {name for name, _ in roots}
     correct_escalation = verdict == "escalated" and required_targets.issubset(escalated_targets)
     success = False
-    if verdict in INFRASTRUCTURE_OUTCOMES:
+    if infrastructure_error:
         success = None
     elif healthy:
         success = False if verdict != "no_incident" or successful else recovered
@@ -270,7 +280,7 @@ def score_record(record):
         "system": (case.get("input") or {}).get("system"), "arm": record["arm"],
         "outcome": verdict, "case_success": success, "checker_recovered": recovered,
         "healthy": healthy, "must_escalate": must_escalate, "fixable": fixable,
-        "strata": case_strata(case), "infrastructure_error": verdict in INFRASTRUCTURE_OUTCOMES,
+        "strata": case_strata(case), "infrastructure_error": infrastructure_error,
         "all_clear": all_clear, "false_all_clear": (not recovered if recovered is not None else None) if all_clear else False,
         "correct_escalation": correct_escalation if must_escalate else None,
         "unnecessary_escalation": verdict == "escalated" and not must_escalate,
