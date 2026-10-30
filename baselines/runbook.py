@@ -221,11 +221,13 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
             raise _BudgetReached
         sleep(max(0.0, seconds))
 
-    def observe():
+    def observe(*, since=None):
         # Old downstream errors can outlive a repair in a rolling window.
         # Judge the next rule using only traffic since the action returned.
-        fresh_window = window_s if last_action_end is None else min(
-            window_s, max(min_window_s, monotonic() - last_action_end))
+        if last_action_end is not None:
+            since = last_action_end if since is None else max(since, last_action_end)
+        fresh_window = window_s if since is None else min(
+            window_s, max(min_window_s, monotonic() - since))
         return call("observe", window_s=fresh_window)
 
     def diagnose(proposal):
@@ -262,12 +264,14 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
         window_s = max(10.0, min_window_s)
         while True:
             observation = observe()
+            probe_started = monotonic()
             probe = call("probe")
             candidates = _rules(profile, observation)
             if not candidates and probe.get("ok") is False:
                 # A slow failed probe can expose a queue that was young or
-                # empty in the earlier snapshot. Check once before escalating.
-                observation = observe()
+                # empty in the earlier snapshot. Check the probe interval once:
+                # older healthy completions must not hide a stopped worker.
+                observation = observe(since=probe_started)
                 candidates = _rules(profile, observation)
             if mode == "advise":
                 for order, proposal in enumerate(candidates, 1):

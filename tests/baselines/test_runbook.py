@@ -468,6 +468,41 @@ def test_failed_probe_refreshes_queue_before_escalation(clock):
     assert result["root_causes"][0]["target"] == "consumer"
 
 
+@pytest.mark.parametrize("min_window", [2, 6])
+@pytest.mark.parametrize("stopped", [True, False])
+def test_failed_probe_excludes_old_worker_completions(clock, min_window, stopped):
+    class RecentWorkerChange(QueueDuringProbe):
+        def __init__(self):
+            super().__init__(clock)
+            self.min_window = min_window
+            self.queue_started = 0.0
+            self.observations = []
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            self.observations.append((clock.monotonic(), window_s))
+            if not self.fixed:
+                # Work finished just before the setting changed. A ten-second
+                # average still includes it, even though the queue is now stuck.
+                old_completion_visible = clock.monotonic() - window_s < -0.5
+                observation["components"]["consumer"]["extra"]["processed_per_s"] = (
+                    2.0 if old_completion_visible or not stopped else 0.0)
+                if not stopped:
+                    observation["changes"][0]["detail"]["to"] = 60
+            return observation
+
+    clock.sleep(5.0)  # The alert follows the setting change.
+    adapter = RecentWorkerChange()
+
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == ("recovered" if stopped else "escalated")
+    assert adapter.taken == ([adapter.expected] if stopped else [])
+    assert not any(action["refused"] for action in result["actions"])
+    assert adapter.observations[:2] == [(5.0, 10.0), (8.5, max(3.5, min_window))]
+    assert all(window >= min_window for _, window in adapter.observations)
+
+
 @pytest.mark.parametrize("limits", [{"max_steps": 3}, {"budget_s": 3}])
 def test_refresh_after_failed_probe_respects_budgets(clock, limits):
     adapter = QueueDuringProbe(clock)
