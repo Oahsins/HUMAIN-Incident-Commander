@@ -7,12 +7,12 @@ from ic.kit.conformance import check_adapter
 from tests.agent.fake_system import FakeSystem
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-AGENT_FILES = [os.path.join(ROOT, "ic", "guard.py"), os.path.join(ROOT, "ic", "llm.py")] + [
+AGENT_FILES = [os.path.join(ROOT, "ic", name) for name in ("guard.py", "llm.py", "demo.py")] + [
     os.path.join(ROOT, "ic", "agent", name) for name in sorted(os.listdir(os.path.join(ROOT, "ic", "agent")))
     if name.endswith(".py")]
 # Words that belong to one system: the practice bank's components, settings and money terms, and dispatch's.
-SYSTEM_WORDS = re.compile(r"\b(bank|banking|ledger|payments?|gateway|clearing|screening|transfer_limit|balances?|"
-                          r"dispatch|ambulance)\b", re.I)
+SYSTEM_WORDS = re.compile(r"\b(bank|banking|ledger|payments?|gateway|clearing|screening|network|reconciliation|"
+                          r"notifications?|transfer_limit|balances?|dispatch|ambulance)\b", re.I)
 
 
 def test_no_system_words_in_the_agent():

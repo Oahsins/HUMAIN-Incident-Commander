@@ -29,6 +29,7 @@ python run.py down           # stops everything
 - [Build plan](docs/BUILD-PLAN.md): timetable, roles, go/no-go checks, cut lines, test design
 - [Interface contract](docs/CONTRACT.md): how the agent, the test systems, the faults, the checker and the evaluation fit together
 - [Codex handoff](docs/CODEX-HANDOFF.md): the tasks Codex owns on the Windows laptop
+- [Adding a system](docs/ADDING-A-SYSTEM.md): how to connect the agent to a system that already runs, or build a new test system on `ic/kit`
 - [Decision log](DECISIONS.md)
 
 Once results exist, the README will add them. Results will be reported only from real runs, with n/N and intervals.
