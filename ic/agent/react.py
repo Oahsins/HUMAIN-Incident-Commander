@@ -49,7 +49,7 @@ Each turn, choose exactly one step:
 - act: one action (set action, target and params). Only the actions listed for a component can be sent. Params: failover needs "to"; quarantine needs "item"; revert_config may name "key"; otherwise null.
 - escalate: hand a fault no allowed action fixes to a person (target = the component, note = what they must do).
 - done: you believe the system is back. List every root cause you found in root_causes. A sustained check then runs; if it fails you are told and carry on.
-Several faults can be present at once. A change made shortly before a component's symptoms is strong evidence. Never act on a healthy component. Keep thought to one or two sentences."""
+Several faults can be present at once. A change made shortly before a component's symptoms is strong evidence. {prompts.HIDDEN_FAULTS} Never act on a healthy component. Keep thought to one or two sentences."""
 
 
 def _escalation(reply, incident):

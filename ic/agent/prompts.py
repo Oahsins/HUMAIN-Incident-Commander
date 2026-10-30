@@ -25,6 +25,12 @@ CLASS_MEANINGS = {
     "external_outage": "a component run by another organisation is failing; no allowed action fixes it, so escalate",
 }
 
+# Shared by every arm's instructions (the react arm states its own steps, but knows the same about faults).
+HIDDEN_FAULTS = ("One fault can hide another. While a component is down or failing, the components after it get "
+                 "little or no work, so their own faults show no symptom yet. A setting changed to a value that "
+                 "cannot work (zero or negative where a positive amount is needed, a timeout or limit far below "
+                 "what normal traffic needs) is a fault even before it shows a symptom.")
+
 _PARAMS = {"type": "object", "additionalProperties": False, "required": ["to", "item", "key"],
            "properties": {"to": {"anyOf": [{"type": "string", "enum": ["standby", "primary"]}, {"type": "null"}]},
                           "item": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
@@ -107,7 +113,7 @@ How to decide:
 - The survey lists findings in ABCDE order (Access, Bottlenecks, Capacity, Dependencies, Events), each with an id. FAULT findings are symptoms. info findings are context, such as recent changes and busy jobs.
 - Several faults can be present at once. List each one separately, in the order you found them. One fault can explain several findings: a stopped worker also explains its growing backlog.
 - A change made to the failing component shortly before its symptoms is strong evidence. A change with no symptom is usually not a fault: routine tuning (a slightly different interval, size or timeout) is normal. A job that is not running is normal.
-- One fault can hide another. While a component is down or failing, the components after it get little or no work, so their own faults show no symptom yet. A setting changed to a value that cannot work (zero or negative where a positive amount is needed, a timeout or limit far below what normal traffic needs) is a fault even before it shows a symptom: list it, with its fix.
+- {HIDDEN_FAULTS} List it, with its fix.
 - The target is the component where the fix is applied. Use only the actions listed for that component. Params: failover needs "to" ("standby", or "primary" to go back); quarantine needs "item" (the id of the work item to set aside, from the findings or logs); revert_config may name the setting in "key" (otherwise the newest change not made by the incident commander is undone); every other param is null.
 - If no allowed action fixes a fault, give the single fix action "escalate", with the component as its target, and say in its note what a person, or the organisation that runs the component, must do. A restart that only buys time is followed by "escalate".
 - Every FAULT finding id must appear in one fault's "explains", or in "dismissed" with the reason it is not a fault.
