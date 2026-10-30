@@ -123,7 +123,7 @@ def test_retry_selects_once_and_oracle_validation_never_overwrites():
     recheck = record("oracle")
     recheck.update(purpose="oracle_recheck", attempt=2)
     selected = select_records([main, retry, third, oracle, recheck])
-    assert selected == [retry, oracle]
+    assert selected == [{**retry, "retry_of_outcome": "api_error"}, oracle]
     main["result"]["outcome"] = "gave_up"
     assert select_records([main, retry])[0] is main
 
@@ -287,6 +287,54 @@ def test_summary_rates_keep_counts_and_infrastructure_not_failure():
     assert len(summary["infrastructure_attempts"]) == 1
 
 
+def test_harness_error_without_completed_retry_stays_out_of_denominator():
+    first = record(verdict="harness_error", recovered=False)
+    selected = select_records([first])
+    assert selected[0] is first
+    assert score_record(selected[0])["case_success"] is None
+    summary = summarise([first], {"invented-1": {"valid": True}})
+    group = summary["overall"]["abcde"]
+    assert group["N"] == 0 and group["infrastructure_errors"] == 1
+    assert summary["infrastructure_attempts"][0]["outcome"] == "harness_error"
+
+
+@pytest.mark.parametrize("first_outcome, unresolved", [
+    ("harness_error", False), ("api_error", True), ("harness_timeout", True)])
+def test_harness_error_counts_as_failure_only_after_matching_retry(first_outcome, unresolved):
+    first = record(verdict=first_outcome, recovered=False)
+    retry = record(verdict="harness_error", recovered=False)
+    retry.update(purpose="retry", attempt=2)
+    originals = deepcopy([first, retry])
+
+    selected = select_records([first, retry])[0]
+    scored = score_record(selected)
+
+    assert selected["retry_of_outcome"] == first_outcome
+    assert scored["case_success"] is (None if unresolved else False)
+    assert scored["infrastructure_error"] is unresolved
+    assert [first, retry] == originals  # Selection must not alter retained evidence.
+    assert score_record(select_records([selected])[0]) == scored
+    group = summarise([first, retry], {"invented-1": {"valid": True}})["overall"]["abcde"]
+    assert group["N"] == (0 if unresolved else 1)
+    assert group["rates"]["case_success"]["n"] == 0
+
+
+@pytest.mark.parametrize("first_outcome, unresolved", [("harness_error", False), ("api_error", True)])
+def test_effective_storage_record_retains_harness_retry_evidence(tmp_path, first_outcome, unresolved):
+    from eval.storage import effective_record, write_json
+
+    first = record(verdict=first_outcome, recovered=False)
+    retry = record(verdict="harness_error", recovered=False)
+    retry.update(purpose="retry", attempt=2)
+    write_json(tmp_path / "record.json", first)
+    write_json(tmp_path / "retry" / "record.json", retry)
+
+    scored = score_record(effective_record(tmp_path))
+
+    assert scored["case_success"] is (None if unresolved else False)
+    assert scored["infrastructure_error"] is unresolved
+
+
 def test_pairs_require_identical_seed_and_include_all_registered_tests():
     rows = valid_fixture()
     comparison = comparisons(rows)
@@ -363,7 +411,31 @@ def test_dev_without_controls_keeps_injection_and_manifest_checks():
     rows[0]["error"] = {"stage": "inject", "type": "RuntimeError"}
     assert assess_validity(rows, split="dev")["invented-1"]["reasons"] == ["fault injection raised"]
     rows[0]["error"] = None
-    assert assess_validity(rows, split="dev")["invented-1"]["valid"] is None
+    assert assess_validity(rows, split="dev")["invented-1"]["valid"] is True
+
+
+@pytest.mark.parametrize("stage", ["alert", "inject"])
+def test_failure_after_completed_injection_does_not_invalidate_case(stage):
+    rows = valid_fixture()
+    rows[0]["error"] = {"stage": stage, "type": "OSError"}
+    rows[0]["result"]["outcome"] = "harness_error"
+    assert assess_validity(rows)["invented-1"] == {"valid": True, "reasons": [], "pending": []}
+
+
+def test_dev_copy_that_never_started_counts_only_after_second_harness_error():
+    first = record(verdict="harness_error", recovered=False)
+    first.update(injection_complete=False, manifest=None,
+                 error={"stage": "start", "type": "OSError"})
+    first["checker"] = None
+    retry = deepcopy(first)
+    retry.update(purpose="retry", attempt=2)
+
+    for records, expected_n in [([first], 0), ([first, retry], 1)]:
+        validity = assess_validity(records, split="dev")
+        assert validity["invented-1"] == {"valid": True, "reasons": [], "pending": []}
+        group = summarise(records, validity)["overall"]["abcde"]
+        assert group["N"] == expected_n
+        assert group["rates"]["case_success"]["n"] == 0
 
 
 def test_strata_follow_root_labels_and_ignore_background_changes():
@@ -378,3 +450,14 @@ def test_strata_follow_root_labels_and_ignore_background_changes():
     assert set(case_strata(case)) == {"practice_only", "double"}
     case["target"]["root_causes"] = []
     assert case_strata(case) == []
+
+
+@pytest.mark.parametrize("count, stratum", [(2, "double"), (4, "four_plus")])
+def test_strata_count_separate_root_causes_on_the_same_pair(count, stratum):
+    case = record()["case"]
+    case["target"]["root_causes"] = [
+        {"target": "worker-x", "class": "bad_config",
+         "fix": {"action": "revert_config", "params": {"key": f"setting-{i}"}}}
+        for i in range(count)]
+
+    assert set(case_strata(case)) == {"practice_only", stratum}

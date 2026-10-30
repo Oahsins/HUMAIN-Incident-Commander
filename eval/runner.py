@@ -285,6 +285,7 @@ def _run_case(root, name, case, arm, port, split, model, timing, hooks, destinat
         record["manifest"] = hooks.inject(data["system"], control, data.get("faults", []),
             seed=data["seed"], allow_sealed=split in {"heldout", "transfer"}, t0=scheduled_start)
         record["injection_complete"] = True
+        stage = "alert"
         first_injection = min((m["t"] for m in record["manifest"]), default=scheduled_start)
         last_injection = max((m["t"] for m in record["manifest"]), default=scheduled_start)
         alert = max(time.time(), last_injection + timing.alert_delay_s)

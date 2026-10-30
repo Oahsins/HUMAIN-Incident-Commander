@@ -87,6 +87,11 @@ def test_log_condition_inherits_controls_but_keeps_injection_gap(tmp_path):
     from eval.storage import read_json
     main = fixture_run(tmp_path / "main")
     changed = fixture_run(tmp_path / "changed", condition="log_format_v2", controls=False)
+    # Robustness inherits controls from a held-out reference, not a dev exemption.
+    for folder in (main, changed):
+        manifest = read_json(folder / "manifest.json")
+        manifest["configuration"]["split"] = "heldout"
+        write_json(folder / "manifest.json", manifest)
     summary = build_summary(changed, against=main)
     assert all(a["n"] == 4 for a in summary["arms"])
     for arm in ("abcde", "runbook"):
@@ -116,6 +121,7 @@ def test_dev_without_controls_has_full_tables_and_explicit_limit(tmp_path):
     path = folder / "cases" / "fixture-0" / "abcde" / "record.json"
     row = read_json(path)
     row["error"] = {"stage": "inject", "type": "RuntimeError"}
+    row["injection_complete"] = False
     write_json(path, row)
     summary = build_summary(folder)
     assert all(arm["n"] == 3 for arm in summary["arms"])
@@ -235,3 +241,30 @@ def test_oracle_validation_retry_is_reported_separately_from_arm_retry(tmp_path)
     assert any("Oracle validation retry" in note and "retry recovered" in note for note in summary["notes"])
     scored = [row for row in summary["measurements"]["cases"] if row["case_id"] == "fixture-0" and row["arm"] == "oracle"]
     assert len(scored) == 1 and scored[0]["outcome"] == "gave_up"
+
+
+def test_interrupted_harness_retry_keeps_report_and_denominator_consistent(tmp_path):
+    folder = fixture_run(tmp_path / "interrupted-retry", controls=False)
+    path = folder / "cases" / "fixture-0" / "runbook" / "record.json"
+    first = read_json(path)
+    first.update(injection_complete=False, manifest=[], checker={},
+                 error={"stage": "start", "type": "OSError"})
+    first["result"]["outcome"] = "harness_error"
+    write_json(path, first)
+
+    pending = build_summary(folder)
+    runbook = pending["measurements"]["overall"]["runbook"]
+    assert runbook["N"] == 3
+    assert runbook["infrastructure_errors"] == 1
+    assert pending["measurements"]["validity"]["fixture-0"]["valid"] is True
+    assert pending["retries"][0]["retry"] == "not completed"
+
+    retry = deepcopy(first)
+    retry.update(attempt=2, purpose="retry")
+    write_json(path.parent / "retry" / "record.json", retry)
+    completed = build_summary(folder)
+    runbook = completed["measurements"]["overall"]["runbook"]
+    assert runbook["N"] == 4
+    assert runbook["rates"]["case_success"]["n"] == 3
+    assert runbook["infrastructure_errors"] == 0
+    assert completed["retries"][0]["retry"] == "harness_error"

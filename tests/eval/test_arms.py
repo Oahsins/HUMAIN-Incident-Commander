@@ -25,6 +25,40 @@ def test_oracle_runtime_parameter_and_then(tmp_path):
     assert roots[0]["fix"]["params"]["item"] is None
 
 
+@pytest.mark.parametrize("mode", ["auto", "advise"])
+def test_oracle_uses_each_matching_manifest_entry_once(tmp_path, mode):
+    roots = [{"target": "engine", "class": "process_down", "fix": {
+        "action": "restart", "target": "engine", "then": [
+            {"action": "quarantine", "target": "engine", "params": {"item": None}}]}}
+        for _ in range(2)]
+    manifest = [{"target": "elsewhere", "class": "process_down", "detail": {"item": 7}},
+                {"target": "engine", "class": "process_down", "detail": {"item": 91}},
+                {"target": "engine", "class": "bad_release", "detail": {"item": 8}},
+                {"target": "engine", "class": "process_down", "detail": {"item": 92}}]
+
+    result = oracle(Guard(Adapter(tmp_path), mode=mode), root_causes=roots,
+                    manifest=manifest, mode=mode)
+
+    actions = result["proposed_actions"] if mode == "advise" else result["actions"]
+    assert result["outcome"] == ("advised" if mode == "advise" else "recovered")
+    assert [a["action"] for a in actions] == ["restart", "quarantine", "restart", "quarantine"]
+    assert [a["params"]["item"] for a in actions if a["action"] == "quarantine"] == [91, 92]
+    assert [entry["detail"]["item"] for entry in manifest] == [7, 91, 8, 92]
+    assert all(root["fix"]["then"][0]["params"]["item"] is None for root in roots)
+
+
+def test_oracle_does_not_reuse_an_exhausted_manifest_match(tmp_path):
+    roots = [{"target": "engine", "class": "process_down", "fix": {
+        "action": "quarantine", "target": "engine", "params": {"item": None}}}
+        for _ in range(2)]
+    manifest = [{"target": "engine", "class": "process_down", "detail": {"item": 91}}]
+
+    with pytest.raises(ValueError, match="no matching manifest entry"):
+        oracle(Guard(Adapter(tmp_path)), root_causes=roots, manifest=manifest)
+
+    assert [entry["params"] for entry in read_jsonl(tmp_path / "actions.jsonl")] == [{"item": 91}]
+
+
 def test_oracle_escalation_is_not_action(tmp_path):
     roots = [{"target": "outside", "class": "external_outage", "fix": {"action": "escalate", "target": "outside"}}]
     result = oracle(Guard(Adapter(tmp_path)), root_causes=roots, manifest=[{"target": "outside", "class": "external_outage"}])
