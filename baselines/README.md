@@ -30,9 +30,11 @@ fell below one tenth of its previous positive value, that mirrored failure does
 not block a setting reversal. Small changes still defer to an apparent external
 outage, and an independently failing internal dependency still takes precedence.
 If the external outage remains after the reversal, the runbook escalates.
-For a down worker, a recorded stop takes priority over setting changes. A change
-made after its last exit cannot explain that exit; an earlier setting remains
-eligible for reversal if it could have caused the crash.
+For a down worker, a recorded stop takes priority over setting changes until
+that worker is started or restarted by any actor. If it crashes again, an
+unresolved setting can be reverted before another restart. A change made after
+its last exit cannot explain that exit; an earlier setting remains eligible
+for reversal if it could have caused the crash.
 Quarantine remains available in the common safety wrapper, but none of these
 six practice signatures justifies using it.
 

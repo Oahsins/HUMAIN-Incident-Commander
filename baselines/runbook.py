@@ -35,9 +35,14 @@ def _bad(metrics, baseline):
 def _changes(observation, name, kind):
     """Keep unresolved changes; an operator's undo closes the earlier change."""
     changes = [c for c in observation.get("changes", [])
-               if c.get("component") == name and c.get("kind") == kind]
+               if c.get("component") == name and (c.get("kind") == kind
+                   or (kind == "stop" and c.get("kind") in ("start", "restart")))]
     current = {}
     for change in sorted(changes, key=lambda c: c.get("t", 0)):
+        if kind == "stop" and change.get("kind") in ("start", "restart"):
+            # Any actor's start closes the old stop, even if the process crashes again.
+            current.pop("stop", None)
+            continue
         detail = change.get("detail") or {}
         key = detail.get("key") if kind == "config" else kind
         if detail.get("revert") or detail.get("rollback"):

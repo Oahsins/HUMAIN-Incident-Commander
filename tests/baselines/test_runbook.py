@@ -803,3 +803,95 @@ def test_several_faults_are_reobserved_and_fixed_without_refusals(clock):
     assert result["outcome"] == "recovered"
     assert len(result["actions"]) == 4
     assert not any(a["refused"] for a in result["actions"])
+
+
+class StoppedWorkerWithCrashingSetting(FakeAdapter):
+    """A stopped worker exits on starting until its bad setting is reverted."""
+
+    def __init__(self, clock, started_again, restart_ok):
+        super().__init__()
+        self.clock = clock
+        self.restart_ok = restart_ok
+        self.up, self.setting_bad, self.exits = False, True, []
+        epoch = clock.time() - clock.monotonic()
+        self.changes = [{"component": "consumer", "kind": "stop", "t": epoch,
+                         "actor": "operator", "detail": {}}]
+        if started_again:
+            self.changes.append({"component": "consumer", "kind": "start", "t": epoch + 1,
+                                 "actor": "operator", "detail": {}})
+            self.exits.append(2.2)
+        self.changes.append({"component": "consumer", "kind": "config", "t": epoch + 2,
+                             "actor": "operator",
+                             "detail": {"key": "poll_interval_s", "from": 0.2, "to": -1}})
+
+    def observe(self, window_s=10.0):
+        observation = super().observe(window_s)
+        consumer = observation["components"]["consumer"]
+        if self.up and not self.setting_bad:
+            consumer["extra"] = {"queue_depth": 0, "oldest_pending_s": 0, "processed_per_s": 2}
+        else:
+            consumer.update(up=False, error_rate=None, reject_rate=None, config_version=None)
+            consumer["extra"] = {"queue_depth": 6, "oldest_pending_s": self.clock.monotonic()}
+        if self.exits:
+            consumer["extra"]["last_exit_s_ago"] = round(self.clock.monotonic() - self.exits[-1], 1)
+        observation["changes"] = list(self.changes)
+        return observation
+
+    def probe(self, journey=None):
+        ok = self.up and not self.setting_bad
+        self.probes.append(ok)
+        self.clock.sleep(0.2 if ok else 3.7)
+        return {"ok": ok, "steps": [{"component": "consumer", "ok": ok}]}
+
+    def act(self, action, target, params=None):
+        self.taken.append((action, target, params or {}))
+        if (action, target) == ("restart", "consumer"):
+            self.changes.append({"component": "consumer", "kind": "restart", "t": self.clock.time(),
+                                 "actor": "incident-commander", "detail": {}})
+            if self.setting_bad:
+                self.exits.append(self.clock.monotonic() + 0.2)
+                # The process started, but the health check sees its new crash.
+                return {"ok": self.restart_ok, "refused": False, "detail": "Exited after starting."}
+            self.up = True
+        elif (action, target) == ("revert_config", "consumer"):
+            assert params == {"key": "poll_interval_s"}
+            self.setting_bad = False
+            self.changes.append({"component": "consumer", "kind": "config", "t": self.clock.time(),
+                                 "actor": "incident-commander",
+                                 "detail": {"key": "poll_interval_s", "revert": True}})
+        else:
+            raise AssertionError("Unexpected action")
+        return {"ok": True, "refused": False, "detail": "Done."}
+
+
+@pytest.mark.parametrize("started_again", [False, True], ids=["still_stopped", "started_then_exited"])
+@pytest.mark.parametrize("restart_ok", [True, False], ids=["restart_accepted", "restart_health_check_failed"])
+def test_stale_stop_record_does_not_block_reverting_a_setting_that_crashes_the_worker(clock, started_again, restart_ok):
+    clock.sleep(7.2)
+    adapter = StoppedWorkerWithCrashingSetting(clock, started_again, restart_ok)
+    result = runbook.run_incident(adapter)
+    assert result["outcome"] == "recovered"
+    expected = [("revert_config", "consumer", {"key": "poll_interval_s"}), ("restart", "consumer", {})]
+    if not started_again:
+        expected.insert(0, ("restart", "consumer", {}))
+    assert adapter.taken == expected
+    assert all(action["sent"] and not action["refused"] for action in result["actions"])
+    assert adapter.probes[-3:] == [True, True, True]
+
+
+@pytest.mark.parametrize("kind", ["start", "restart"])
+@pytest.mark.parametrize("actor", ["operator", "incident-commander"])
+def test_later_worker_start_closes_stop_even_when_timestamps_tie(kind, actor):
+    stop = {"component": "consumer", "kind": "stop", "t": 10, "actor": "operator", "detail": {}}
+    resume = {"component": "consumer", "kind": kind, "t": 10, "actor": actor, "detail": {}}
+    assert runbook._changes({"changes": [stop, resume]}, "consumer", "stop") == []
+    assert runbook._changes({"changes": [resume, stop]}, "consumer", "stop") == [stop]
+
+
+def test_worker_stop_is_closed_only_by_its_own_later_start():
+    stop = {"component": "consumer", "kind": "stop", "t": 10, "actor": "operator", "detail": {}}
+    restart = {"component": "consumer", "kind": "restart", "t": 11, "actor": "operator", "detail": {}}
+    stop_again = {**stop, "t": 12}
+    other_restart = {**restart, "component": "logic", "t": 13}
+    assert runbook._changes({"changes": [stop, other_restart]}, "consumer", "stop") == [stop]
+    assert runbook._changes({"changes": [restart, stop_again, stop]}, "consumer", "stop") == [stop_again]
