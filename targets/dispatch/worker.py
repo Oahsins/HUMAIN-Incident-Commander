@@ -58,6 +58,7 @@ class Worker(ServiceBase):
     SETTINGS = {}
     OPERATION = "work"
     BUSY_MS = 1000
+    cycle_version = None   # the settings version the current cycle ran with, set by run_loop
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -80,8 +81,11 @@ class Worker(ServiceBase):
         return check_settings(values, self.SETTINGS)
 
     def wait(self, seconds):
-        """Sleep in 0.25 s slices; return early when the settings change."""
-        _, version = self.config.values()
+        """Sleep in 0.25 s slices; return early when the settings change from the ones the cycle ran with (read
+        before it), so a change made during a cycle also cuts short the sleep its old poll_interval_s set."""
+        version = self.cycle_version
+        if version is None:
+            _, version = self.config.values()
         end = time.time() + seconds
         while True:
             left = end - time.time()
@@ -97,6 +101,7 @@ class Worker(ServiceBase):
     def run_loop(self):
         while True:
             self.server.gate.wait()
+            self.cycle_version = self.config.values()[1]   # read first: a change after it ends the next wait
             settings, bad_key = self.settings()
             if settings is None:
                 self.log_unusable(bad_key)

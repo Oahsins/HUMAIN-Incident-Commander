@@ -197,8 +197,8 @@ def pending_board(conn, now, window_s):
 
 
 def units_not_acknowledging(conn, now):
-    return conn.execute(f"SELECT COUNT(DISTINCT unit_id) FROM assignments WHERE test = 0 "
-                        f"AND status IN ('assigned', 'alerted') AND assigned_t < ?",
+    return conn.execute("SELECT COUNT(DISTINCT unit_id) FROM assignments WHERE test = 0 "
+                        "AND status IN ('assigned', 'alerted') AND assigned_t < ?",
                         (now - UNACKNOWLEDGED_S,)).fetchone()[0]
 
 

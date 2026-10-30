@@ -131,6 +131,14 @@ def started_as(pid, started_t):
         return False
 
 
+def process_tree(pid):
+    """pid, then every process it started."""
+    try:
+        return [pid] + [child.pid for child in psutil.Process(pid).children(recursive=True)]
+    except psutil.Error:
+        return [pid]
+
+
 def same_process(pid, t):
     """Is pid still the process that wrote a registry entry at time t: running, and started no later than t (with
     a second's slack for clock steps)? A pid the system has since given to a new process is not."""
@@ -261,13 +269,14 @@ class Spec:
                                                 "possible_duplicate_incidents": duplicates}
             out["unit-sync"]["extra"].update(queue)
             out["unit-sync"]["extra"]["integrity"] = {"unit_reports_overdue": overdue}
-        # The export job: how hard it works while it runs.
+        # The export job: how hard it works while it runs (each run's process and the processes it started: on
+        # Windows a venv's python.exe is a launcher that runs Python as its child).
         try:
             jobs = sup.jobs_named("incident-archive")
             archive = out["incident-archive"]
             archive["extra"]["runs"] = len(jobs)
             if jobs:
-                usages = [proc.usage(job.pid) for job in jobs]
+                usages = [proc.usage(pid) for job in jobs for pid in process_tree(job.pid)]
                 archive["cpu_pct"] = round(sum(u["cpu_pct"] or 0 for u in usages), 1)
                 archive["mem_mb"] = round(sum(u["mem_mb"] or 0 for u in usages), 1)
         except Exception:

@@ -322,6 +322,14 @@ def test_no_reserved_word_in_code_that_runs_inside_the_centre():
     assert found == [], "\n".join(found)
 
 
+def test_no_reserved_word_in_the_code_whose_text_the_agent_reads():
+    """spec.py writes what observe, probe and act return, and adapter.py serves them."""
+    found = [f"{relative(path)}:{number}: {line.strip()}"
+             for path in (os.path.join(DISPATCH, "spec.py"), os.path.join(DISPATCH, "adapter.py"))
+             for number, line in enumerate(read(path).splitlines(), 1) if RESERVED.search(line)]
+    assert found == [], "\n".join(found)
+
+
 def test_no_reserved_word_in_what_describe_shows(tmp_path):
     assert [text for text in strings_in(profile(tmp_path)) if RESERVED.search(text)] == []
 

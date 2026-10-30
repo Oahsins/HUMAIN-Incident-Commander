@@ -196,6 +196,13 @@ def double_sent(v):
     return v["integrity"]["incidents_double_sent"] > 0  # "N incidents had more than one crew en route"
 
 
+def records_behind_or_double_sent(v):
+    """A unit record that stops following its crew shows one way or the other: a record left on a state its crew
+    has left differs from the crew, and a record left at available has the unit sent again while its crew is
+    already out, so a second crew goes."""
+    return records_behind(v) or double_sent(v)
+
+
 def duplicates(v):
     return v["integrity"]["duplicate_incidents"] > 0    # "N incidents duplicate an open incident ..."
 
@@ -469,11 +476,11 @@ class TestOneCopy:
 
     def test_a_healthy_minute_with_a_small_surge_is_green(self, copy):
         control = copy.control()
-        control.surge(1.0, 30)                  # emergencies per second, well below the cap of 3
-        before = surge_logs(copy)
+        first = control.surge(1.0, 30)          # emergencies per second, well below the cap of 3
         with pytest.raises(RuntimeError, match="above the cap"):
             control.surge(2.5, 10)              # 1.0 + 2.5 is over the cap: refused, never clamped
-        assert surge_logs(copy) == before, "a refused surge places no call"
+        allowed = {os.path.join(copy.data_dir, "logs", f"call-surge-{first}.jsonl")}
+        assert surge_logs(copy) <= allowed, "a refused surge places no call"
 
         sleep_until(copy.ready_t + HEALTHY_S)
         v = check_healthy(copy, monitor_window_s=60.0)
@@ -486,7 +493,8 @@ class TestOneCopy:
         assert lines_above_info(copy.data_dir) == []
 
     def test_an_unreadable_report_is_set_aside_and_unit_sync_restarted(self, copy):
-        _, green, state = break_and_heal(copy, unreadable_report, records_behind, quarantine_then_restart)
+        _, green, state = break_and_heal(copy, unreadable_report, records_behind_or_double_sent,
+                                         quarantine_then_restart)
         listed = [entry for entry in green["integrity"]["for_operations"] if entry.get("kind") == "set_aside"]
         assert [entry["item"] for entry in listed] == [state["item"]], green["integrity"]["for_operations"]
         assert green["integrity"]["unreadable_set_aside"] == 1 and green["integrity"]["wrongly_quarantined"] == 0
@@ -528,7 +536,7 @@ def set_aside_listed(platform, state, green):
 # check or put back afterwards).
 TABLE = [
     ("kill cad", kill("cad"), not_told, fix_with("restart", "cad"), None),
-    ("stop unit-sync", stop("unit-sync"), records_behind, fix_with("restart", "unit-sync"), None),
+    ("stop unit-sync", stop("unit-sync"), records_behind_or_double_sent, fix_with("restart", "unit-sync"), None),
     ("hang dispatcher", hang("dispatcher"), not_reached, fix_with("restart", "dispatcher"), None),
     ("hang alerting", hang("alerting"), not_reached, fix_with("restart", "alerting"), None),
     ("call-handling positions 1", setting("call-handling", "positions", 1), answered_late,
@@ -540,8 +548,10 @@ TABLE = [
     ("dispatcher->alerting latency 1500 ms", slow_link("dispatcher->alerting", latency_ms=1500), not_reached,
      fix_with("failover", "alerting", {"to": "standby"}), back_to_primary),
     ("incident-archive --hold-lock 600", hold_lock, not_told, fix_with("release_lock", "cad-db"), None),
-    ("an unreadable report", unreadable_report, records_behind, quarantine_then_restart, set_aside_listed),
-    ("a far-future report for M3", far_future_report, records_behind, fix_with("restart", "unit-sync"), None),
+    ("an unreadable report", unreadable_report, records_behind_or_double_sent, quarantine_then_restart,
+     set_aside_listed),
+    ("a far-future report for M3", far_future_report, records_behind_or_double_sent,
+     fix_with("restart", "unit-sync"), None),
 ]
 
 # Three families at the real timing: (name, the break, the labelled fix).
@@ -716,10 +726,10 @@ class TestThreeCopies:
         assert poll_verdict(platform, time.time() + 60.0, is_green)[0]
         started = time.time()
         pid = control.surge(3.0, 150, mix="medical")
-        before = surge_logs(platform)
         with pytest.raises(RuntimeError, match="above the cap"):
             control.surge(0.5, 60)
-        assert surge_logs(platform) == before, "a refused surge places no call"
+        allowed = {os.path.join(platform.data_dir, "logs", f"call-surge-{pid}.jsonl")}
+        assert surge_logs(platform) <= allowed, "a refused surge places no call"
         for at in range(30, 161, 10):
             sleep_until(started + at)
             v = verdict(platform)

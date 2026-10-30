@@ -7,7 +7,9 @@ Each cycle, in this order:
    alert_timeout_s, so a path that does not answer costs a cycle at most one timeout, and the timer and new
    commits keep their pace;
 2. the acknowledgement timer: an assignment still assigned or alerted after ack_timeout_s becomes no_ack, and
-   an incident left with no other unit goes back to pending, never to be offered that unit again;
+   an incident left with no other unit goes back to pending. That unit is not offered it again for 30 s, so the
+   next free unit goes; after that it may be, so an incident every unit failed during an alerting outage is
+   dispatched once alerts get through again instead of waiting for good;
 3. pending incidents are taken in priority order, oldest first within a priority. Each gets a free unit of its
    preferred type, or of any type when none of that type is free: the closest by station (or the first in
    roster order), committed in one short transaction. The station is alerted right after the commit, on the
@@ -29,6 +31,7 @@ from targets.dispatch import area, cadstore
 from targets.dispatch.worker import Worker
 
 RETRY_S = 0.3   # an alert that was not delivered is sent again after this long
+REOFFER_S = 30.0   # a unit that failed to acknowledge an incident is not offered it again for this long
 OPEN = ", ".join(f"'{status}'" for status in cadstore.OPEN_ASSIGNMENT)
 ROSTER_ORDER = {unit: n for n, unit in enumerate(area.UNIT_IDS)}
 ALERT = ("assignment_id", "incident_id", "unit", "station", "priority", "nature", "x", "y")
@@ -36,11 +39,12 @@ ALERT = ("assignment_id", "incident_id", "unit", "station", "priority", "nature"
 INCIDENT = "SELECT id, nature, priority, unit_type, x, y, test FROM incidents"
 # A unit CAD can commit: shown available, and holding no open assignment (a record lags its crew: a unit alerted
 # a moment ago still shows available). Parameters: the test flag, then the incident, which the unit must not
-# already have failed to acknowledge.
+# have failed to acknowledge since the time given last (now less REOFFER_S): the failure's closed_t, or its
+# assigned_t on a row written without one.
 FREE = (f"SELECT u.id, u.type, u.station FROM units u WHERE u.status = 'available' AND u.test = ? "
         f"AND NOT EXISTS (SELECT 1 FROM assignments a WHERE a.unit_id = u.id AND a.status IN ({OPEN})) "
         f"AND NOT EXISTS (SELECT 1 FROM assignments a WHERE a.unit_id = u.id AND a.incident_id = ? "
-        f"AND a.status = 'no_ack')")
+        f"AND a.status = 'no_ack' AND COALESCE(a.closed_t, a.assigned_t) > ?)")
 
 
 def _number(value):
@@ -101,7 +105,7 @@ class Release(Worker):
 
     def any_unit_free(self, conn):
         """Is any real unit free at all, whatever incident it would go to?"""
-        return conn.execute(FREE + " LIMIT 1", (0, None)).fetchone() is not None   # no incident excludes a unit
+        return conn.execute(FREE + " LIMIT 1", (0, None, 0)).fetchone() is not None   # no incident excludes a unit
 
     def alerts_held(self):
         """Did the station alerting path fail in the last 0.3 s? Then alerts wait for their next turn."""
@@ -128,9 +132,9 @@ class Release(Worker):
     def expire_unacknowledged(self, conn, settings):
         """The acknowledgement timer, in one transaction: an assignment still assigned or alerted after
         ack_timeout_s becomes no_ack. Its incident, if dispatched with no other open assignment, goes back to
-        pending; free_units never offers that unit for it again. An incident a crew has already reached (en route
-        or on scene) and that is left with no open assignment closes as completed: every crew that took it on
-        has cleared, and the unit sent as well never answered."""
+        pending; free_units does not offer it that unit again for REOFFER_S. An incident a crew has already
+        reached (en route or on scene) and that is left with no open assignment closes as completed: every crew
+        that took it on has cleared, and the unit sent as well never answered."""
         due = ("SELECT id, incident_id, unit_id FROM assignments WHERE status IN ('assigned', 'alerted') "
                "AND assigned_t < ? ORDER BY id")
         if conn.execute(due + " LIMIT 1", (time.time() - settings["ack_timeout_s"],)).fetchone() is None:
@@ -175,8 +179,9 @@ class Release(Worker):
 
     def free_units(self, conn, incident):
         """Units CAD can commit to this incident: available, with its test flag, holding no open assignment, and
-        never one that has already failed to acknowledge it."""
-        return [dict(row) for row in conn.execute(FREE + " ORDER BY u.id", (incident["test"], incident["id"]))]
+        not one that failed to acknowledge it in the last REOFFER_S."""
+        return [dict(row) for row in conn.execute(FREE + " ORDER BY u.id",
+                                                  (incident["test"], incident["id"], time.time() - REOFFER_S))]
 
     def recommend(self, incident, units, settings):
         """The unit to send, or None. A test incident only ever gets TEST-1, and a real one never does. The
@@ -201,7 +206,8 @@ class Release(Worker):
         now = time.time()
         pending = conn.execute("SELECT 1 FROM incidents WHERE id = ? AND status = 'pending'",
                                (incident["id"],)).fetchone()
-        free = conn.execute(FREE + " AND u.id = ?", (incident["test"], incident["id"], unit["id"])).fetchone()
+        free = conn.execute(FREE + " AND u.id = ?",
+                            (incident["test"], incident["id"], now - REOFFER_S, unit["id"])).fetchone()
         if pending is None or free is None:
             conn.execute("ROLLBACK")
             return None

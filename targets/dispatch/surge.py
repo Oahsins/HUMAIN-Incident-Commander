@@ -290,7 +290,7 @@ class Surge:
                       f"number block {self.block.block}")
         due = begun
         try:
-            while True:
+            while self.started < MAX_EMERGENCIES:   # arrivals are random, so rate x seconds can run over
                 due += rng.expovariate(args.rate)
                 if due >= end_t:
                     break

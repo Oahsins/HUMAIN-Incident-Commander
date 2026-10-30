@@ -673,9 +673,49 @@ def test_the_helper_refuses_as_a_process_in_the_line_control_reads(copy_dir):
     [line] = result.stdout.splitlines()
     match = re.fullmatch(r"call-surge (\d+): refused: (rate must be .+)", line)
     assert match
-    with open(os.path.join(copy_dir, "logs", "call-surge.out"), "w", encoding="utf-8") as handle:
+    out = os.path.join(copy_dir, "logs", "call-surge.out")
+    with open(out, "w", encoding="utf-8") as handle:
+        handle.write("call-surge 11: refused: an earlier surge's reason\n")
+    offset = os.path.getsize(out)
+    with open(out, "a", encoding="utf-8") as handle:
         handle.write(result.stdout)
-    assert control._refusal(copy_dir, int(match.group(1))) == match.group(2)
+    assert control._refusal(out, offset) == match.group(2)
+    assert control._refusal(out, os.path.getsize(out)) == "the helper exited before registering"
+
+
+def surge_control(copy_dir, spawn):
+    """A Control for copy_dir whose spawn() is the given function (no supervisor behind it)."""
+    ctl = object.__new__(control.Control)
+    ctl.data_dir = copy_dir
+    ctl.spawn = spawn
+    return ctl
+
+
+def test_surge_finds_its_helper_started_through_a_venv_launcher(copy_dir, monkeypatch):
+    """On Windows a venv's python.exe is a launcher: spawn() returns its pid, and the helper, its child, registers
+    its own. surge() returns the helper's pid; an entry left by a process that has gone is not taken for it."""
+    me, launcher = os.getpid(), 4_000_000
+    def spawn(name, argv):
+        write_json(os.path.join(copy_dir, "surge.json"), {"helpers": [
+            {"pid": launcher, "rate": 1.0, "until_t": time.time() + 60, "started_t": T0},   # a pid reused since
+            {"pid": me, "rate": 1.0, "until_t": time.time() + 60, "started_t": spec.process_started(me)}]})
+        return launcher
+    monkeypatch.setattr(control, "process_tree", lambda pid: [pid, me] if pid == launcher else [pid])
+    monkeypatch.setattr(control.proc, "alive", lambda pid: True)
+    assert surge_control(copy_dir, spawn).surge(1.0, 60) == me
+
+
+def test_surge_gives_the_refusal_of_a_helper_started_through_a_venv_launcher(copy_dir, monkeypatch):
+    out = os.path.join(copy_dir, "logs", "call-surge.out")
+    with open(out, "w", encoding="utf-8") as handle:
+        handle.write("call-surge 11: refused: an earlier surge's reason\n")
+    def spawn(name, argv):   # the helper, the launcher's child, refused under its own pid and is gone
+        with open(out, "a", encoding="utf-8") as handle:
+            handle.write("call-surge 4000001: refused: all 5 number blocks are held by running surges\n")
+        return 4_000_000
+    monkeypatch.setattr(control.proc, "alive", lambda pid: False)
+    with pytest.raises(RuntimeError, match="call surge refused: all 5 number blocks are held by running surges"):
+        surge_control(copy_dir, spawn).surge(1.0, 60)
 
 
 def test_the_registry_caps_all_surges_together_at_three_per_second(copy_dir, running):

@@ -275,7 +275,7 @@ def test_a_unit_whose_record_still_shows_available_is_not_committed_twice(dispat
     assert not conn.in_transaction and len(assignments(conn, second)) == 0
 
 
-def test_an_unacknowledged_unit_times_out_and_is_never_offered_again(dispatch):
+def test_an_unacknowledged_unit_times_out_and_is_not_offered_it_again_for_30_s(dispatch):
     conn = dispatch.conn
     cardiac = add_incident(conn, "cardiac", (15.0, 5.0))
     dispatch.cycle()
@@ -294,6 +294,37 @@ def test_an_unacknowledged_unit_times_out_and_is_never_offered_again(dispatch):
     assert not free & {"M3", "M4", "M5", "M6"}
     warned = [r for r in dispatch.logs() if r["event"] == "no_acknowledgement"]
     assert [(r["unit"], r["incident_id"], r["level"]) for r in warned] == [(u, cardiac, "WARN") for u in sent[:3]]
+
+
+def test_a_setting_changed_during_a_cycle_cuts_short_the_sleep_it_set(dispatch):
+    """A cycle started with poll_interval_s 30; the setting is undone while it runs. The sleep after that cycle
+    ends within about 0.25 s, not 30 s later."""
+    release = dispatch.release
+    store = ConfigStore(release.data_dir, "dispatcher")
+    store.set("poll_interval_s", 30, "test")
+    time.sleep(0.3)   # the worker reads its settings file again after 0.2 s
+    release.cycle_version = release.config.values()[1]   # as run_loop reads it before the cycle
+    store.set("poll_interval_s", 0.2, "test")             # the undo lands during the cycle
+    started = time.monotonic()
+    release.wait(30)
+    assert time.monotonic() - started < 1.0
+
+
+def test_an_incident_every_unit_failed_is_offered_again_once_30_s_have_passed(dispatch):
+    """An alerting outage: every unit failed to acknowledge the incident. Once alerts get through again it is
+    dispatched, to the closest unit whose failure is at least REOFFER_S old, rather than waiting for good."""
+    conn = dispatch.conn
+    cardiac = add_incident(conn, "cardiac", (15.0, 5.0))
+    for unit in area.UNIT_IDS:
+        add_assignment(conn, cardiac, unit, "no_ack")
+    conn.execute("UPDATE assignments SET closed_t = ?", (time.time() - 5.0,))
+    dispatch.cycle()
+    assert committed(conn, cardiac) is None and row(conn, "incidents", cardiac)["status"] == "pending"
+    conn.execute("UPDATE assignments SET closed_t = ? WHERE unit_id IN ('M4', 'M9')",
+                 (time.time() - dispatcher.REOFFER_S - 1.0,))
+    dispatch.cycle()
+    assert committed(conn, cardiac) == "M4"
+    assert row(conn, "incidents", cardiac)["status"] == "dispatched"
 
 
 def test_the_timer_leaves_an_incident_a_crew_is_on(dispatch):

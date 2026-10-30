@@ -4,12 +4,14 @@ For the fault injector, the checker and the evaluation harness. Never given to t
 """
 
 import os
+import re
 import time
 
 from ic.kit import proc
 from ic.kit.client import ControlClient
 from ic.kit.store import read_json
 from targets.dispatch import cadstore
+from targets.dispatch.spec import process_tree, started_as
 
 SURGE_WAIT_S = 5.0   # how long surge() waits for the helper to register or refuse
 
@@ -41,21 +43,27 @@ class Control(ControlClient):
         """Start a burst of extra emergencies, the only source of extra calls (docs/DISPATCH.md, Call surge).
 
         rate_per_s is emergencies per second; each makes about 1.1 calls. All bursts together are capped at
-        3.0 emergencies per second, and one burst places at most 1,000. Returns the helper's pid once it has
-        registered. A burst the helper refuses (over the cap, no free number block, a bad argument) raises
-        RuntimeError with the helper's reason: it is refused, never clamped, so a case never runs without it.
+        3.0 emergencies per second, and one burst places at most 1,000. Returns the helper's own pid (the one in
+        its log lines and file names) once it has registered. A burst the helper refuses (over the cap, no free
+        number block, a bad argument) raises RuntimeError with the helper's reason: it is refused, never clamped,
+        so a case never runs without it.
         """
+        out = os.path.join(paths_for(self.data_dir)["logs"], "call-surge.out")
+        offset = _size(out)
         pid = self.spawn("call-surge", ["{python}", "-m", "targets.dispatch.surge", "--data", "{data}",
                                         "--rate", str(rate_per_s), "--seconds", str(seconds),
                                         "--seed", str(seed), "--mix", mix])
         registry = paths_for(self.data_dir)["surge_registry"]
         deadline = time.time() + SURGE_WAIT_S
         while time.time() < deadline:
+            mine = set(process_tree(pid))   # on Windows a venv's python.exe is a launcher: the helper is its child
             helpers = (read_json(registry, {"helpers": []}) or {}).get("helpers") or []
-            if any(h.get("pid") == pid for h in helpers):
-                return pid
+            for helper in helpers:   # its entry: a pid of this process tree, still the process that wrote it
+                if (isinstance(helper, dict) and isinstance(helper.get("pid"), int) and helper["pid"] in mine
+                        and started_as(helper["pid"], helper.get("started_t"))):
+                    return helper["pid"]
             if not proc.alive(pid):
-                raise RuntimeError(f"call surge refused: {_refusal(self.data_dir, pid)}")
+                raise RuntimeError(f"call surge refused: {_refusal(out, offset)}")
             time.sleep(0.05)
         raise RuntimeError(f"call surge {pid} neither registered nor refused within {SURGE_WAIT_S:.0f} s")
 
@@ -63,12 +71,24 @@ class Control(ControlClient):
         return {**super().paths(), **paths_for(self.data_dir)}
 
 
-def _refusal(data_dir, pid):
-    """The helper's own reason, from its one stdout line "call-surge <pid>: refused: <reason>"."""
-    marker = f"call-surge {pid}: refused: "
+def _size(path):
     try:
-        with open(os.path.join(data_dir, "logs", "call-surge.out"), encoding="utf-8", errors="replace") as handle:
-            lines = [line.strip() for line in handle if line.startswith(marker)]
+        return os.path.getsize(path)
     except OSError:
-        lines = []
-    return lines[-1][len(marker):] if lines else "the helper exited before registering"
+        return 0
+
+
+REFUSED = re.compile(r"call-surge \d+: refused: (.*)")
+
+
+def _refusal(out, offset):
+    """The helper's own reason: the last line "call-surge <pid>: refused: <reason>" written to call-surge.out
+    since this surge was spawned (its pid may be a venv launcher's child, so the line is found by place)."""
+    try:
+        with open(out, "rb") as handle:
+            handle.seek(offset)
+            text = handle.read().decode("utf-8", errors="replace")
+    except OSError:
+        text = ""
+    reasons = [match.group(1).strip() for match in map(REFUSED.match, text.splitlines()) if match]
+    return reasons[-1] if reasons else "the helper exited before registering"
