@@ -895,3 +895,28 @@ def test_worker_stop_is_closed_only_by_its_own_later_start():
     other_restart = {**restart, "component": "logic", "t": 13}
     assert runbook._changes({"changes": [stop, other_restart]}, "consumer", "stop") == [stop]
     assert runbook._changes({"changes": [restart, stop_again, stop]}, "consumer", "stop") == [stop_again]
+
+
+class StoppedWorkerWithTextSetting(StoppedWorkerWithCrashingSetting):
+    """The crashing setting is text, and a newer harmless setting follows it."""
+
+    def __init__(self, clock):
+        super().__init__(clock, started_again=False, restart_ok=True)
+        epoch = clock.time() - clock.monotonic()
+        self.changes = [
+            {"component": "consumer", "kind": "stop", "t": epoch, "actor": "operator", "detail": {}},
+            {"component": "consumer", "kind": "config", "t": epoch + 1, "actor": "operator",
+             "detail": {"key": "poll_interval_s", "from": 0.2, "to": "fast"}},
+            {"component": "consumer", "kind": "config", "t": epoch + 2, "actor": "operator",
+             "detail": {"key": "batch_size", "from": 50, "to": 60}},
+        ]
+
+
+def test_text_in_a_number_setting_is_reverted_before_a_newer_harmless_setting(clock):
+    clock.sleep(7.2)
+    adapter = StoppedWorkerWithTextSetting(clock)
+    result = runbook.run_incident(adapter)
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == [("restart", "consumer", {}),
+                             ("revert_config", "consumer", {"key": "poll_interval_s"}),
+                             ("restart", "consumer", {})]
