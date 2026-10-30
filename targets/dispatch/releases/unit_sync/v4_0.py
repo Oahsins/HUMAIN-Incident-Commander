@@ -59,8 +59,8 @@ class Release(Worker):
         id), taken from the reports themselves, since the queue's unit_id column is only what cad saw."""
         size = settings["batch_size"]
         items = [dict(row) for row in conn.execute(
-            "SELECT id, unit_id, payload_json, attempts FROM field_queue WHERE status = 'pending' ORDER BY id "
-            "LIMIT ?", (size,))]
+            "SELECT id, payload_json, attempts FROM field_queue WHERE status = 'pending' ORDER BY id LIMIT ?",
+            (size,))]
         rows = items
         if len(items) == size:   # more are waiting, and a newer report of a unit outdates this batch's
             rows = items + conn.execute("SELECT id, payload_json FROM field_queue WHERE status = 'pending' "

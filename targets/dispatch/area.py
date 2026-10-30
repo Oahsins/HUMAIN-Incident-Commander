@@ -75,7 +75,7 @@ FIRE_NATURES = tuple(code for code in REAL_NATURES if NATURES[code]["unit_type"]
 
 # ----- numbers -----
 
-ANI_PATTERN = re.compile(r"^0\d\d-555-01\d\d$")
+ANI_PATTERN = re.compile(r"0[0-9]{2}-555-01[0-9]{2}")   # whole string, ASCII digits only (fullmatch)
 NORMAL_PP = range(10, 40)           # 3,000 numbers, used in turn by the everyday callers
 SURGE_PP_START = 40                 # five blocks of ten PP values (1,000 numbers each), one per helper
 SURGE_BLOCKS = 5
@@ -103,7 +103,7 @@ def test_number(seq):
 
 
 def valid_number(ani):
-    return isinstance(ani, str) and ANI_PATTERN.match(ani) is not None
+    return isinstance(ani, str) and ANI_PATTERN.fullmatch(ani) is not None
 
 
 def is_test_number(ani):

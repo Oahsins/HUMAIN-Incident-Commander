@@ -1,7 +1,8 @@
 """Dispatcher release 2.1: the automated dispatch positions.
 
 Each cycle, in this order:
-1. station alerts that did not go through are sent again, every 0.3 s until one is delivered;
+1. station alerts that did not go through are sent again every 0.3 s, until one is delivered or the
+   acknowledgement timer gives up on the unit;
 2. the acknowledgement timer: an assignment still assigned or alerted after ack_timeout_s becomes no_ack, and
    an incident left with no other unit goes back to pending, never to be offered that unit again;
 3. pending incidents are taken in priority order, oldest first within a priority. Each gets a free unit of its
@@ -116,7 +117,9 @@ class Release(Worker):
     def expire_unacknowledged(self, conn, settings):
         """The acknowledgement timer, in one transaction: an assignment still assigned or alerted after
         ack_timeout_s becomes no_ack. Its incident, if dispatched with no other open assignment, goes back to
-        pending; free_units never offers that unit for it again."""
+        pending; free_units never offers that unit for it again. An incident a crew has already reached (en route
+        or on scene) and that is left with no open assignment closes as completed: every crew that took it on
+        has cleared, and the unit sent as well never answered."""
         due = ("SELECT id, incident_id, unit_id FROM assignments WHERE status IN ('assigned', 'alerted') "
                "AND assigned_t < ? ORDER BY id")
         if conn.execute(due + " LIMIT 1", (time.time() - settings["ack_timeout_s"],)).fetchone() is None:
@@ -124,12 +127,16 @@ class Release(Worker):
         conn.execute("BEGIN IMMEDIATE")
         now = time.time()
         rows = conn.execute(due, (now - settings["ack_timeout_s"],)).fetchall()
+        no_unit_left = f"NOT EXISTS (SELECT 1 FROM assignments WHERE incident_id = ? AND status IN ({OPEN}))"
         for row in rows:
+            incident_id = row["incident_id"]
             conn.execute("UPDATE assignments SET status = 'no_ack', closed_t = ? WHERE id = ?", (now, row["id"]))
             conn.execute(f"UPDATE incidents SET status = 'pending', attempts = attempts + 1, pending_since = ?, "
-                         f"updated_t = ? WHERE id = ? AND status = 'dispatched' AND NOT EXISTS (SELECT 1 FROM "
-                         f"assignments WHERE incident_id = ? AND status IN ({OPEN}))",
-                         (now, now, row["incident_id"], row["incident_id"]))
+                         f"updated_t = ? WHERE id = ? AND status = 'dispatched' AND {no_unit_left}",
+                         (now, now, incident_id, incident_id))
+            conn.execute(f"UPDATE incidents SET status = 'closed', close_reason = 'completed', closed_t = ?, "
+                         f"updated_t = ? WHERE id = ? AND status IN ('enroute', 'onscene') AND {no_unit_left}",
+                         (now, now, incident_id, incident_id))
         conn.execute("COMMIT")
         for row in rows:
             self.log.warn("no_acknowledgement",

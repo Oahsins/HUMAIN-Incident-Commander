@@ -12,7 +12,10 @@ the database directly, so they still answer while the dispatcher or unit-sync is
 import os
 import sqlite3
 import time
+from contextlib import contextmanager
+from urllib.parse import quote
 
+from ic.kit.store import read_json
 from targets.dispatch import area
 
 DB_CLOCK = "(julianday('now') - 2440587.5) * 86400.0"
@@ -97,10 +100,56 @@ def locks_path(data_dir):
     return os.path.join(data_dir, "cad_locks.json")
 
 
+class HoldersBusy(Exception):
+    """cad_locks.json stayed locked by another process."""
+
+
+@contextmanager
+def holders_lock(data_dir, wait_s=2.0):
+    """A short lock on cad_locks.json, for every process that rewrites it: cad_locks.lock, made with
+    O_CREAT|O_EXCL and closed at once (Windows has no fcntl, and cannot remove an open file). Tried every 50 ms
+    for up to wait_s; one older than 5 s was left by a process that died while holding it, and is removed."""
+    lock = os.path.splitext(locks_path(data_dir))[0] + ".lock"
+    deadline = time.time() + wait_s
+    while True:
+        try:
+            os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except FileExistsError:
+            try:
+                if time.time() - os.path.getmtime(lock) > 5.0:
+                    os.remove(lock)
+            except OSError:
+                pass
+        except PermissionError:   # Windows: another process is removing it
+            pass
+        if time.time() >= deadline:
+            raise HoldersBusy()
+        time.sleep(0.05)
+    try:
+        yield
+    finally:
+        try:
+            os.remove(lock)
+        except OSError:
+            pass
+
+
+def lock_holders(data_dir):
+    """The entries of cad_locks.json that are well formed: a dict with a whole pid above 0. Never raises."""
+    try:
+        doc = read_json(locks_path(data_dir), {"holders": []})
+    except OSError:
+        return []
+    holders = doc.get("holders") if isinstance(doc, dict) else None
+    return [h for h in holders if isinstance(h, dict) and isinstance(h.get("pid"), int)
+            and not isinstance(h["pid"], bool) and h["pid"] > 0] if isinstance(holders, list) else []
+
+
 def connect(data_dir, busy_timeout_ms=1000, readonly=False):
     """Open cad-db. Writers wait up to busy_timeout_ms for a lock, then fail with 'database is locked'."""
-    if readonly:
-        uri = "file:" + path(data_dir).replace("\\", "/") + "?mode=ro"
+    if readonly:   # quoted, so a folder name with "#", "?" or "%" cannot change what the URI opens
+        uri = "file:" + quote(path(data_dir).replace("\\", "/"), safe="/:") + "?mode=ro"
         conn = sqlite3.connect(uri, uri=True, timeout=busy_timeout_ms / 1000, isolation_level=None,
                                check_same_thread=False)
     else:

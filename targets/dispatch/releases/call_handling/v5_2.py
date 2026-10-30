@@ -39,6 +39,8 @@ class Release(ServiceBase):
         self.seats = {}             # position number -> call_id of the call it is answering
         self.calls = {}             # call_id -> {call_id, ani, test, answered_t, position, location}
         self.answered = Window()
+        self.unusable_lock = threading.Lock()
+        self.unusable_mark = (0.0, 0)   # when settings_unusable was last written, and how often it came up since
 
     def routes(self):
         return {("POST", "/dial"): self.dial, ("POST", "/calls/*"): self.report}
@@ -233,10 +235,20 @@ class Release(ServiceBase):
         """The settings in force, or None once a value cannot be used (logged by its key, never its value)."""
         settings, bad_key = check_settings(self.config.values()[0], self.SETTINGS)
         if settings is None:
-            self.log_every("settings_unusable", 2.0, "ERROR", "settings_unusable",
-                           f"setting {bad_key} cannot be used; calls are not answered until it changes",
-                           key=bad_key)
+            self._log_unusable(bad_key, "calls are not answered until it changes")
         return settings
+
+    def _log_unusable(self, bad_key, effect):
+        """One ERROR line every 2 s naming the setting. Not log_every: its own first parameter is called key."""
+        now = time.time()
+        with self.unusable_lock:
+            last_t, count = self.unusable_mark
+            if now - last_t < 2.0:
+                self.unusable_mark = (last_t, count + 1)
+                return
+            self.unusable_mark = (now, 0)
+        self.log.error("settings_unusable", f"setting {bad_key} cannot be used; {effect}", occurrences=count + 1,
+                       key=bad_key)
 
     def _settings(self):
         settings = self._usable()

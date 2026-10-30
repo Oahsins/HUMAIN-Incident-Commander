@@ -15,6 +15,8 @@ import os
 import sqlite3
 import time
 
+import psutil
+
 from ic.contract import CONTRACT_VERSION
 from ic.kit import net, proc
 from ic.kit.store import ConfigStore, Routing, read_json, write_json
@@ -109,8 +111,34 @@ def surge_registry_path(data_dir):
     return os.path.join(data_dir, "surge.json")
 
 
-def live_entries(path, key):
-    return [h for h in (read_json(path, {key: []}) or {}).get(key) or [] if proc.alive(h.get("pid"))]
+def same_process(pid, t):
+    """Is pid still the process that wrote a registry entry at time t: running, and started no later than t (with
+    a second's slack for clock steps)? A pid the system has since given to a new process is not."""
+    try:
+        process = psutil.Process(pid)
+        return (process.is_running() and process.status() != psutil.STATUS_ZOMBIE
+                and process.create_time() <= t + 1.0)
+    except (psutil.Error, OSError, TypeError, ValueError, OverflowError):
+        return False
+
+
+def live_holders(data_dir):
+    """cad_locks.json's sessions whose process is still the one that registered (by since_t)."""
+    return [h for h in cadstore.lock_holders(data_dir)
+            if _real(h.get("since_t")) and same_process(h["pid"], h["since_t"])]
+
+
+def live_helpers(data_dir):
+    """surge.json's helpers still running: well-formed entries whose process started before its until_t."""
+    try:
+        doc = read_json(surge_registry_path(data_dir), {"helpers": []})
+    except OSError:
+        return []
+    helpers = doc.get("helpers") if isinstance(doc, dict) else None
+    if not isinstance(helpers, list):
+        return []
+    return [h for h in helpers if isinstance(h, dict) and _whole(h.get("pid")) and h["pid"] > 0
+            and _real(h.get("until_t")) and same_process(h["pid"], h["until_t"])]
 
 
 class Spec:
@@ -131,6 +159,9 @@ class Spec:
         write_json(cadstore.locks_path(d), {"holders": []})
         write_json(os.path.join(d, "probe.json"), {"seq": 0})
         write_json(surge_registry_path(d), {"helpers": []})
+        write_json(os.path.join(d, "checker_baseline.json"),   # replaced by the warm-up's own (Platform.after_warmup)
+                   {"t": None, "window_s": None, "n": 0, "success_rate": None, "answer_p95_ms": None,
+                    "answer_p90_ms": None})
         os.makedirs(os.path.join(d, "surge-slots"), exist_ok=True)
         for name in (*ALERT_INBOXES.values(), "people.jsonl"):
             open(os.path.join(d, name), "a", encoding="utf-8").close()
@@ -140,9 +171,11 @@ class Spec:
                                 "--mdt-port", sup.ports["cad"], "--seed", sup.seed)
 
     def cleanup(self, sup):
-        for entry in (live_entries(cadstore.locks_path(sup.data_dir), "holders")
-                      + live_entries(surge_registry_path(sup.data_dir), "helpers")):
-            proc.kill(entry["pid"])
+        for entry in live_holders(sup.data_dir) + live_helpers(sup.data_dir):
+            try:
+                proc.kill(entry["pid"])
+            except psutil.Error:
+                pass
 
     # ----- what the agent sees -----
 
@@ -163,16 +196,24 @@ class Spec:
         }
 
     def observe_extra(self, sup, out, window_s):
+        """CAD's own monitors (docs/DISPATCH.md, Monitors), each on the component that owns the watchdog. Every
+        step is guarded: observe never fails over a monitor."""
         now = time.time()
-        # Failed writes: each writer counts its own; they show as cad-db's write_errors, as a DBA's counter would.
-        counts = [(out.get(name) or {}).get("extra", {}).pop("db_write_errors", None) for name in WRITERS]
-        counts = [c for c in counts if isinstance(c, int)]
         store = out["cad-db"]
+        # Failed writes: each writer counts its own; they show as cad-db's write_errors, as a DBA's counter would.
+        counts = []
+        for name in WRITERS:
+            extra = (out.get(name) or {}).get("extra")
+            count = extra.pop("db_write_errors", None) if isinstance(extra, dict) else None
+            if _whole(count):
+                counts.append(count)
         store["extra"]["write_errors"] = sum(counts) if counts else None
-        store["extra"]["lock_holders"] = [
-            {"session": h.get("session"), "mode": h.get("mode"),
-             "held_s": round(max(0.0, now - float(h.get("since_t") or now)), 1), "statement": h.get("statement", "")}
-            for h in self._live_lock_holders(sup)]
+        try:
+            store["extra"]["lock_holders"] = [
+                {"session": h.get("session"), "mode": h.get("mode"), "held_s": round(max(0.0, now - h["since_t"]), 1),
+                 "statement": h.get("statement", "")} for h in live_holders(sup.data_dir)]
+        except Exception:   # a damaged lock file shows no holder rather than breaking observe
+            store["extra"]["lock_holders"] = []
         # CAD's monitors, read from cad-db itself, so they show while the dispatcher or unit-sync is down.
         try:
             conn = cadstore.connect(sup.data_dir, busy_timeout_ms=300, readonly=True)
@@ -188,6 +229,8 @@ class Spec:
         except sqlite3.Error as exc:
             store["up"] = False
             store["extra"]["error"] = f"cad-db cannot be read ({type(exc).__name__})"
+        except Exception:   # a row no monitor can read: cad-db answers, and its monitors sit this one out
+            store["up"] = True
         else:
             store["up"] = True
             out["dispatcher"]["extra"].update(board)
@@ -197,16 +240,16 @@ class Spec:
             out["unit-sync"]["extra"].update(queue)
             out["unit-sync"]["extra"]["integrity"] = {"unit_reports_overdue": overdue}
         # The export job: how hard it works while it runs.
-        jobs = sup.jobs_named("incident-archive")
-        archive = out["incident-archive"]
-        archive["extra"]["runs"] = len(jobs)
-        if jobs:
-            usages = [proc.usage(job.pid) for job in jobs]
-            archive["cpu_pct"] = round(sum(u["cpu_pct"] or 0 for u in usages), 1)
-            archive["mem_mb"] = round(sum(u["mem_mb"] or 0 for u in usages), 1)
-
-    def _live_lock_holders(self, sup):
-        return live_entries(cadstore.locks_path(sup.data_dir), "holders")
+        try:
+            jobs = sup.jobs_named("incident-archive")
+            archive = out["incident-archive"]
+            archive["extra"]["runs"] = len(jobs)
+            if jobs:
+                usages = [proc.usage(job.pid) for job in jobs]
+                archive["cpu_pct"] = round(sum(u["cpu_pct"] or 0 for u in usages), 1)
+                archive["mem_mb"] = round(sum(u["mem_mb"] or 0 for u in usages), 1)
+        except Exception:
+            pass
 
     # ----- the test call (the agent's probe) -----
 
@@ -252,11 +295,8 @@ class Spec:
         if not isinstance(call_id, str):
             return step("call-handling", False, t0, "answered without a call id")
         step("call-handling", True, t0, "answered")
-        # call-network: the location service found the test caller (recorded; the call goes on either way)
         location = answer.get("location")
         located = _near(location, area.TEST_XY, 0.05)
-        step("call-network", located, t0, "location verified" if located else
-             "location not verified (unavailable)" if location is None else "location not verified (differs)")
 
         # cad: the call is entered and the caller is told help is on the way
         t1 = time.perf_counter()
@@ -278,6 +318,9 @@ class Spec:
         ok, detail = _test_incident_recorded(d, incident_id, call_id)
         if not step("cad-db", ok, t2, detail):
             return False
+        # call-network: the location service found the test caller (recorded; the call went on either way)
+        step("call-network", located, t0, "location verified" if located else
+             "location not verified (unavailable)" if location is None else "location not verified (differs)")
 
         # dispatcher: TEST-1 is committed to the incident
         t3 = time.perf_counter()
@@ -376,13 +419,14 @@ class Spec:
         return True, f"{target} now served by its {to}"
 
     def _release_lock(self, sup, actor):
-        path = cadstore.locks_path(sup.data_dir)
+        """End every registered session still holding cad-db (checked to be the process that registered, so a
+        reused pid is never ended), under the lock every writer of cad_locks.json takes."""
         ended = []
-        for holder in (read_json(path, {"holders": []}) or {}).get("holders") or []:
-            if proc.alive(holder.get("pid")):
+        with cadstore.holders_lock(sup.data_dir):
+            for holder in live_holders(sup.data_dir):
                 proc.kill(holder["pid"])
                 ended.append(holder.get("session"))
-        write_json(path, {"holders": []})
+            write_json(cadstore.locks_path(sup.data_dir), {"holders": []})
         if not ended:
             return False, "no session was holding a cad-db lock"
         sup.changes.add("cad-db", "lock_release", actor, sessions=ended)
@@ -412,8 +456,7 @@ class Spec:
                "config": {c["name"]: ConfigStore(d, c["name"]).load()["values"]
                           for c in self.components(sup.condition) if c.get("config") is not None},
                "links": sup.links, "routing": Routing(d).load(),
-               "lock_holders": (read_json(cadstore.locks_path(d), {"holders": []}) or {}).get("holders") or [],
-               "surge_helpers": live_entries(surge_registry_path(d), "helpers"), "data_dir": d}
+               "lock_holders": cadstore.lock_holders(d), "surge_helpers": live_helpers(d), "data_dir": d}
         try:
             conn = cadstore.connect(d, busy_timeout_ms=2000, readonly=True)
             try:
@@ -446,6 +489,14 @@ def _size(path):
 
 def _whole(value):
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _real(value):
+    """A finite int or float; true and false are not numbers."""
+    try:
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _whole_param(value):

@@ -40,6 +40,8 @@ class Release(ServiceBase):
         super().__init__(ctx)
         self.local = threading.local()
         self.write_errors = Window()
+        self.unusable_lock = threading.Lock()
+        self.unusable_mark = (0.0, 0)   # when settings_unusable was last written, and how often it came up since
 
     def routes(self):
         return {("POST", "/calls"): self.create_call, ("POST", "/mdt"): self.mdt}
@@ -202,11 +204,22 @@ class Release(ServiceBase):
         value."""
         settings, bad_key = check_settings(self.config.values()[0], self.SETTINGS)
         if settings is None:
-            self.log_every("settings_unusable", 2.0, "ERROR", "settings_unusable",
-                           f"setting {bad_key} cannot be used; calls and unit reports are refused until it "
-                           f"changes", key=bad_key)
+            self._log_unusable(bad_key)
             raise net.Reply(503, dict(UNAVAILABLE))
         return settings
+
+    def _log_unusable(self, bad_key):
+        """One ERROR line every 2 s naming the setting. Not log_every: its own first parameter is called key."""
+        now = time.time()
+        with self.unusable_lock:
+            last_t, count = self.unusable_mark
+            if now - last_t < 2.0:
+                self.unusable_mark = (last_t, count + 1)
+                return
+            self.unusable_mark = (now, 0)
+        self.log.error("settings_unusable",
+                       f"setting {bad_key} cannot be used; calls and unit reports are refused until it changes",
+                       occurrences=count + 1, key=bad_key)
 
 
 def valid_number(ani):
