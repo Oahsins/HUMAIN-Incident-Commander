@@ -734,7 +734,7 @@ Checklist for a test system:
 - The six actions, the component kinds and the root-cause classes (`ic/contract.py`).
 - `ic/kit/`. Every test system shares it, so a change to it changes the bank too. It is part of the system hash and freezes at `freeze-1`: a change a new system needs waits until the final and robustness runs end, and is recorded in `DECISIONS.md` (CONTRACT 15). Following this guide on both paths needed no change to it.
 
-Dispatch, the transfer system, adds files only under `targets/dispatch/`, `tests/dispatch/`, `scenarios/transfer/` (its cases in `dispatch.jsonl`) and `docs/` (CONTRACT 15). Any other system to run the exam on also needs `eval/` to load its scenario file and seal its faults (`select_cases` in `eval/cli.py`, `_sealed_roots` in `eval/seals.py`). That change also waits until the final and robustness runs end. `ic/systems.py` finds every system by its folder.
+Dispatch, the transfer system, adds files only under `targets/dispatch/`, `tests/dispatch/`, `scenarios/transfer/` (its cases in `dispatch.jsonl`) and `docs/` (CONTRACT 15). It has no practice faults in the repository: `targets/dispatch/faults/` is Session A's and is sealed as a whole, and a practice plugin there could shadow a sealed type of the same name. Its builder checks each break and heal by hand through Control instead. Any other system to run the exam on also needs `eval/` to load its scenario file and seal its faults (`select_cases` in `eval/cli.py`, `_sealed_roots` in `eval/seals.py`). That change also waits until the final and robustness runs end. `ic/systems.py` finds every system by its folder.
 
 ## 5. Where the code does less than the contract
 

@@ -40,6 +40,7 @@ CASES = [
     ("crash", {"target": "payments"}),
     ("crash", {}),
     ("bad_update", {}),
+    ("unrecorded_payments", {}),
     ("bad_setting", {"variant": "transfer_limit"}),
     ("bad_setting", {"variant": "screening_timeout"}),
     ("bad_setting", {"variant": "clearing_batch"}),
