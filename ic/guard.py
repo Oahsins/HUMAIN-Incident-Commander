@@ -14,7 +14,9 @@ directly. The guard, not the model, decides what may be sent:
   advise never sends and keeps the action as a proposal. dry_run is advise
   mode for tests and rehearsals.
 - audit: one line per decision, in memory and, when audit_path is given, in a
-  JSON Lines file.
+  JSON Lines file. A read that raises CallError (the system cannot be reached)
+  is audited too and raised on, so the harness sees it even when the arm
+  catches it and hands over.
 - redaction: log text the model will read has secrets and personal data
   masked first.
 
@@ -27,6 +29,7 @@ import re
 import time
 
 from ic.contract import ACTIONS, AGENT_MAX_STEPS, GUARD_MAX_ACTIONS, GUARD_MAX_REPEATS, MODES
+from ic.kit.net import CallError
 
 
 class StepLimit(Exception):
@@ -99,25 +102,32 @@ class Guard:
         if self.on_step:
             self.on_step(name, self.steps)
 
+    def _read(self, name, *args):
+        """One read from the adapter, as one step. CallError means the system cannot be reached: the
+        harness counts the case as a harness error (CONTRACT.md section 11), so it is audited before
+        it goes on to the arm."""
+        self._step(name)
+        try:
+            return getattr(self.adapter, name)(*args)
+        except CallError as exc:
+            self._audit({"event": "read_error", "call": name, "kind": exc.kind, "detail": str(exc)})
+            raise
+
     def describe(self):
         if self.profile is None:
-            self._step("describe")
-            self.profile = self.adapter.describe()
+            self.profile = self._read("describe")
             self.allowed_actions = {c["name"]: set(c.get("actions") or []) & set(ACTIONS)
                                     for c in self.profile.get("components", [])}
         return self.profile
 
     def observe(self, window_s=10.0):
-        self._step("observe")
-        return self.adapter.observe(window_s)
+        return self._read("observe", window_s)
 
     def logs(self, component, since_s=60.0, limit=200):
-        self._step("logs")
-        return redact_value(self.adapter.logs(component, since_s, limit))
+        return redact_value(self._read("logs", component, since_s, limit))
 
     def probe(self, journey=None):
-        self._step("probe")
-        return self.adapter.probe(journey)
+        return self._read("probe", journey)
 
     # ----- actions -----
 

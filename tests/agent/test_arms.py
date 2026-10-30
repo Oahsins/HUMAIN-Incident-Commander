@@ -7,6 +7,7 @@ import pytest
 from ic import contract, llm
 from ic.agent import ARMS, common, load_arm
 from ic.guard import Guard
+from ic.kit.net import CallError
 from tests.agent import mock_model
 from tests.agent.fake_system import FakeSystem
 
@@ -165,3 +166,16 @@ def test_mode_comes_from_the_harness_guard():
     fake = FakeSystem({"web_down"})
     result = load_arm("abcde")(Guard(fake, mode="advise"), model=MODEL, budget_s=90.0)
     assert result["mode"] == "advise" and result["outcome"] == "advised" and fake.acts == []
+
+
+@pytest.mark.parametrize("arm", ["abcde", "react"])
+def test_an_unreachable_system_still_reaches_the_harness(arm, tmp_path):
+    class Unreachable(FakeSystem):
+        def observe(self, window_s=10.0):
+            raise CallError("refused", detail="connection refused")
+    llm.register_mock("react-observe", _react_model([{"tool": "observe", "window_s": 8}]))
+    guard = Guard(Unreachable({"web_down"}), audit_path=str(tmp_path / "audit.jsonl"))
+    result = load_arm(arm)(guard, model=MODEL if arm == "abcde" else "mock:react-observe", budget_s=90.0)
+    check_shape(result)
+    assert result["outcome"] == "gave_up"     # the arm still hands over; the audit line tells the harness why
+    assert [(e["call"], e["kind"]) for e in guard.audit if e["event"] == "read_error"] == [("observe", "refused")]

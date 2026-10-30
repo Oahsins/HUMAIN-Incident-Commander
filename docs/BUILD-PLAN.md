@@ -75,9 +75,9 @@ The 09:00 slot is required, not optional. If the morning is lost, do the same st
 |---|---|---|---|---|
 | **09:00-09:30** | Read both `NIGHT-REPORT.md` files; review and merge the overnight pull requests and the agent pull request once green; paste the C4 prompt | Fix anything from the night | - | - |
 | 09:30-10:00 | - | Review Codex's pull requests | C4 rehearsal on `main`: tests, then GO/NO-GO 1 steps 1-4 | - |
-| 10:00-11:00 | If the briefs are out, decide on an organiser system (otherwise at 14:00) | Tune the agent on practice scenarios | - | `python run.py demo` once (model-key check); the harness end to end on 3 practice scenarios, 1 copy then 3 copies |
-| 11:00-12:00 | - | Tune | - | C2b: the runbook on the 6 practice faults alone and on 5 compounds, then fix its rules |
-| 12:00-14:00 | - | Tune | C5: dry-run the sealed faults without the agent; seal 2 pushed by 14:00 | - |
+| 10:00-11:00 | If the briefs are out, decide on an organiser system (otherwise at 14:00) | Tune the agent on practice scenarios | C5a: the `extra_service` variants and the strata check, counts only | `python run.py demo` once (model-key check); the harness end to end on 3 practice scenarios, 1 copy then 3 copies |
+| 11:00-12:00 | - | Tune | C5a, continued | C2b: the runbook on the 6 practice faults alone and on 5 compounds, then fix its rules |
+| 12:00-14:00 | - | Tune | C5: dry-run the sealed faults without the agent; seal 2 pushed by 14:00 | C3a: contract 1.2 in `eval/` and the runbook (pull request `codex/eval-1-2`) |
 | **14:00-14:30** | Read the final brief. Confirm Challenge 1. Choose the lead story: banking (default) or dispatch. The bank carries the sealed exam either way; choosing dispatch makes it the video demo. Create the project page (name, one-sentence description) | Adjust the plan to the brief | Pull `main` | Pull `main` |
 | **14:30-16:30** | Watch the go/no-go run | Fix anything the run shows | C4 for real: GO/NO-GO 1 steps 1-4 on port bases 8100, 8200, 8300 | - |
 | **16:30 GO/NO-GO 1** | Decide (section 7) | | | |
@@ -149,7 +149,7 @@ Each cut belongs to a decision point. Never cut the bottom block.
 - `scenarios/heldout/robustness.jsonl` holds the four-fault cases (practice faults added until there are four) and the `extra_service` variants, sealed with the rest.
 - `SEALED.json` pre-registers `core40` (the first 40 ids in run order: 13 singles, including 4 healthy and 4 must-escalate; 17 doubles; 10 triples) and `robust20` (20 ids drawn from `core40` with `random.Random(2026).sample`, at least 2 healthy and 2 must-escalate).
 
-**Arms on identical seeds:** `abcde`, `runbook` (no AI), `react`, `naive_verify` and, if time allows, `fifo`. The harness adds `noop` and `oracle` as validity checks: a case the oracle cannot fix is excluded by the rule in CONTRACT section 11.
+**Arms on identical seeds:** `abcde`, `runbook` (no AI), `react`, `naive_verify` and, if time allows, `fifo`. The harness adds `noop` and `oracle` as validity checks: a fixable case the oracle cannot fix is excluded by the rule in CONTRACT section 11.
 
 **Robustness (robust20):** the held-out and blind faults (built into the exam); `four_faults`; `log_format_v2`; `extra_service`; `model_swap` (the frozen agent on a model it was not tuned on); then the transfer to a second system (dispatch, or the organiser's system). The runbook runs every condition except `model_swap`.
 

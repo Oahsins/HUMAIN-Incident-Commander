@@ -314,6 +314,30 @@ C5  Dry-run the sealed faults without the agent (Fri 12:00-14:00)
     - After each merge of Claude's pull requests before freeze-1, rerun this
       sealed self-test. Report pass or fail per fault only.
 
+C5a The extra_service variants and the strata check (Fri 10:00-12:00, after
+    the 09:00 merge, on port bases 8900 and 9000)
+    - The -xs lines were sealed before the notifications worker reached main,
+      so the C1 live check never ran on them. Labels cannot change after seal
+      1; the aim is only to know the extra_service N before the final run.
+      Copy the sealed plugins in. For each -xs case in robustness.jsonl, on
+      its own fresh copy (up to two at once, as in C1; pass --port-base on
+      every command, because a command without it goes to the copy started
+      last): python run.py up --condition extra_service --port-base <base>
+      (8900 or 9000), then python run.py inject --port-base <base> --scenario
+      <robustness.jsonl in HUMAIN-sealed> --id <the -xs id> --sealed, then the
+      C1 check: runs\bank-<base>\injected.jsonl names the label's (target,
+      class) pairs; python run.py check --port-base <base> says NOT RECOVERED
+      125 s after the inject returns (RECOVERED for a healthy source case);
+      apply the labelled fixes in order with python run.py act --port-base
+      <base> ...; and check says RECOVERED 40 s after the last one (a
+      must-escalate case stays NOT RECOVERED). Then python run.py down
+      --port-base <base>.
+    - Check that the strata in CONTRACT.md section 16 item 6, computed from
+      heldout.jsonl, give the counts in SEALED.json "composition".
+    - Report only how many -xs cases passed and how many failed, and "strata
+      match" or the names of the strata whose counts differ. Never a case id,
+      a fault or a value.
+
 C6  The final run (prepare Fri 21:00-21:30; it runs overnight)
     - After Omar merges every open pull request and says go: tag that main
       commit freeze-1 and push the tag.
@@ -340,6 +364,10 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       no bank practice fault shows. Use only made-up callers and addresses.
     - Seal them in scenarios/transfer/SEALED.json and push only that file
       before the run. Claude never sees them before the run.
+    - Just before the run, check its ports: python run.py up --system dispatch
+      --port-base 9100, then python run.py down --port-base 9100, and the same
+      for 9200 and 9300. If a base will not start, run on 8100, 8200 and 8300
+      instead (--port-bases 8100,8200,8300; free once the bank runs end).
     - The run (Sat 12:00-13:00, about 50 minutes): python run.py eval --split
       transfer --final --arms abcde,noop,oracle --copies 3 --name transfer-1
       (the frozen agent, with noop and oracle for validity, on port bases 9100,
@@ -578,11 +606,12 @@ C3  Evaluation harness, statistics and charts (overnight, after C2)
       re-run once at the end, reported separately, and never counted as agent
       failures. Other errors stay in the denominator.
     - Validity re-run: at the end, after the api_error and harness_timeout
-      re-runs, run the oracle once more on every fault case where it was red
-      (main run, four_faults and extra_service), and keep both results;
-      section 11 excludes a case only when both are red. This is the one
-      exception to "the first complete result counts", and a rerun with the
-      same --name does not repeat it.
+      re-runs, run the oracle once more on every fixable case where it was red
+      (main run, four_faults, extra_service and transfer), never on a
+      must-escalate case, and keep both results; section 11 excludes a
+      fixable case only when both are red. This is the one exception to "the
+      first complete result counts", and a rerun with the same --name does
+      not repeat it.
     - --final: check the files against the newest entry in SEALED.json
       "seals" and refuse on a hash mismatch or an unlisted file, ignoring
       SEALED.json, .gitkeep and __pycache__ (section 14); manifests record git
@@ -613,11 +642,50 @@ C2b Runbook on the merged bank (Fri 11:00-12:00)
     - Run the runbook on each of the 6 practice faults alone and on 5 compound
       practice scenarios from dev-01 to dev-20, then fix its rules.
 
+C3a Contract 1.2 in eval/ and the runbook (Fri 12:00-14:00, before the 16:30
+    runbook tuning)
+    Contract 1.2 (on main after the 09:00 merge) answers issue #4 and adds
+    what the review of your pull requests found. One pull request,
+    codex/eval-1-2 (or more commits on codex/eval if #7 is still open), with
+    a test for each change, before freeze-1, when the metric code freezes:
+    - Harmful quarantines (section 11): when the arm made a successful
+      quarantine, each item in integrity.harmful_quarantines is one harmful
+      action; with no successful quarantine there are none. Case success is
+      unknown only when the key is missing after a successful quarantine. A
+      not_allowlisted refusal stays harmful whatever the checker says.
+    - Time to mitigate (section 11): read impact.time_to_mitigate_s and
+      impact.mitigation_censored; report the mean with the censored n/N
+      beside it.
+    - Must-escalate validity (section 11): from noop only. Never re-run the
+      oracle on a must-escalate case and never read its verdict there; keep
+      the oracle check for fixable cases.
+    - Dev runs without noop and oracle (section 11): skip only the noop and
+      oracle checks, keep the inject and manifest checks, and add the note
+      "not validated: no controls in this run", so the runbook tuning and
+      the pilot get full tables.
+    - Strata (section 16 item 6): from the labels as defined there; a healthy
+      case counts as single. On a full held-out run, print any difference
+      from SEALED.json "composition".
+    - Harness errors (sections 3.6 and 11): a case where the arm raised
+      ic.kit.net.CallError, or whose audit file has a "read_error" line, is
+      harness_error (keep the error type) and is re-run once at the end.
+    - Oracle (section 9): after a fix that answers ok false, keep applying
+      the remaining fixes and their then actions in order, waiting
+      est_seconds after each; end gave_up if any failed.
+    - Reasons (section 3.6): the runbook calls act(action, target, params,
+      reason) with its rule's reason, and the oracle passes one too.
+    - Robustness pairs (section 8): pair by source_id, system and arm, not
+      by seed; add a report note when a pair's seeds differ.
+    - Ctrl+C: start no new pair, kill the case processes in flight, write no
+      record for them (a rerun with the same --name runs them as first
+      attempts) and leave the manifest marked incomplete. Wait on each
+      future with a timeout so Ctrl+C is noticed on Windows.
+
 Friday, also yours (follow-up prompts give the times): the model-key check and
-the harness end to end (10:00-11:00), the pilot (17:30), the prices check and a
-resume test (18:30-20:00), the dry run and checker calibration (20:00-21:00),
-baselines/FROZEN.json and a backup demo take (21:00-21:30). Saturday: the
-results report and charts from the final run.
+the harness end to end (10:00-11:00), C3a (12:00-14:00), the pilot (17:30),
+the prices check and a resume test (18:30-20:00), the dry run and checker
+calibration (20:00-21:00), baselines/FROZEN.json and a backup demo take
+(21:00-21:30). Saturday: the results report and charts from the final run.
 
 8. WHEN YOU REPORT BACK TO OMAR
 Keep it short: what you built; the commands to run; test results; what you did
@@ -628,10 +696,12 @@ not test; anything that needs his decision.
 
 Paste these into the named session when the time comes.
 
-- **Fri 09:00-09:30 (Omar first):** read both NIGHT-REPORT.md files, review and merge the overnight pull requests and Claude's agent pull request once the tests workflow is green. If the morning is lost, do the same from 14:00.
+- **Fri 09:00-09:30 (Omar first):** read both NIGHT-REPORT.md files, review and merge the overnight pull requests and Claude's agent pull request once the tests workflow is green, in the order pull request #8 gives. If the morning is lost, do the same from 14:00. Before the 10:00 prompts, make the model key visible to every new process: add `ANTHROPIC_API_KEY` under "Edit environment variables for your account" in Windows, then restart Codex and any open PowerShell window. Session B's model runs and the final run both need it; never paste the key into a chat.
 - **Fri 09:30, Session A:** "Pull main and start C4 as a rehearsal: run the tests as C4 says, then GO/NO-GO 1 steps 1-4 in BUILD-PLAN.md section 7, and report each step's result."
+- **Fri 10:00, Session A:** "Pull main and do C5a in docs/CODEX-HANDOFF.md: the extra_service variants and the strata check, on port bases 8900 and 9000. Report only the counts it asks for."
 - **Fri 10:00, Session B:** "Pull main. Run `python run.py demo --port-base 8400` once to check the model key (practice faults only). Then run the harness end to end on 3 practice scenarios with `--model anthropic:claude-opus-5-5`, first on 1 copy, then on 3 copies, with `--port-bases 8400,8500,8600`. At 11:00 start C2b."
 - **Fri 12:00, Session A:** "Start C5: dry-run the sealed faults without the agent, then push seal 2. Report pass/fail per fault only."
+- **Fri 12:00, Session B:** "Pull main and do C3a in docs/CODEX-HANDOFF.md: contract 1.2 in eval/ and the runbook, one pull request with a test for each change. Finish before the 16:30 runbook tuning."
 - **Fri 14:30, Session A:** "C4 for real: GO/NO-GO 1 steps 1-4 on eval port bases 8100, 8200, 8300. Report each step's result."
 - **Fri 16:30, Session B (after GO/NO-GO 1):** "Tune the runbook on dev-01 to dev-20 only; it freezes with the agent at freeze-1."
 - **Fri 17:30, Session B:** "Run the pilot: `python run.py eval --split dev --ids dev-21,dev-22,dev-23,dev-24,dev-25,dev-26,dev-27,dev-28,dev-29,dev-30 --arms abcde,react,runbook --copies 3 --model anthropic:claude-opus-5-5 --name pilot-1` (to try another candidate model, run it again with that `--model` and its own name). Send me the results table; its numbers stay internal."
