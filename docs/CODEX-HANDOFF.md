@@ -50,8 +50,8 @@ customers paying nonstop). Use the words "system" or "target system", never
 - Omar: every decision, runs commands on this laptop, video, deck, project page,
   free-text answer. He is not a software engineer and must be able to explain
   every file, so keep code small, readable and commented in plain English.
-- Claude (in the cloud): plan, test design, contract, the bank, its 6
-  practice faults (needed tonight to build and test the agent), its checker,
+- Claude (in the cloud): plan, test design, contract, the bank, its 7
+  practice faults (needed to build and test the agent), its checker,
   the agent and its ablation arms, the safety wrapper, the demo command, the
   dispatch system's platform, adapter, control and checker (after freeze-1),
   reviews of your pull requests.
@@ -99,7 +99,8 @@ customers paying nonstop). Use the words "system" or "target system", never
   windows-latest.
 - Only edit the paths you own (CONTRACT.md section 2): scripts/preflight.py,
   tests/preflight/, targets/bank/faults/heldout/, scenarios/heldout/,
-  targets/dispatch/faults/, scenarios/transfer/, tests/dispatch/. A tiny Windows fix in Claude's files is
+  targets/dispatch/faults/, scenarios/transfer/ (your own checks of the
+  dispatch faults stay in HUMAIN-sealed). A tiny Windows fix in Claude's files is
   allowed only in its own pull request that says exactly what changed and why.
 - Contract changes: open a GitHub issue titled "contract: <change>" or ask Omar;
   Claude makes the change. Never edit DECISIONS.md: record hashes in
@@ -369,10 +370,14 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       values of your choosing: a caller told help is coming but no incident
       created; work dropped or closed without reaching a unit during a call
       surge (extra calls only from the dispatch burst helper); a sync that
-      gradually writes wrong unit records. The first mirrors the bank's
+      gradually writes wrong unit records. Put one incident of each shape,
+      and one healthy incident, among the first 10 lines of dispatch.jsonl,
+      since the first 10 are never cut. The first shape mirrors the bank's
       unrecorded_payments practice fault; the other two can count toward the 2
       types above. Write at least one more type of your own that you never
-      name to Claude.
+      name to Claude. It must not be a stopped worker or stale unit
+      availability: on 30 Oct Claude saw two case names in a separate Codex
+      chat's test kit (DECISIONS.md).
     - As in the bank's exam (CONTRACT.md section 8), give every incident 1 to
       3 harmless background changes from a benign plugin of your own, sealed
       with the rest, and make at least 2 of the 20 healthy (background changes
@@ -383,7 +388,10 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       dispatch merge, and copy that id into the seal entry as "dispatch_tree".
       If DECISIONS.md records a newer id before the run, re-check every
       incident's noop and oracle on it and seal again.
-    - Just before the run, check its ports: python run.py up --system dispatch
+    - Just before the run, check that git rev-parse HEAD:targets/dispatch
+      prints the seal's dispatch_tree and that git status --porcelain --
+      targets/dispatch prints nothing; if not, stop and tell Omar. Then
+      check its ports: python run.py up --system dispatch
       --port-base 9100, then python run.py down --port-base 9100, and the same
       for 9200 and 9300. If a base will not start, run on 8100, 8200 and 8300
       instead (--port-bases 8100,8200,8300; free once the bank runs end).
@@ -435,7 +443,7 @@ customers paying nonstop). Use the words "system" or "target system", never
 - Omar: every decision, runs commands on this laptop, video, deck, project page,
   free-text answer. He is not a software engineer and must be able to explain
   every file, so keep code small, readable and commented in plain English.
-- Claude (in the cloud): plan, test design, contract, the bank, its 6
+- Claude (in the cloud): plan, test design, contract, the bank, its 7
   practice faults, its checker, the agent and its ablation arms, the safety
   wrapper, the demo command, reviews of your pull requests (interface and
   contract conformance only for baselines/).
@@ -485,8 +493,7 @@ customers paying nonstop). Use the words "system" or "target system", never
   windows-latest. Tests run with python -m pytest -q from the repository root;
   every tests/ subfolder has an __init__.py; no shared conftest.py.
 - Only edit the paths you own (CONTRACT.md section 2): baselines/, eval/,
-  requirements-eval.txt, tests/eval/, tests/baselines/, and after freeze-1
-  replays/demo-frozen.jsonl. A tiny Windows fix in
+  requirements-eval.txt, tests/eval/ and tests/baselines/. A tiny Windows fix in
   Claude's files is allowed only in its own pull request that says exactly
   what changed and why.
 - Contract changes: open a GitHub issue titled "contract: <change>" or ask Omar;
@@ -704,8 +711,8 @@ Friday, also yours (follow-up prompts give the times; the freeze moved to
 about 19:00): the model-key check and the harness end to end, C3a, the
 runbook tuning (about 11:00-13:00), the pilot (about 13:00), the prices check
 and a resume test (about 14:30), the dry run and checker calibration (about
-15:00-16:00), baselines/FROZEN.json and a backup demo take (at the freeze,
-about 18:30-19:00). Saturday: the results report and charts from the final
+15:00-16:00), baselines/FROZEN.json (at the freeze, about 18:30-19:00; the
+backup demo take is dropped, see DECISIONS.md). Saturday: the results report and charts from the final
 run.
 
 8. WHEN YOU REPORT BACK TO OMAR
@@ -728,7 +735,7 @@ Paste these into the named session when the time comes. On Friday morning the da
 - **Fri about 14:30, Session B:** "Check configs/prices.json against the provider's price page and send Claude any differences. Then test resume: stop a run and rerun it with the same name."
 - **Fri about 15:00, Session B:** "Pull main first. Dry run: `python run.py eval --split dev --limit 6 --arms abcde,runbook,react,naive_verify,fifo,noop,oracle --copies 3 --name dry-1`, plus 1 practice scenario under `log_format_v2` and `extra_service` with the runbook arm, and 1 under `model_swap` with the abcde arm (check that its calls name the swap model). Report the mean minutes per incident and how many copies ran without interference. Checker calibration: run noop on the healthy practice cases dev-09, dev-18 and dev-24, four times each across 3 copies (names `calib-1` to `calib-4`); tell Claude if more than 1 of the 12 is red."
 - **Fri about 17:30, Session A (after Omar merges the silent-drop pull request):** "Pull main and run C5's sealed self-test again on it. Report pass or fail per fault only."
-- **Fri about 18:30, Session B:** "Commit baselines/FROZEN.json (the runbook file's hash and the freeze time) and open its pull request. After the freeze tag, record one backup demo take on the frozen agent: `git fetch --tags; git switch -c codex/demo-replay freeze-1`, then `New-Item -ItemType Directory -Force replays | Out-Null; $env:IC_RECORD='replays\demo-frozen.jsonl'; python run.py demo --port-base 8400; Remove-Item Env:IC_RECORD`. Open a pull request from codex/demo-replay with only replays/demo-frozen.jsonl in it. Finish before the final run starts at about 19:00."
+- **Fri about 18:30, Session B (once the #14 fix is merged):** "Commit baselines/FROZEN.json (the runbook file's hash and the freeze time) and open its pull request. Skip the backup demo take: the recorded replay on main already matches the agent."
 - **Fri about 18:30, Session A (after Omar merges every open pull request):** "Start C6: tag freeze-1 and push the tag, then clean-clone pass 1 into %USERPROFILE%\Documents\HUMAIN-final with the sealed files copied in."
 - **Fri about 19:00, Omar in a new PowerShell window (arms as set by GO/NO-GO 3; for the core40 cut add `--limit 40` and skip `robust-v2` and `robust-xs`):**
 
@@ -749,5 +756,5 @@ Paste these into the named session when the time comes. On Friday morning the da
   For the core40 cut, add `--limit 40` to the final-1 line and delete the robust-v2 and robust-xs lines. Check progress with `Get-Content results\final.log -Tail 20`.
 - **Sat 09:00, Session A:** "Start C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, with at least one incident of each of the three shapes C7 lists, seal them, push only scenarios/transfer/SEALED.json, and report."
 - **Sat 11:00, Session A:** "If the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N."
-- **Sat 12:00, Session B:** "The final run is over, so you may now open %USERPROFILE%\Documents\HUMAIN-final; change nothing there outside results/. In that folder run `python run.py eval --report final-1`, then `--report robust-ff --against final-1` (and the same for robust-v2, robust-xs and robust-ms), with n/N, intervals, and where the runbook ties or wins, and send Omar the tables for Claude." **Session A:** "Run the transfer test (C7), then open the codex/reveal pull request with the sealed files."
+- **Sat 12:00, Session B:** "The final run is over, so you may now open %USERPROFILE%\Documents\HUMAIN-final; change nothing there outside results/. In that folder run `python run.py eval --report final-1`, then `--report robust-ff --against final-1` (and the same for robust-v2, robust-xs and robust-ms), with n/N, intervals, and where the runbook ties or wins. Then make the off-list table and its react sensitivity row exactly as DECISIONS.md defines them (30 Oct, the two exploratory analyses, item 2), labelled exploratory. Send Omar the tables for Claude." **Session A:** "Run the transfer test (C7), then open the codex/reveal pull request with the sealed files."
 - **Sat 16:00, Session A:** "Scan the full git history for secrets and report. After Omar makes the repository public, clean-clone pass 2: `$env:GIT_TERMINAL_PROMPT=0; git -c credential.helper= clone https://github.com/Oahsins/HUMAIN-Incident-Commander ic-clean`, follow the README exactly, run `python run.py demo`, then run it again in the same window with the key unset (`Remove-Item Env:ANTHROPIC_API_KEY`, which affects only that window): it must print 'REPLAY of a recorded run (no API key found)' and replay replays/demo-frozen.jsonl. Report anything that fails." Repeat the check at 18:00.
