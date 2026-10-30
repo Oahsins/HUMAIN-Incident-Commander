@@ -59,6 +59,7 @@ def oracle(adapter, *, root_causes, manifest, budget_s=90.0, max_steps=40,
     result["t_start"] = time.time()
     deadline = time.monotonic() + budget_s
     escalation = []
+    any_failed = False
     try:
         profile = guarded.describe()
         components = {c["name"]: c for c in profile.get("components", [])}
@@ -86,7 +87,7 @@ def oracle(adapter, *, root_causes, manifest, budget_s=90.0, max_steps=40,
                     record["order"] = len(result["proposed_actions"]) + 1
                     result["proposed_actions"].append(record)
                     continue
-                reply = guarded.act(action, target, params)
+                reply = guarded.act(action, target, params, record["reason"])
                 record.update(reply)
                 record["sent"] = not record.get("refused", False) and not record.get("declined", False)
                 result["actions"].append(record)
@@ -100,13 +101,15 @@ def oracle(adapter, *, root_causes, manifest, budget_s=90.0, max_steps=40,
                     result["outcome"] = "budget_exhausted"
                     return result
                 if not record.get("ok"):
-                    result["outcome"] = "gave_up"
-                    return result
+                    # A failed fix must not suppress its follow-up actions or
+                    # the fixes for other faults. The checker needs them all.
+                    any_failed = True
         if escalation:
             result["escalation"] = {"components": sorted(set(escalation)), "class": None,
                 "reason": "The labelled fault has no allowed fix.", "urgency": "now", "to": None,
                 "ask": "Restore the affected external service."}
-        result["outcome"] = "advised" if result["proposed_actions"] else "escalated" if escalation else "recovered"
+        result["outcome"] = ("gave_up" if any_failed else "advised" if result["proposed_actions"]
+                             else "escalated" if escalation else "recovered")
     except StepLimit:
         result["outcome"] = "budget_exhausted"
     finally:

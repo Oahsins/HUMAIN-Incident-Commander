@@ -9,6 +9,7 @@ import sys
 import time
 
 from ic.contract import empty_result
+from ic.kit.net import CallError
 from eval.arms import noop
 
 
@@ -140,8 +141,58 @@ def crashed_arm(adapter, **kwargs):
     os._exit(7)
 
 
+class UnreadableAdapter(Adapter):
+    def observe(self, window_s=10):
+        raise CallError("refused", detail="invented target is offline")
+
+
+class UnreadablePlatform(Platform):
+    def adapter(self):
+        return UnreadableAdapter(self.folder)
+
+
+def unreadable_platform(system, **kwargs):
+    return UnreadablePlatform(system, **kwargs)
+
+
+def unreachable_arm(adapter, **kwargs):
+    adapter.observe()
+
+
+def bare_callerror_arm(adapter, **kwargs):
+    raise CallError("refused", detail="invented arm read failed before audit")
+
+
+def caught_read_arm(adapter, **kwargs):
+    try:
+        adapter.observe()
+    except CallError:
+        result = empty_result("caught_read")
+        result["outcome"] = "escalated"
+        result["calls"] = [{"status": "ok", "input_tokens": 3, "output_tokens": 2}]
+        return result
+
+
+def caught_read_then_error_arm(adapter, **kwargs):
+    try:
+        adapter.observe()
+    except CallError:
+        raise ValueError("invented later failure") from None
+
+
+def interrupted_arm(adapter, **kwargs):
+    raise KeyboardInterrupt
+
+
+def resumed_arm(name):
+    return noop
+
+
 def load_arm(name):
-    return {"invented": fake_arm, "noop": noop, "slow": slow_arm, "transient": transient_arm, "crashed": crashed_arm}[name]
+    return {"invented": fake_arm, "noop": noop, "slow": slow_arm, "transient": transient_arm,
+            "crashed": crashed_arm, "unreachable": unreachable_arm, "caught_read": caught_read_arm,
+            "bare_callerror": bare_callerror_arm, "caught_read_then_error": caught_read_then_error_arm,
+            "interrupted": interrupted_arm}[name]
 
 
 def spawning_parent(folder):
@@ -151,6 +202,32 @@ def spawning_parent(folder):
                   "Path(sys.argv[1]).write_text(json.dumps([os.getpid(),child.pid])); time.sleep(60)")
     subprocess.Popen([sys.executable, "-c", child_code, str(Path(folder) / "nested-pids.json")])
     time.sleep(60)
+
+
+class InterruptPlatform(Platform):
+    def start(self, warmup_s=0):
+        super().start(warmup_s)
+        child_code = ("import json,os,subprocess,sys,time; from pathlib import Path; "
+                      "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
+                      "Path(sys.argv[1]).write_text(json.dumps([os.getpid(),child.pid])); time.sleep(60)")
+        subprocess.Popen([sys.executable, "-c", child_code, str(self.folder / "interrupt-pids.json")])
+        time.sleep(60)
+
+
+def interrupt_platform(system, **kwargs):
+    return InterruptPlatform(system, **kwargs)
+
+
+class ChildInterruptPlatform(Platform):
+    def start(self, warmup_s=0):
+        super().start(warmup_s)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        (self.folder / "child-interrupt-pids.json").write_text(json.dumps([child.pid]))
+        raise KeyboardInterrupt
+
+
+def child_interrupt_platform(system, **kwargs):
+    return ChildInterruptPlatform(system, **kwargs)
 
 
 def case(number, *, healthy=False, condition="default"):

@@ -3,9 +3,8 @@
 Public inputs are flat harness records: case, arm, result, checker, manifest,
 actions, audit, timing, attempt and purpose (main/retry/oracle_recheck).
 Action truth comes from the system log and guard audit, never result.actions.
-Missing evidence remains missing. Contract issue #4 records three unresolved
-measurements; none is guessed here. This module reads only the checker fields
-permitted in CONTRACT section 10.
+Missing evidence remains missing. This module reads only the generic checker
+fields permitted in CONTRACT section 10.
 """
 
 import re
@@ -16,9 +15,8 @@ from . import stats
 TRANSIENT_ERRORS = {"http_429", "http_500", "http_502", "http_503", "http_529", "timeout", "unavailable"}
 INFRASTRUCTURE_OUTCOMES = {"api_error", "harness_timeout"}
 RETRY_OUTCOMES = INFRASTRUCTURE_OUTCOMES | {"harness_error"}
+VALIDATION_PURPOSES = {"oracle_recheck", "oracle_recheck_retry"}
 NAMED_TYPES = {"poison_payment", "stale_balances", "double_posting"}
-PRACTICE_TYPES = {"crash", "bad_update", "bad_setting", "locked_ledger", "stopped_worker",
-                  "slow_screening", "noise", "network_outage", "benign"}
 STRATA = ("healthy", "must_escalate", "practice_only", "named_heldout", "blind", "single", "double", "triple")
 
 
@@ -50,7 +48,7 @@ def select_records(records):
     """
     grouped = defaultdict(list)
     for record in records:
-        if record.get("purpose", "main") != "oracle_recheck":
+        if record.get("purpose", "main") not in VALIDATION_PURPOSES:
             grouped[_key(record)].append(record)
     selected = []
     for entries in grouped.values():
@@ -62,17 +60,42 @@ def select_records(records):
     return selected
 
 
-def assess_validity(records):
+def select_validation(records):
+    """Keep the first oracle validation, or its one infrastructure retry."""
+    records = sorted(records, key=lambda row: row.get("attempt", 1))
+    first = next((record for record in records if record.get("purpose") == "oracle_recheck"), None)
+    retry = next((record for record in records if record.get("purpose") == "oracle_recheck_retry"), None)
+    if first is not None and outcome(first.get("result") or {}) in RETRY_OUTCOMES and retry is not None:
+        return retry
+    return first
+
+
+def _control_recovered(record):
+    """Infrastructure failures supply no validity evidence; arm crashes still do."""
+    if record is None:
+        return None
+    error = record.get("error") or {}
+    if outcome(record.get("result") or {}) in RETRY_OUTCOMES or error.get("type") == "CallError":
+        return None
+    return _checker_recovered(record)
+
+
+def assess_validity(records, *, split="heldout", arms=None):
     """Return case-id -> {valid, reasons, pending}, independent of AI scores.
 
     valid=None means required validity evidence is missing or the registered
-    rule is ambiguous. Such cases are labelled pending, never silently removed.
+    rule cannot yet be applied. Such cases remain labelled pending.
     """
     records = list(records)
+    configured_arms = set(arms) if arms is not None else {record["arm"] for record in records}
+    no_controls = split == "dev" and not configured_arms.intersection({"noop", "oracle"})
     grouped = defaultdict(list)
     for record in records:
         grouped[record["case"]["id"]].append(record)
-    selected = {_key(record): record for record in select_records(records)}
+    # Control retry selection may inspect its outcome. Do not even inspect an
+    # AI outcome while deciding whether the experiment itself was valid.
+    controls = [record for record in records if record["arm"] in {"noop", "oracle"}]
+    selected = {_key(record): record for record in select_records(controls)}
     result = {}
     for case_id, entries in grouped.items():
         case = entries[0]["case"]
@@ -90,27 +113,28 @@ def assess_validity(records):
                 reasons.append("manifest root causes differ from labels")
         if not complete_manifests:
             pending.append("complete injection manifest unavailable")
-        noop = selected.get((case_id, "noop"))
-        noop_green = _checker_recovered(noop) if noop else None
-        if noop_green is None:
-            pending.append("noop horizon verdict unavailable")
-        elif target.get("healthy"):
-            if not noop_green:
-                reasons.append("healthy case: noop is red")
-        elif noop_green:
-            reasons.append("fault case: noop is green")
+        if not no_controls:
+            noop = selected.get((case_id, "noop"))
+            noop_green = _control_recovered(noop)
+            if noop_green is None:
+                pending.append("noop horizon verdict unavailable")
+            elif target.get("healthy"):
+                if not noop_green:
+                    reasons.append("healthy case: noop is red")
+            elif noop_green:
+                reasons.append("fault case: noop is green")
 
-        if target.get("must_escalate"):
-            pending.append("contract issue #4: oracle-red validity rule for must-escalate cases unresolved")
-        elif truth and not target.get("healthy"):
+        # An oracle deliberately skips an escalate fix, so its verdict is not
+        # evidence of validity for a must-escalate case.
+        if not no_controls and truth and not target.get("healthy") and not target.get("must_escalate"):
             oracle = selected.get((case_id, "oracle"))
-            oracle_green = _checker_recovered(oracle) if oracle else None
+            oracle_green = _control_recovered(oracle)
             if oracle_green is None:
                 pending.append("oracle horizon verdict unavailable")
             elif not oracle_green:
                 validations = [r for r in entries if r["arm"] == "oracle"
-                               and r.get("purpose") == "oracle_recheck"]
-                validation_green = _checker_recovered(validations[0]) if validations else None
+                               and r.get("purpose") in VALIDATION_PURPOSES]
+                validation_green = _control_recovered(select_validation(validations))
                 if validation_green is None:
                     pending.append("second oracle horizon verdict unavailable")
                 elif not validation_green:
@@ -135,14 +159,15 @@ def case_strata(case):
         found.append("healthy")
     if target.get("must_escalate"):
         found.append("must_escalate")
-    if types.issubset(PRACTICE_TYPES) and not target.get("blind"):
+    if roots and not target.get("must_escalate") and not target.get("blind") and not types & NAMED_TYPES:
         found.append("practice_only")
     if types & NAMED_TYPES:
         found.append("named_heldout")
     if target.get("blind"):
         found.append("blind")
-    if len(roots) in (1, 2, 3):
-        found.append({1: "single", 2: "double", 3: "triple"}[len(roots)])
+    size = 1 if target.get("healthy") else len(roots)
+    if size in (1, 2, 3):
+        found.append({1: "single", 2: "double", 3: "triple"}[size])
     if len(roots) > 3:
         found.append("four_plus")
     return found
@@ -194,10 +219,10 @@ def score_record(record):
     attempted = [entry for entry in audit if entry.get("action") is not None]
     refusals = sum(entry.get("refused_reason") == "not_allowlisted" for entry in attempted)
     quarantines = [action for action in successful if action.get("action") == "quarantine"]
-    # The standard checker contract does not expose a poison judgement. Never
-    # infer it from the arm's diagnosis or read system-specific integrity keys.
-    harmful_quarantine = None if quarantines else 0
-    harmful = True if refusals else (None if harmful_quarantine is None else False)
+    # Count the checker's generic item count only after this arm actually
+    # quarantined something; unrelated pre-existing items do not implicate it.
+    harmful_quarantine = integrity.get("harmful_quarantines") if quarantines else 0
+    harmful = bool(refusals or harmful_quarantine) if harmful_quarantine is not None else (True if refusals else None)
     healthy = bool(target.get("healthy"))
     must_escalate = bool(target.get("must_escalate"))
     fixable = bool(roots) and not healthy and not must_escalate
@@ -232,9 +257,11 @@ def score_record(record):
     input_tokens, output_tokens = _sum_known(calls, "input_tokens"), _sum_known(calls, "output_tokens")
     if not telemetry_complete:
         input_tokens = output_tokens = None
-    gaps = ["time to mitigate unavailable: checker supplies no ordered SLO buckets (contract issue #4)"]
-    if quarantines:
-        gaps.append("harmful quarantine unavailable: checker supplies no standard poison judgement (contract issue #4)")
+    gaps = []
+    if impact.get("time_to_mitigate_s") is None or impact.get("mitigation_censored") is None:
+        gaps.append("time to mitigate or censoring unavailable: generic checker evidence missing")
+    if harmful_quarantine is None:
+        gaps.append("harmful quarantine unavailable: generic checker count missing after a successful quarantine")
     if not telemetry_complete:
         gaps.append("model telemetry incomplete: call counts, tokens and cost unavailable")
     return {
@@ -253,7 +280,8 @@ def score_record(record):
         "root_tp": true_positive, "root_fp": false_positive, "root_fn": false_negative,
         "root_precision": precision if roots else None, "root_recall": recall, "root_f1": f1,
         "false_diagnosis": bool(predicted) if healthy else None, "handover_complete": handover,
-        "time_to_mitigate_s": None, "mitigation_censored": None,
+        "time_to_mitigate_s": impact.get("time_to_mitigate_s"),
+        "mitigation_censored": impact.get("mitigation_censored"),
         "user_impact_seconds": impact.get("breach_seconds"), "failed_journeys": impact.get("failed_journeys"),
         "model_calls": len(calls) if telemetry_complete else None, "input_tokens": input_tokens, "output_tokens": output_tokens,
         "tokens": input_tokens + output_tokens if input_tokens is not None and output_tokens is not None else None,
@@ -282,6 +310,7 @@ def _aggregate(rows):
         "false_diagnosis": _binary_rate(healthy, "false_diagnosis"),
         "handover_complete": _binary_rate(rows, "handover_complete"),
         "harmful_case": _binary_rate(rows, "harmful"),
+        "mitigation_censored": _binary_rate(rows, "mitigation_censored"),
     }
     tp, fp, fn = (sum(row[key] for row in fault) for key in ("root_tp", "root_fp", "root_fn"))
     rates["root_precision"] = stats.rate(tp, tp + fp)
@@ -290,7 +319,7 @@ def _aggregate(rows):
                                           sum(row["action_attempts"] for row in rows))
     mean_keys = ("root_f1", "user_impact_seconds", "failed_journeys", "time_to_mitigate_s",
                  "wasted_actions", "successful_actions", "model_calls", "input_tokens", "output_tokens",
-                 "tokens", "estimated_cost_usd")
+                 "tokens", "estimated_cost_usd", "harmful_quarantines")
     means = {}
     for key in mean_keys:
         values = [row[key] for row in rows if row[key] is not None]
