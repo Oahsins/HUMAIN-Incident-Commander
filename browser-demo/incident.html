@@ -12,7 +12,7 @@
           --sans:system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"DejaVu Sans Mono",ui-monospace,Menlo,Consolas,monospace; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 var(--sans); }
-  .card { height:100%; display:grid; grid-template-rows:auto auto 1fr auto auto; gap:12px; padding:14px 16px; }
+  .card { height:100%; display:grid; grid-template-rows:auto auto 1fr auto; gap:12px; padding:14px 16px; }
   .top { display:flex; align-items:center; gap:12px; }
   .title { font-size:18px; font-weight:650; }
   .status { margin-left:auto; font:600 13px var(--sans); padding:6px 12px; border-radius:99px; background:var(--panel);
@@ -42,7 +42,10 @@
   .letter.clear b { color:var(--ok); }
   .act { border:1px solid var(--ok); background:var(--okbg); border-radius:8px; padding:9px 11px; display:grid; gap:3px; animation:in .4s ease-out; }
   .act.no { border-color:var(--bad); background:var(--badbg); }
-  .act .a { font:600 15px var(--mono); } .act .d { font-size:12.5px; color:var(--ink); opacity:.85; }
+  .act .a { font:600 15px var(--mono); }
+  .act .d { font-size:12.5px; color:var(--ink); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .act { padding:7px 11px; }
+  .verifyrow { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .act .g { font:11.5px var(--mono); color:var(--ok); } .act.no .g { color:var(--bad); }
   .cause { font-size:13px; display:flex; gap:8px; align-items:baseline; animation:in .4s ease-out; }
   .cause code { font:600 12.5px var(--mono); color:var(--bad); }
@@ -56,7 +59,7 @@
   .sbar { display:grid; gap:4px; font-size:12.5px; line-height:1.35; }
   .sbar div { display:grid; grid-template-columns:22px 1fr; gap:6px; animation:in .4s ease-out; }
   .sbar b { font:700 13px var(--mono); color:var(--hand_over); }
-  .sbar span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .sbar span { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
   .verdict { border:2px dashed var(--line); border-radius:10px; display:grid; place-items:center; text-align:center; padding:10px;
              font:600 15px var(--sans); color:var(--muted); }
   .verdict.ok { border-style:solid; border-color:var(--ok); background:var(--okbg); color:var(--ok); font-size:19px; }
@@ -78,14 +81,13 @@
     <div class="box"><div class="h">What it found</div><div class="letters" id="letters" hidden></div>
       <div id="causes"></div><div class="feed" id="feed"><span class="empty">Nothing yet. The agent starts when the alert fires.</span></div></div>
     <div class="box"><div class="h">Actions, through the guard</div><div id="acts"><span class="empty">No action yet.</span></div>
-      <div class="h" style="margin-top:6px">Verifying recovery</div>
-      <div class="looks" id="looks"></div><div class="lookt" id="lookt">Needs 2 clean checks in a row.</div></div>
+      <div class="verifyrow"><div class="h">Verifying</div><div class="looks" id="looks"></div>
+      <div class="lookt" id="lookt">Needs 2 clean checks in a row.</div></div></div>
   </div>
   <div class="bottom">
     <div class="box"><div class="h">Handover (SBAR)</div><div class="sbar" id="sbar"><span class="empty">Written when the agent hands over.</span></div></div>
     <div class="verdict" id="verdict">Independent checker<small>scores the customers' own logs after the handover</small></div>
   </div>
-  <div class="term" id="term"></div>
 </div>
 <script>
 const PHASES = [["survey", "Survey"], ["triage", "Triage"], ["remediate", "Remediate"], ["verify", "Verify"], ["hand_over", "Hand over"]];
@@ -145,7 +147,7 @@ function render(lines) {
     el.querySelector("span").textContent = on ? `from ${ps[k].toFixed(1)} s` : "—";
   }
   // feed: the latest steps that are not actions or checks
-  if (steps.length) $("feed").innerHTML = steps.slice(-7).map((s) =>
+  if (steps.length) $("feed").innerHTML = steps.slice(-5).map((s) =>
     `<div><span class="t">${s.t.toFixed(1)}s</span><span class="n" style="color:var(--${s.phase})">${esc(s.name)}</span><span>${esc(s.summary)}</span></div>`).join("");
   if (causes.length) $("causes").innerHTML = causes.map((c) => `<div class="cause">root cause <code>${esc(c.cls)}</code> on <b>${esc(c.target)}</b></div>`).join("");
   if (acts.length) $("acts").innerHTML = acts.map((a) => `<div class="act ${a.status === "done" ? "" : "no"}"><span class="a">${esc(a.action)} → ${esc(a.target)}</span>` +
@@ -189,7 +191,6 @@ async function poll() {
     if (lines.length !== shownLines) {
       shownLines = lines.length;
       render(lines);
-      $("term").innerHTML = lines.filter((l) => l.trim()).slice(-6).map((l) => `<div>${esc(l)}</div>`).join("");
     }
   } catch (e) {}
   setTimeout(poll, 300);

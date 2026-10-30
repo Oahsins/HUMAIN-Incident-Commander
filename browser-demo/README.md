@@ -22,7 +22,7 @@ sets no model key: the agent's model answers come from the keyless replay
 
 | File | What it is |
 |---|---|
-| `browser-demo.mp4` | the whole run, browser beside the terminal (about 75 s) |
+| `browser-demo.mp4` | the whole run at 1920x1080: customer left, incident card top right, terminal bottom right (about 75 s) |
 | `browser-demo-cut.mp4` | a 25-30 s highlight cut for the project video (`cut.py`) |
 | `report.html` | the visual report: story, swimlane timeline, map of the bank, ABCDE survey, checker numbers, shot list |
 | `stills/` | each report section as a 1920-wide PNG |
@@ -41,12 +41,11 @@ sets no model key: the agent's model answers come from the keyless replay
   `targets/bank/customers.py`: 2xx ok, 4xx rejected, 5xx or a timeout failed. Without those lines
   the checker would count the browser's payments as ghost payments.
 - `page.html` shows only what a customer sees: amount, Pay, Retry same payment, the last result,
-  the payment list and the balance. `stage.html` puts it beside `incident.html`, an incident card
-  drawn live from the demo's terminal lines (phase stepper, the agent's steps, actions with the
-  guard's answer, the verify checks, the SBAR and the checker's verdict, with the last terminal
-  lines underneath). After the handover the card adds the ABCDE letters from the agent's saved
+  the payment list and the balance. `stage.html` films it on the left; the right side is split,
+  with `incident.html` on top and the live terminal of `run.py demo` (`terminal.html`) below. The card is
+  drawn live from those same terminal lines (phase stepper, the agent's steps, actions with the
+  guard's answer, the verify checks, the SBAR and the checker's verdict). After the handover the card adds the ABCDE letters from the agent's saved
   result. The card only redraws what the demo printed; the model does not generate it.
-  `terminal.html` is the plain terminal view.
 - `journey.cjs` runs one continuous Chromium session with video and a trace, locked to
   `127.0.0.1`, with WebSockets and service workers blocked. It follows the demo by reading its
   terminal log. Its post-incident payments fall inside the checker's scored window; its "already

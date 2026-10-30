@@ -41,8 +41,8 @@ async function waitFor(pattern, timeoutMs = 240000) {
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined;
   const browser = await chromium.launch({ executablePath });
   const context = await browser.newContext({
-    viewport: { width: 1600, height: 900 }, serviceWorkers: "block",
-    recordVideo: { dir: path.join(OUT, "video-raw"), size: { width: 1600, height: 900 } },
+    viewport: { width: 1920, height: 1080 }, serviceWorkers: "block",
+    recordVideo: { dir: path.join(OUT, "video-raw"), size: { width: 1920, height: 1080 } },
   });
   // Locked to the local demo server: anything else is refused, and so are WebSockets.
   await context.route("**/*", (route) =>
