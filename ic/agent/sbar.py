@@ -67,6 +67,31 @@ def settle_urgency(escalations, actions, findings):
     return escalations
 
 
+def withdraw_cleared(incident, escalations, findings):
+    """After a passing check: a page ("now") is dropped when the incident commander never tried an action on the
+    components it names, each of them is called by a component it did fix, and the last look shows no fault at
+    all there. They recovered once their callers were fixed, so they were symptoms, not causes; their root-cause
+    claims go too. Returns the components cleared."""
+    tried = {a["target"] for a in incident.result["actions"] if a.get("sent")}
+    done = {a["target"] for a in incident.result["actions"] if a.get("sent") and a.get("ok")}
+    calls = {c["name"]: set(c.get("depends_on") or []) for c in (incident.profile or {}).get("components", [])}
+    fixed_caller = {dep for name in done for dep in calls.get(name, ())}
+    faulty = {f.get("component") for f in verify.open_faults(findings)}
+    cleared = []
+    for record in list(escalations):
+        components = set(record["components"])
+        if record["urgency"] == "now" and not components & tried and components <= fixed_caller \
+                and not components & faulty:
+            escalations.remove(record)
+            cleared += sorted(components)
+    if cleared:
+        incident.result["root_causes"] = [c for c in incident.result["root_causes"] if c["target"] not in cleared]
+        incident.note("verify", "note", "withdraw", f"no page for {', '.join(cleared)}: it recovered once the "
+                                                    f"components that call it were fixed, so it was a symptom, "
+                                                    f"not a cause")
+    return cleared
+
+
 def merge_escalations(records):
     """One escalation for the incident: every component, the most urgent urgency."""
     if not records:
@@ -103,6 +128,9 @@ def facts(result, profile, summary=""):
     if checks:
         lines.append(f"Recovery check (each look runs the main journey once and reads every component's metrics): "
                      f"{len(checks)} look(s); the last, at {checks[-1]['t']:.0f} s: {checks[-1]['summary']}")
+    for entry in result.get("trace") or []:
+        if entry.get("name") == "withdraw":
+            lines.append(f"Not escalated after all: {entry['summary']}")
     if result.get("escalation"):
         e = result["escalation"]
         lines.append(f"Escalated ({e['urgency']}) to {e['to']}: {', '.join(e['components'])}. Ask: {e['ask']}")

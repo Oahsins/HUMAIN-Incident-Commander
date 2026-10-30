@@ -117,6 +117,7 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None, log=None, 
                                                 keep_s=HANDOVER_KEEP_S)
                 if ok:
                     sbar.settle_urgency(escalations, incident.result["actions"], findings)
+                    sbar.withdraw_cleared(incident, escalations, findings)
                     handoffs = sbar.damage_handoffs(verify.damage(findings, ignore), incident.describe())
                     incident.declare("escalated" if any(e["urgency"] == "now" for e in escalations) else "recovered")
                     break
