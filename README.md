@@ -22,7 +22,7 @@ python run.py check          # the independent checker's verdict
 python run.py down           # stops everything
 ```
 
-`python run.py demo` runs live when `ANTHROPIC_API_KEY` is set. Without a key it replays a recorded run of the frozen agent and says so first. Keys are read only from environment variables, never from files.
+`python run.py demo` runs live when `ANTHROPIC_API_KEY` is set. Without a key it replays a recorded run of the frozen agent (`replays/demo-frozen.jsonl`) and says so first. The system and the checks run live; only the model's answers are replayed, so the handover quotes the recorded run's times. Keys are read only from environment variables, never from files.
 
 ## Documents
 
