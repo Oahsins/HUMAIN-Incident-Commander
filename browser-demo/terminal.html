@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Terminal</title>
+<style>
+  html, body { margin:0; height:100%; background:#0b1015; color:#d6dee6; }
+  pre { margin:0; padding:10px 12px; font:14px/1.45 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space:pre-wrap; word-break:break-word; }
+  .survey { color:#56d4e6; } .triage { color:#e07ce0; } .remediate { color:#f2c94c; } .verify { color:#6fdc8c; } .hand_over { color:#7aa7ff; }
+  .t { color:#6b7a88; } .good { color:#0b1015; background:#6fdc8c; font-weight:700; padding:0 4px; }
+  .bad { color:#fff; background:#d1453b; font-weight:700; padding:0 4px; } .head { color:#fff; font-weight:700; }
+</style>
+</head>
+<body>
+<pre id="out"></pre>
+<script>
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+function paint(line) {
+  const m = line.match(/^(\s*\d+\.\d+s)(\s+)(survey|triage|remediate|verify|hand_over)(.*)$/);
+  if (m) return `<span class="t">${esc(m[1])}</span>${m[2]}<span class="${m[3]}">${esc(m[3])}</span>${esc(m[4])}`;
+  if (/^CHECKER: RECOVERED/.test(line)) return `<span class="good">${esc(line)}</span>`;
+  if (/^CHECKER: NOT RECOVERED/.test(line)) return `<span class="bad">${esc(line)}</span>`;
+  if (/^(Outcome:|SITUATION:|BACKGROUND:|ASSESSMENT:|RECOMMENDATION:)/.test(line)) {
+    const i = line.indexOf(":") + 1; return `<span class="head">${esc(line.slice(0, i))}</span>${esc(line.slice(i))}`;
+  }
+  return esc(line);
+}
+let shown = "";
+async function poll() {
+  try {
+    const r = await fetch("/api/terminal"); const { text } = await r.json();
+    if (text !== shown) {
+      shown = text;
+      document.getElementById("out").innerHTML = text.split("\n").map(paint).join("\n");
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+  } catch (e) {}
+  setTimeout(poll, 400);
+}
+poll();
+</script>
+</body>
+</html>
