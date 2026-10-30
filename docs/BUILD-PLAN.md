@@ -69,26 +69,23 @@ Each Codex session pushes each finished task to its `codex/*` branch, opens a dr
 
 ## 5. Friday 30 Oct
 
-The 09:00 slot is required, not optional. If the morning is lost, do the same steps in the same order from 14:00. "Green" means the tests workflow passes on ubuntu-latest and windows-latest.
+Moved earlier on Friday morning (`DECISIONS.md`, 30 Oct): GO/NO-GO 1 passed on the morning rehearsal, and the freeze is at about 18:00 so the full exam fits overnight. Times after 10:30 are targets; each step still waits for the one before it. "Green" means the tests workflow passes on ubuntu-latest and windows-latest.
 
 | Time | Omar | Claude | Codex Session A | Codex Session B |
 |---|---|---|---|---|
-| **09:00-09:30** | Read both `NIGHT-REPORT.md` files; review and merge the overnight pull requests and the agent pull request once green; paste the C4 prompt | Fix anything from the night | - | - |
-| 09:30-10:00 | - | Review Codex's pull requests | C4 rehearsal on `main`: tests, then GO/NO-GO 1 steps 1-4 | - |
-| 10:00-11:00 | If the briefs are out, decide on an organiser system (otherwise at 14:00) | Tune the agent on practice scenarios | C5a: the `extra_service` variants and the strata check, counts only | `python run.py demo` once (model-key check); the harness end to end on 3 practice scenarios, 1 copy then 3 copies |
-| 11:00-12:00 | - | Tune | C5a, continued | C2b: the runbook on the 6 practice faults alone and on 5 compounds, then fix its rules |
-| 12:00-14:00 | - | Tune | C5: dry-run the sealed faults without the agent; seal 2 pushed by 14:00 | C3a: contract 1.2 in `eval/` and the runbook (pull request `codex/eval-1-2`) |
+| **08:00-10:30 (done)** | Merged the overnight pull requests; pasted the early prompts; added the model key to the cloud environment | Checked the harness end to end on the real bank; a tuning thread tuned the agent on dev-01 to dev-20 with the real model (pull request #12, merged 10:17) | C4 rehearsal: GO/NO-GO 1 steps 1-4 passed; C5a: the `extra_service` variants and the strata check; C5: the sealed faults dry-run without the agent, seal 2 pushed at 09:58 (pull request #11) | `python run.py demo` once (model-key check); C3a (pull request #9); the harness end to end on 3 practice scenarios, 1 copy then 3 copies; C2b (pull request #10) |
+| **10:31 GO/NO-GO 1** | Counted the rehearsal as GO/NO-GO 1 (section 7) | | | |
+| 10:30-11:00 | Merge #11, then #9 and #10 after Claude's review | Review #9 and #10 | - | - |
+| 11:00-13:00 | If the briefs are out, decide on an organiser system (otherwise at 14:00) | Tune the agent on dev-01 to dev-20 only, with the real model (tuning thread) | - | Tune the runbook on dev-01 to dev-20 only |
+| 13:00-13:45 | Read the pilot results | Pick the bulk model from the pilot's measured cost and seconds per call | - | Pilot: dev-21 to dev-30 × abcde, react, runbook, on 3 copies |
+| **13:45 GO/NO-GO 2** | Decide the framing (section 7) | | | |
 | **14:00-14:30** | Read the final brief. Confirm Challenge 1. Choose the lead story: banking (default) or dispatch. The bank carries the sealed exam either way; choosing dispatch makes it the video demo. Create the project page (name, one-sentence description) | Adjust the plan to the brief | Pull `main` | Pull `main` |
-| **14:30-16:30** | Watch the go/no-go run | Fix anything the run shows | C4 for real: GO/NO-GO 1 steps 1-4 on port bases 8100, 8200, 8300 | - |
-| **16:30 GO/NO-GO 1** | Decide (section 7) | | | |
-| 16:30-17:30 | 20-minute explain-back: Claude walks Omar through every file | Tune on practice scenarios only, with the real model | - | Tune the runbook on dev-01 to dev-20 only |
-| **17:30-18:30** | Read the pilot results | Pick the bulk model from the pilot's measured cost and seconds per call | - | Pilot: dev-21 to dev-30 × abcde, react, runbook, on 3 copies |
-| **18:30 GO/NO-GO 2** | Decide the framing (section 7) | | | |
-| 18:30-20:00 | Start the video script outline with Claude | The `extra_service` condition; demo polish; regression tests | - | Check `configs/prices.json`; test resume |
-| 20:00-21:00 | Second explain-back | Tests green on Windows; `DECISIONS.md` (ablation diffs, analysis plan) | - | Dry run `dry-1` on 6 practice scenarios on 3 copies, plus 1 scenario under `log_format_v2` and `extra_service` (runbook) and 1 under `model_swap` (abcde); checker calibration with noop, 4 runs each of the 3 healthy practice cases (dev-09, dev-18, dev-24) |
-| **21:00 GO/NO-GO 3** | Set the run size (section 7) | | | |
-| **21:00-21:30 FREEZE** | Merge every open pull request (including `baselines/FROZEN.json`); approve the tag | Record the tag, the commit and the five group hashes in `DECISIONS.md` | C6: tag `freeze-1`, push the tag, clean-clone pass 1 into `%USERPROFILE%\Documents\HUMAIN-final` with the sealed files copied in | `baselines/FROZEN.json`; after the tag, the backup demo take into `replays/demo-frozen.jsonl` (pull request `codex/demo-replay`) |
-| 21:30 | Start the final run in his own PowerShell window in `HUMAIN-final`, with the 5-try auto-resume loop from the handoff; leave the laptop on mains power | Build the dispatch platform, adapter, control and checker with `ic/kit`, and `docs/ADDING-A-SYSTEM.md` (21:30 to Sat 02:00) | - | - |
+| 14:30-15:00 | - | The bulk model in `configs/models.json`; tests green on Windows | - | Check `configs/prices.json`; test resume |
+| 15:00-16:00 | 20-minute explain-back: Claude walks Omar through every file | `DECISIONS.md` (ablation diffs, analysis plan) | - | Dry run `dry-1` on 6 practice scenarios on 3 copies, plus 1 scenario under `log_format_v2` and `extra_service` (runbook) and 1 under `model_swap` (abcde); checker calibration with noop, 4 runs each of the 3 healthy practice cases (dev-09, dev-18, dev-24) |
+| **16:00 GO/NO-GO 3** | Set the run size (section 7) | | | |
+| 16:00-17:30 | Start the video script outline with Claude | The last agent pull request green by 17:00; demo polish; regression tests | C5's sealed self-test again, on `main` | - |
+| **17:30-18:00 FREEZE** | Merge every open pull request (including `baselines/FROZEN.json`); approve the tag | Record the tag, the commit and the five group hashes in `DECISIONS.md` | C6: tag `freeze-1`, push the tag, clean-clone pass 1 into `%USERPROFILE%\Documents\HUMAIN-final` with the sealed files copied in | `baselines/FROZEN.json`; after the tag, the backup demo take into `replays/demo-frozen.jsonl` (pull request `codex/demo-replay`) |
+| about 18:00 | Start the final run in his own PowerShell window in `HUMAIN-final`, with the 5-try auto-resume loop from the handoff; leave the laptop on mains power. Then the second explain-back while it runs | Build the dispatch platform, adapter, control and checker with `ic/kit`, and `docs/ADDING-A-SYSTEM.md` (18:00 to about 23:00) | - | - |
 
 The final run goes case-major in the line order of `heldout.jsonl` (its first 40 ids are `core40`) (case 1 under every arm, then case 2), so a partial run is still paired: the main exam first, then the robustness subset. It must finish by 06:00 Sat. Progress: `Get-Content results\final.log -Tail 20`.
 
@@ -107,7 +104,7 @@ The final run goes case-major in the line order of `heldout.jsonl` (its first 40
 
 ## 7. Go/no-go checks
 
-**GO/NO-GO 1, Fri 14:30-16:30 (rehearsed at 09:30).** On Omar's Windows laptop, on the eval port bases:
+**GO/NO-GO 1 (passed: Session A's morning rehearsal passed all four steps, and Omar counted it at 10:31 Fri).** On Omar's Windows laptop, on the eval port bases:
 
 1. `python run.py up` starts the bank with one command, and `python run.py status` shows every component healthy.
 2. All 6 practice faults, one at a time, each break payments in a way that `status` shows at once and `check` shows from 30 s after the injection.
@@ -116,13 +113,13 @@ The final run goes case-major in the line order of `heldout.jsonl` (its first 40
 
 If step 1, 2 or 3 fails and isn't fixed by 16:30, take the cut path. It keeps every Adapter and Control signature and every component name: `link()` becomes an in-service delay, and failover to `screening-standby` uses a cached decision list. If only step 4 fails, run on the copies that passed, and GO/NO-GO 3 sets the exam size.
 
-**GO/NO-GO 2, Fri 18:30 (the pilot).** Count the checker-recovered cases out of 10: A for `abcde` and R for `runbook`. Apply the first rule that matches.
+**GO/NO-GO 2, Fri about 13:45 (the pilot).** Count the checker-recovered cases out of 10: A for `abcde` and R for `runbook`. Apply the first rule that matches.
 
-1. A is 6 or fewer: the agent is unreliable. Cut the `react` and `naive_verify` arms, work only on `abcde`'s reliability until 21:00, then freeze as planned.
+1. A is 6 or fewer: the agent is unreliable. Cut the `react` and `naive_verify` arms, work only on `abcde`'s reliability until 17:00, then freeze as planned.
 2. A is at least R + 2: keep the pitch as planned.
 3. Otherwise: keep the build and reframe it honestly. The script handles known faults; the agent is for held-out, compound and changed-condition faults, and it writes the handover. The sealed exam then tests exactly that claim.
 
-**GO/NO-GO 3, Fri 21:00 (run size).** From the 20:00 dry run, m = mean minutes per incident and c = the number of copies that ran without interference. Hours = (60 × arms + 220) × m / (60 × c). If that is 8 or less, run 60. Otherwise cut to the pre-registered core40 and keep only `four_faults` and `model_swap`, so hours = (40 × arms + 100) × m / (60 × c). If that is still over 8, also cut `naive_verify`. If the start slips past 22:00, recompute: the run must finish by 06:00.
+**GO/NO-GO 3, Fri about 16:00 (run size).** From the dry run, m = mean minutes per incident and c = the number of copies that ran without interference. Hours = (60 × arms + 220) × m / (60 × c). The run must end by 05:30 Sat, half an hour before the 06:00 deadline, counted from its planned start (about 18:00, so about 11.5 hours). If it fits, run 60. Otherwise cut to the pre-registered core40 and keep only `four_faults` and `model_swap`, so hours = (40 × arms + 100) × m / (60 × c). If that still does not fit, also cut `naive_verify`. If the start slips, recompute from the actual start: the run must finish by 06:00.
 
 ## 8. Cut lines
 
@@ -130,9 +127,9 @@ Each cut belongs to a decision point. Never cut the bottom block.
 
 | Decision point | Cuts, in this order |
 |---|---|
-| GO/NO-GO 1 (16:30) | The TCP link proxy (use in-service delays; the cut path in section 7) |
-| GO/NO-GO 2 (18:30) | The FIFO arm; the rich console timeline (plain text instead); the naive-verify arm; the free-form ReAct arm |
-| GO/NO-GO 3 (21:00) | The extra robustness conditions (keep `four_faults` and `model_swap`); then the exam from 60 to the core40 list; then the naive-verify arm |
+| GO/NO-GO 1 (passed) | The TCP link proxy (use in-service delays; the cut path in section 7) |
+| GO/NO-GO 2 (about 13:45) | The FIFO arm; the rich console timeline (plain text instead); the naive-verify arm; the free-form ReAct arm |
+| GO/NO-GO 3 (about 16:00) | The extra robustness conditions (keep `four_faults` and `model_swap`); then the exam from 60 to the core40 list; then the naive-verify arm |
 | Sat 12:00 | The transfer run from 20 incidents to its first 10 |
 
 **Never cut:** the one-command run; the sealed exam; the independent checker with the ledger check; the scripted runbook baseline; the SBAR handover and escalation; the first 10 transfer incidents (the agent must be shown to plug into another system); the video.
@@ -189,7 +186,7 @@ Each cut belongs to a decision point. Never cut the bottom block.
 | Windows quirks (killing processes, SQLite locks, ports in use) | Standard-library processes plus `psutil`; the 09:30 rehearsal and GO/NO-GO 1; the cut path in section 7 |
 | The laptop sleeps or restarts overnight | The power settings and the paused Windows Update before pasting; the auto-resume loop |
 | No working model key on Friday | Omar sets one tonight on the laptop and in Claude's cloud environment; the runbook and the replay work without one |
-| The script ties the agent | Known by 18:30 Friday; the GO/NO-GO 2 rules |
+| The script ties the agent | Known by about 13:45 Friday; the GO/NO-GO 2 rules |
 | The overnight run crashes | A 300 s per-case watchdog (`harness_timeout`); provider errors scored `api_error`; both re-run once at the end and reported separately; the 5-try auto-resume loop on 3 copies; case-major order, so a partial run is still paired; at Sat 11:00, if the main exam is incomplete, stop the robustness subset and report n of N |
 | A sealed file is committed by mistake | `.gitignore`, staging by explicit path, `git status --short` before every commit, `.git/info/exclude` on the laptop |
 | An organiser system is supplied | Decide by Fri 10:00 if the briefs are out (else at 14:00). The bank keeps the sealed exam; the organiser system replaces dispatch as the transfer test. Claude writes its adapter, control and checker; Codex writes its faults and 20 sealed incidents. Before `freeze-1`, Claude runs only the conformance check and the Control tests on it, never the agent. Organiser material never enters the repository unless the brief says it may be redistributed; the adapter reads it from the folder in `IC_ORGANISER_DIR` |
@@ -199,6 +196,6 @@ Each cut belongs to a decision point. Never cut the bottom block.
 ## 13. Open decisions for Omar
 
 1. The lead story, at Fri 14:00: banking (default) or dispatch. An organiser system, by Fri 10:00 if the briefs are out, else at 14:00.
-2. Exam size: set by GO/NO-GO 3 at 21:00.
-3. The bulk model: picked at the pilot, Fri 17:30-18:30.
+2. Exam size: set by GO/NO-GO 3 at about 16:00.
+3. The bulk model: picked at the pilot, Fri about 13:00-13:45.
 4. When the repository becomes public: after Codex's secret scan on Saturday afternoon, before publishing. Judges need it public by Saturday's publish.
