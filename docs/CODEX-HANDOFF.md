@@ -369,10 +369,10 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       --port-base 9100, then python run.py down --port-base 9100, and the same
       for 9200 and 9300. If a base will not start, run on 8100, 8200 and 8300
       instead (--port-bases 8100,8200,8300; free once the bank runs end).
-    - The run (Sat 12:00-13:00, about 50 minutes): python run.py eval --split
-      transfer --final --arms abcde,noop,oracle --copies 3 --name transfer-1
-      (the frozen agent, with noop and oracle for validity, on port bases 9100,
-      9200 and 9300). Stop at 14:15 whatever its state. Run the first 10
+    - The run (Sat 12:00-13:10, about 65 minutes): python run.py eval --split
+      transfer --final --arms abcde,runbook,noop,oracle --copies 3 --name
+      transfer-1 (the frozen agent and the frozen runbook, with noop and oracle
+      for validity, on port bases 9100, 9200 and 9300). Stop at 14:15 whatever its state. Run the first 10
       incidents first: those 10 are never cut. Report the agent hash beside
       the results.
     - If an organiser system replaces dispatch as the transfer test, do the same
