@@ -47,7 +47,7 @@ def main():
     out = os.path.abspath(args.out or os.path.join(HERE, "out", time.strftime("%Y%m%d-%H%M%S")))
     os.makedirs(out, exist_ok=True)
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "IC_RECORD")}
-    env.update(PYTHONUNBUFFERED="1", COLUMNS="104", PLAYWRIGHT_NODE_MODULE=PLAYWRIGHT)
+    env.update(PYTHONUNBUFFERED="1", COLUMNS="400", PLAYWRIGHT_NODE_MODULE=PLAYWRIGHT)
 
     meta = {"label": "demo, not evidence", "port_base": args.port_base, "model": args.model,
             "commit": git("rev-parse", "HEAD"), "describe": git("describe", "--tags", "--always", "--dirty"),

@@ -11,8 +11,9 @@ Responses map the way customers.py maps them: 2xx is ok, 4xx is rejected,
 
     python browser-demo/server.py --port-base 27800
 
-Also serves /stage (the page beside the live terminal, for filming) and
-/terminal (a view of the demo's terminal log), both outside what the customer sees.
+Also serves /stage (the page beside the live incident card, for filming), /incident (a card
+drawn live from the demo's terminal lines and, after the handover, the agent's saved result)
+and /terminal (the plain terminal log), all outside what the customer sees.
 """
 
 import argparse
@@ -30,7 +31,7 @@ ROOT = os.path.dirname(HERE)
 CUSTOMER = "web-01"
 ACCOUNT = "cust-20"   # an existing customer account; never probe-01, never a probe- id
 ATTEMPT_TIMEOUT_S = 3.0   # as customers.py
-PAGES = {"/": "page.html", "/stage": "stage.html", "/terminal": "terminal.html"}
+PAGES = {"/": "page.html", "/stage": "stage.html", "/terminal": "terminal.html", "/incident": "incident.html"}
 
 
 class App:
@@ -39,6 +40,7 @@ class App:
         self.customers_log = os.path.join(data_dir, "customers.jsonl")
         self.journal = os.path.join(data_dir, "web-01-journal.jsonl")   # for report.py; the checker never reads it
         self.terminal_log = terminal_log
+        self.data_dir = data_dir
         self.lock = threading.Lock()
         self.seq = 0
 
@@ -97,6 +99,17 @@ class App:
         return 200, {"end_to_end_id": e2e, "outcome": outcome, "http": status, "answer": answer,
                      "ms": round((t1 - t0) * 1000)}
 
+    def result(self):
+        """The agent's saved result, once run.py demo has written it (the copy's folder is wiped at each start)."""
+        names = sorted(n for n in os.listdir(self.data_dir) if n.startswith("agent-") and n.endswith(".json")) \
+            if os.path.isdir(self.data_dir) else []
+        if not names:
+            return 404, {"error": "no result yet"}
+        with open(os.path.join(self.data_dir, names[-1]), encoding="utf-8") as handle:
+            r = json.load(handle)
+        findings = next((ev.get("data", {}).get("findings") for ev in r.get("trace", []) if ev.get("name") == "abcde"), [])
+        return 200, {"findings": findings, "root_causes": r.get("root_causes"), "outcome": r.get("outcome")}
+
     def terminal(self):
         try:
             with open(self.terminal_log, encoding="utf-8", errors="replace") as handle:
@@ -132,6 +145,8 @@ def handler(app):
                 return self.relay(*app.call("GET", f"/balance/{ACCOUNT}"))
             if path.startswith("/api/payment/"):
                 return self.relay(*app.call("GET", "/payment/" + path.rsplit("/", 1)[1]))
+            if path == "/api/result":
+                return self.send(*app.result())
             if path == "/api/terminal":
                 return self.send(*app.terminal())
             self.send(404, {"error": "not found"})

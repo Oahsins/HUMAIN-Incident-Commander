@@ -41,7 +41,12 @@ sets no model key: the agent's model answers come from the keyless replay
   `targets/bank/customers.py`: 2xx ok, 4xx rejected, 5xx or a timeout failed. Without those lines
   the checker would count the browser's payments as ghost payments.
 - `page.html` shows only what a customer sees: amount, Pay, Retry same payment, the last result,
-  the payment list and the balance. `stage.html` and `terminal.html` put it beside the terminal for filming.
+  the payment list and the balance. `stage.html` puts it beside `incident.html`, an incident card
+  drawn live from the demo's terminal lines (phase stepper, the agent's steps, actions with the
+  guard's answer, the verify checks, the SBAR and the checker's verdict, with the last terminal
+  lines underneath). After the handover the card adds the ABCDE letters from the agent's saved
+  result. The card only redraws what the demo printed; the model does not generate it.
+  `terminal.html` is the plain terminal view.
 - `journey.cjs` runs one continuous Chromium session with video and a trace, locked to
   `127.0.0.1`, with WebSockets and service workers blocked. It follows the demo by reading its
   terminal log. Its post-incident payments fall inside the checker's scored window; its "already
