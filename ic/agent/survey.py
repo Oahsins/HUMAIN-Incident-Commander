@@ -27,6 +27,7 @@ RPS_DROP = 0.5             # traffic below half the baseline rate
 RECENT_EXIT_S = 30.0       # with FLAPPING_EXITS exits in 15 min, the last one this recent: a crash loop
 FLAPPING_EXITS = 3
 BUSY_CPU_PCT = 50.0        # a job above this is noted (not a fault by itself)
+DATA_CHECK = "data check failed: "
 
 
 def _num(value):
@@ -127,7 +128,7 @@ def component_signals(name, entry, base, component, baselines, entry_point=False
                                         f"({dep} itself answered in {baselines[dep]['p95_ms']:.0f} ms at baseline)"))
     for check, problems in (extra.get("integrity") or {}).items():
         if _num(problems):
-            found.append(("D", "fault", f"data check failed: {check.replace('_', ' ')} = {problems}"))
+            found.append(("D", "fault", f"{DATA_CHECK}{check.replace('_', ' ')} = {problems}"))
     if _num(extra.get("quarantined_items")):
         found.append(("D", "info", f"{extra['quarantined_items']} item(s) already set aside"))
     if extra.get("active") == "standby":
@@ -200,6 +201,19 @@ def survey(profile, obs, probe, *, now=None, change_horizon_s=900.0):
 
 def faults(findings):
     return [f for f in findings if f["severity"] == "fault"]
+
+
+def data_check(finding):
+    """(component, check, count) for a failed data check, else None. A count over a trailing window stays
+    up after its cause is fixed, so verify compares it from one look to the next."""
+    text = finding.get("text", "")
+    if finding.get("severity") != "fault" or not text.startswith(DATA_CHECK):
+        return None
+    check, _, count = text[len(DATA_CHECK):].rpartition(" = ")
+    try:
+        return finding.get("component"), check, float(count)
+    except ValueError:
+        return None
 
 
 def table(findings, letters=LETTERS):

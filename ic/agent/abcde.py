@@ -22,6 +22,7 @@ from ic.agent.common import Incident, OutOfTime
 SURVEY_WINDOW_S = 8.0
 REASSESS_ROUNDS = 2
 HANDOVER_KEEP_S = 12.0      # budget kept for the handover once the work is done
+REASSESS_MIN_S = 26.0       # a reassessment, one more fix and a sustained check fit in this, on top of the handover
 ASSESS_EFFORT = "medium"
 
 ARMS = {
@@ -37,7 +38,7 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None, log=None, 
     settings = ARMS[arm]
     incident = Incident(adapter, arm, budget_s=budget_s, max_steps=max_steps, model=model, log=log, mode=mode,
                         confirm=confirm, seed=seed, audit_path=audit_path)
-    state = {"summary": "", "escalations": [], "history": [], "declined": set(), "contained": None}
+    state = {"summary": "", "escalations": [], "handoffs": [], "history": [], "declined": set(), "contained": None}
     try:
         _respond(incident, settings, state)
     except OutOfTime:
@@ -50,9 +51,10 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None, log=None, 
     finally:
         if not incident.result["t_declared"]:
             incident.declare(incident.result["outcome"])
-        incident.result["escalation"] = sbar.merge_escalations(state["escalations"])
-        if incident.result["escalation"] and incident.result["outcome"] in ("gave_up", "budget_exhausted"):
+        if state["escalations"] and incident.result["outcome"] in ("gave_up", "budget_exhausted"):
             incident.result["outcome"] = "escalated"
+        incident.result["escalation"] = sbar.merge_escalations(
+            state["escalations"] + state["handoffs"] + sbar.quarantine_handoffs(incident.result, incident.profile or {}))
         try:
             sbar.write(incident, state["summary"])
         except OutOfTime:
@@ -173,6 +175,10 @@ def _respond(incident, settings, state):
         clean, findings, probe = verify.look(incident, phase="survey")
         if clean:
             state["summary"] = "The survey found nothing abnormal in any component, and the main journey passed."
+            context = [(f"{f['component']}: " if f.get("component") else "") + f["text"]
+                       for f in findings if f["severity"] == "info"][:5]
+            if context:
+                state["summary"] += " Seen, with no symptom: " + "; ".join(context) + "."
             incident.declare("no_incident")
             return
 
@@ -214,9 +220,11 @@ def _respond(incident, settings, state):
         ok, findings = check(incident, incident.result["actions"], ignore_components=ignore,
                              keep_s=HANDOVER_KEEP_S)
         if ok:
+            sbar.settle_urgency(state["escalations"], incident.result["actions"], findings)
+            state["handoffs"] = sbar.damage_handoffs(verify.damage(findings, ignore), profile)
             incident.declare("escalated" if any(e["urgency"] == "now" for e in state["escalations"]) else "recovered")
             return
-        if round_number == REASSESS_ROUNDS or incident.remaining() < HANDOVER_KEEP_S + 30:
+        if round_number == REASSESS_ROUNDS or incident.remaining() < HANDOVER_KEEP_S + REASSESS_MIN_S:
             break
         obs, probe, found = _survey(incident, phase="triage")
         logs = _logs(incident, found["findings"], phase="triage")

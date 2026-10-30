@@ -5,7 +5,7 @@ if the call fails, a template writes it from the same facts. Either way the
 handover is written inside the budget.
 """
 
-from ic.agent import prompts
+from ic.agent import prompts, verify
 
 MODEL_SBAR_MIN_S = 10.0     # below this much budget, use the template
 
@@ -26,6 +26,47 @@ def escalation(fault, fix, profile, journey_down):
             "ask": fix.get("note") or "investigate and fix; the incident commander has no safe action for this"}
 
 
+def handoff(profile, component, reason, ask):
+    """A follow-up ("soon") for work only people can do, after the system itself is back."""
+    role = next((c.get("role") for c in profile.get("escalation_contacts") or [] if component in (c.get("for") or [])),
+                None)
+    return {"components": [component] if component else sorted(c["name"] for c in profile.get("components", [])),
+            "class": None, "reason": reason, "urgency": "soon", "to": role or "the operations team", "ask": ask}
+
+
+def quarantine_handoffs(result, profile):
+    """Every item the arm set aside goes to a person: a quarantine is never the end of that item's story."""
+    out = []
+    for record in result.get("actions") or []:
+        if record.get("action") == "quarantine" and record.get("sent") and record.get("ok"):
+            item, target = (record.get("params") or {}).get("item"), record.get("target")
+            out.append(handoff(profile, target, f"item {item} was set aside from {target}'s work queue",
+                               f"review item {item} set aside from {target}: repair and resubmit it, or close it "
+                               f"with its customer"))
+    return out
+
+
+def damage_handoffs(findings, profile):
+    """Failed data checks that stopped growing once the fixes were in: the damage stays for a person."""
+    return [handoff(profile, f.get("component"), f"past damage, no longer growing: {f['text']}",
+                    f"find and put right the records behind '{f['text']}'; the incident commander cannot change data")
+            for f in findings]
+
+
+def settle_urgency(escalations, actions, findings):
+    """After a passing check: a page ("now") becomes a follow-up ("soon") when the incident commander acted on
+    every component it names and the last look shows no open fault there. The fix held; the escalation is the
+    work behind it (a slow primary behind its standby, capacity behind a restart). Escalations on components
+    it could not act on stay pages."""
+    done = {a["target"] for a in actions if a.get("sent") and a.get("ok")}
+    still = {f.get("component") for f in verify.open_faults(findings)}
+    for record in escalations:
+        components = set(record["components"])
+        if record["urgency"] == "now" and components <= done and not components & still:
+            record["urgency"] = "soon"
+    return escalations
+
+
 def merge_escalations(records):
     """One escalation for the incident: every component, the most urgent urgency."""
     if not records:
@@ -43,7 +84,8 @@ def merge_escalations(records):
 
 def facts(result, profile, summary=""):
     """Plain-text facts for the note: outcome, causes, actions, escalation."""
-    lines = [f"System: {profile.get('system')}. Outcome: {result['outcome']}. Mode: {result['mode']}."]
+    lines = [f"System: {profile.get('system')}. Outcome: {result['outcome']}. Mode: {result['mode']}"
+             + (" (the incident commander took the actions below itself)." if result["mode"] == "auto" else ".")]
     if summary:
         lines.append(f"Assessment summary: {summary}")
     for cause in result.get("root_causes") or []:
@@ -57,6 +99,10 @@ def facts(result, profile, summary=""):
     for record in result.get("proposed_actions") or []:
         lines.append(f"Proposed, not taken (advise mode): {record['action']} on {record['target']} "
                      f"{record.get('params') or ''}. Reason: {record.get('reason', '')}")
+    checks = [e for e in result.get("trace") or [] if e.get("phase") == "verify" and e.get("name") == "check"]
+    if checks:
+        lines.append(f"Recovery check (each look runs the main journey once and reads every component's metrics): "
+                     f"{len(checks)} look(s); the last, at {checks[-1]['t']:.0f} s: {checks[-1]['summary']}")
     if result.get("escalation"):
         e = result["escalation"]
         lines.append(f"Escalated ({e['urgency']}) to {e['to']}: {', '.join(e['components'])}. Ask: {e['ask']}")
