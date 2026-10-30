@@ -47,11 +47,14 @@ def _changes(observation, name, kind):
     return list(current.values())
 
 
-def _worker_change_time(profile, observation):
-    """Keep every worker's post-change progress when refreshing an aged queue."""
+def _worker_change_age(profile, observation):
+    """Measure the refresh anchor's age entirely on the target system's clock."""
     timestamps = []
     aged_changed_queue = False
-    now = time()
+    observed_at = observation.get("t")
+    if (not isinstance(observed_at, (int, float)) or isinstance(observed_at, bool)
+            or not isfinite(observed_at) or observed_at <= 0):
+        return None
     for comp in profile.get("components", []):
         if comp.get("kind") != "worker" or "revert_config" not in comp.get("actions", []):
             continue
@@ -60,15 +63,19 @@ def _worker_change_time(profile, observation):
         if (changes and _number(extra.get("queue_depth")) > 0
                 and _number(extra.get("oldest_pending_s")) >= 3):
             aged_changed_queue = True
+            # Its severe change explains the new stall more strongly than an
+            # earlier harmless adjustment to another setting on this worker.
+            severe = [change for change in changes if _severe_change(change)]
+            changes = severe or changes
         # One observe window applies to every component. A second worker's
         # young queue can age during the probe, so retain its progress too.
         for change in changes:
             changed_at = change.get("t")
             if (not isinstance(changed_at, (int, float)) or isinstance(changed_at, bool)
-                    or not isfinite(changed_at) or not 0 < changed_at <= now):
+                    or not isfinite(changed_at) or not 0 < changed_at <= observed_at):
                 return None  # Unknown timing cannot justify discarding history.
             timestamps.append(changed_at)
-    return min(timestamps) if aged_changed_queue and timestamps else None
+    return observed_at - min(timestamps) if aged_changed_queue and timestamps else None
 
 
 def _upstream_bad(component, observation):
@@ -86,17 +93,28 @@ def _upstream_bad(component, observation):
     return False
 
 
-def _propagated_failure(component, observation):
+def _severe_change(change):
+    """A large numeric reduction is stronger evidence than a small adjustment."""
+    detail = change.get("detail") or {}
+    before, after = detail.get("from"), detail.get("to")
+    return (isinstance(before, (int, float)) and before > 0
+            and isinstance(after, (int, float)) and after < before / 10)
+
+
+def _propagated_failure(component, observation, component_kinds, severe_local_change=False):
     """Defer a caller's config change when the dependency itself is failing.
 
     A bad caller edge alone is insufficient: its own timeout setting may be
-    wrong while the dependency is healthy.
+    wrong while the dependency is healthy. An external component mirrors its
+    callers, so it cannot rule out a severe local setting change.
     """
     metrics = observation.get("components", {})
     edges = (metrics.get(component["name"], {}).get("extra") or {}).get("dependencies", {})
     for name in component.get("depends_on", []):
         edge = edges.get(name) or {}
         if not any(_number(edge.get(key)) > 0.05 for key in ("error_rate", "reject_rate")):
+            continue
+        if severe_local_change and component_kinds.get(name) == "external":
             continue
         upstream = metrics.get(name, {})
         extra = upstream.get("extra") or {}
@@ -114,6 +132,7 @@ def _candidate(action, component, cause, reason, params=None):
 def _rules(profile, observation):
     """Six fixed rules, checked in this order; component order is also fixed."""
     components = profile.get("components", [])
+    component_kinds = {comp["name"]: comp.get("kind") for comp in components}
     metrics = observation.get("components", {})
     baseline = observation.get("baseline", {})
     candidates = []
@@ -143,17 +162,28 @@ def _rules(profile, observation):
         name = comp["name"]
         m, base = metrics.get(name, {}), baseline.get(name, {})
         changes = _changes(observation, name, "config")
+        if comp.get("kind") == "worker" and m.get("up") is False:
+            if _changes(observation, name, "stop"):
+                continue  # Restart the explicitly stopped worker first.
+            last_exit = (m.get("extra") or {}).get("last_exit_s_ago")
+            observed_at = observation.get("t")
+            if (isinstance(last_exit, (int, float)) and isfinite(last_exit) and last_exit >= 0
+                    and isinstance(observed_at, (int, float)) and isfinite(observed_at)):
+                exited_at = observed_at - last_exit
+                # A later setting cannot explain an earlier crash. Keep older
+                # changes eligible, including a setting that caused the exit.
+                changes = [c for c in changes if not isinstance(c.get("t"), (int, float))
+                           or c["t"] <= exited_at]
+                if not changes:
+                    continue
         if ("revert_config" not in comp.get("actions", []) or not _bad(m, base)
-                or _propagated_failure(comp, observation)):
+                or _propagated_failure(comp, observation, component_kinds,
+                                       severe_local_change=any(_severe_change(c) for c in changes))):
             continue
         if changes:
             # A drastic reduction or zero is more suspicious than a small harmless change.
             def priority(change):
-                detail = change.get("detail") or {}
-                before, after = detail.get("from"), detail.get("to")
-                severe = (isinstance(before, (int, float)) and before > 0
-                          and isinstance(after, (int, float)) and after < before / 10)
-                return severe, change.get("t", 0)
+                return _severe_change(change), change.get("t", 0)
             change = max(changes, key=priority)
             key = (change.get("detail") or {}).get("key")
             params = {"key": key} if key is not None else {}
@@ -246,13 +276,13 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
             raise _BudgetReached
         sleep(max(0.0, seconds))
 
-    def observe(*, since_change=None):
+    def observe(*, window_limit=None):
         # Old downstream errors can outlive a repair in a rolling window.
         # Judge the next rule using only traffic since the action returned.
         fresh_window = window_s if last_action_end is None else min(
             window_s, max(min_window_s, monotonic() - last_action_end))
-        if since_change is not None:
-            fresh_window = min(fresh_window, max(min_window_s, time() - since_change))
+        if window_limit is not None:
+            fresh_window = min(fresh_window, max(min_window_s, window_limit))
         return call("observe", window_s=fresh_window)
 
     def diagnose(proposal):
@@ -289,13 +319,17 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
         window_s = max(10.0, min_window_s)
         while True:
             observation = observe()
+            observed_returned_at = monotonic()
             probe = call("probe")
             candidates = _rules(profile, observation)
             if not candidates and probe.get("ok") is False:
                 # A slow failed probe can expose a queue that was young or
-                # empty in the earlier snapshot. Exclude pre-change completions
-                # for an aged queue, but retain progress after its setting changed.
-                observation = observe(since_change=_worker_change_time(profile, observation))
+                # empty in the earlier snapshot. Anchor an aged queue at its
+                # severe setting change, retaining other workers' history too.
+                change_age = _worker_change_age(profile, observation)
+                if change_age is not None:
+                    change_age += monotonic() - observed_returned_at
+                observation = observe(window_limit=change_age)
                 candidates = _rules(profile, observation)
             if mode == "advise":
                 for order, proposal in enumerate(candidates, 1):

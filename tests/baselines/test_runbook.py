@@ -97,7 +97,7 @@ class FakeAdapter:
             metrics["front"].update(release="1.1", config_version=2)
             changes += [{"component": "front", "kind": "deploy", "t": 1, "detail": {"from": "1.0", "to": "1.1"}},
                         {"component": "front", "kind": "config", "t": 2, "detail": {"key": "timeout", "from": 2, "to": 3}}]
-        return {"t": 1, "window_s": window_s, "components": metrics, "baseline": baseline, "changes": changes + self.extra_changes}
+        return {"t": runbook.time(), "window_s": window_s, "components": metrics, "baseline": baseline, "changes": changes + self.extra_changes}
 
     def probe(self, journey=None):
         ok = self.signature in (None, "noise", "bad_update", "bad_setting")
@@ -424,6 +424,111 @@ def test_external_outage_is_not_blame_for_a_benign_caller_config(clock):
     assert result["root_causes"][0]["class"] == "external_outage"
 
 
+@pytest.mark.parametrize("upstream_kind", ["external", "dependency"])
+@pytest.mark.parametrize("outage_persists", [False, True])
+def test_severe_local_timeout_is_not_hidden_by_external_mirrored_metrics(clock, upstream_kind, outage_persists):
+    class MirroredTimeout(FakeAdapter):
+        def __init__(self):
+            super().__init__("external")
+            self.expected = ("revert_config", "consumer", {"key": "dependency_wait_s"})
+            self.persist = outage_persists
+            self.setting_reverted = False
+
+        def describe(self):
+            profile = super().describe()
+            next(c for c in profile["components"] if c["name"] == "outside")["kind"] = upstream_kind
+            return profile
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            if self.signature:
+                observation["components"]["consumer"].update(error_rate=1.0, config_version=2,
+                    extra={"dependencies": {"outside": {"n": 20, "error_rate": 1.0}},
+                           "queue_depth": 4, "oldest_pending_s": 8, "processed_per_s": 0})
+                # An external entry is the caller's view, not a second health check.
+                observation["components"]["outside"]["extra"] = {"view": "as our callers see it"}
+                observation["changes"].append({"component": "consumer", "kind": "config", "t": 1,
+                    "detail": {"key": "dependency_wait_s", "from": 2.0, "to": 0.001}})
+                if self.setting_reverted:
+                    observation["changes"].append({"component": "consumer", "kind": "config", "t": 2,
+                        "actor": "incident-commander", "detail": {"key": "dependency_wait_s", "revert": True}})
+            return observation
+
+        def act(self, action, target, params=None):
+            response = super().act(action, target, params)
+            self.setting_reverted = True
+            return response
+
+    adapter = MirroredTimeout()
+
+    result = runbook.run_incident(adapter)
+
+    should_revert = upstream_kind == "external"
+    assert adapter.taken == ([adapter.expected] if should_revert else [])
+    assert result["outcome"] == ("recovered" if should_revert and not outage_persists else "escalated")
+    assert not any(action["refused"] for action in result["actions"])
+
+
+def test_external_outage_before_a_harmless_worker_change_is_escalated(clock):
+    class OutageBeforeChange(FakeAdapter):
+        def __init__(self):
+            super().__init__("external")
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            observation["components"]["consumer"].update(error_rate=1.0, config_version=2,
+                extra={"dependencies": {"outside": {"error_rate": 1.0}},
+                       "queue_depth": 4, "oldest_pending_s": 5.5, "processed_per_s": 0})
+            observation["changes"].append({"component": "consumer", "kind": "config",
+                "t": clock.time() - 5.0,
+                "detail": {"key": "poll_delay_s", "from": 0.2, "to": 0.25}})
+            return observation
+
+    clock.sleep(5.5)  # The outage began at zero; the harmless change followed at 0.5.
+    adapter = OutageBeforeChange()
+    result = runbook.run_incident(adapter)
+    assert result["outcome"] == "escalated"
+    assert adapter.taken == result["actions"] == []
+    assert [(r["target"], r["class"]) for r in result["root_causes"]] == [("outside", "external_outage")]
+
+
+@pytest.mark.parametrize("cause", ["stopped", "crashed_before_change", "crashed_after_change"])
+def test_down_worker_setting_changes_do_not_displace_the_explained_restart(clock, cause):
+    class DownWorker(FakeAdapter):
+        def __init__(self):
+            super().__init__("stopped_worker")
+            self.expected = (("revert_config", "consumer", {"key": "batch_count"})
+                             if cause == "crashed_after_change" else ("restart", "consumer", {}))
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            observation["t"] = clock.time()
+            if self.signature:
+                epoch = clock.time() - clock.monotonic()
+                observation["components"]["consumer"]["extra"] = {
+                    "queue_depth": 4, "oldest_pending_s": 5}
+                observation["changes"] = []
+                if cause == "stopped":
+                    observation["changes"].append({"component": "consumer", "kind": "stop",
+                                                    "t": epoch, "detail": {}})
+                else:
+                    exit_at = 2.0 if cause == "crashed_after_change" else 0.0
+                    observation["components"]["consumer"]["extra"]["last_exit_s_ago"] = clock.monotonic() - exit_at
+                before_crash = cause == "crashed_after_change"
+                observation["changes"].append({"component": "consumer", "kind": "config",
+                    "t": epoch + (0.0 if before_crash else 2.0),
+                    "detail": {"key": "batch_count", "from": 50, "to": 0 if before_crash else 60}})
+            return observation
+
+    clock.sleep(5)
+    adapter = DownWorker()
+    result = runbook.run_incident(adapter)
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == [adapter.expected]
+    assert len(result["root_causes"]) == 1
+    assert not any(action["refused"] for action in result["actions"])
+
+
 class QueueDuringProbe(FakeAdapter):
     """The failed journey creates work; its queue ages while the probe waits."""
     def __init__(self, clock):
@@ -468,9 +573,35 @@ def test_failed_probe_refreshes_queue_before_escalation(clock):
     assert result["root_causes"][0]["target"] == "consumer"
 
 
+def test_worker_refresh_anchors_at_severe_change_after_harmless_change(clock):
+    class TwoSettings(QueueDuringProbe):
+        def __init__(self):
+            super().__init__(clock)
+            self.queue_started = 3.0
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            if not self.fixed:
+                epoch = clock.time() - clock.monotonic()
+                observation["changes"][0]["t"] = epoch + 3.0
+                observation["changes"].append({"component": "consumer", "kind": "config", "t": epoch,
+                    "detail": {"key": "poll_delay_s", "from": 0.2, "to": 0.25}})
+                observation["components"]["consumer"]["extra"]["processed_per_s"] = (
+                    1.0 if clock.monotonic() - window_s < 2.9 else 0.0)
+            return observation
+
+    clock.sleep(8)  # Five seconds after the severe setting change.
+    adapter = TwoSettings()
+    result = runbook.run_incident(adapter)
+    assert result["outcome"] == "recovered"
+    assert adapter.taken == [adapter.expected]
+    assert not any(action["refused"] for action in result["actions"])
+
+
 @pytest.mark.parametrize("min_window", [2, 6])
 @pytest.mark.parametrize("completion", [0.5, 4.0, None], ids=["stopped", "intermittent", "steady"])
-def test_failed_probe_keeps_progress_after_worker_change(clock, min_window, completion):
+@pytest.mark.parametrize("clock_offset", [0.0, 3.5, -7200.0])
+def test_failed_probe_keeps_progress_after_worker_change(clock, min_window, completion, clock_offset):
     stopped = completion == 0.5
 
     class RecentWorkerChange(QueueDuringProbe):
@@ -482,6 +613,7 @@ def test_failed_probe_keeps_progress_after_worker_change(clock, min_window, comp
 
         def observe(self, window_s=10):
             observation = super().observe(window_s)
+            observation["t"] = clock.time() + clock_offset
             self.observations.append((clock.monotonic(), window_s))
             if not self.fixed:
                 # The setting changed at one second. Retain completions after
@@ -489,7 +621,7 @@ def test_failed_probe_keeps_progress_after_worker_change(clock, min_window, comp
                 completion_visible = completion is None or clock.monotonic() - window_s < completion
                 observation["components"]["consumer"]["extra"]["processed_per_s"] = (
                     2.0 if completion_visible else 0.0)
-                observation["changes"][0]["t"] = clock.time() - clock.monotonic() + 1.0
+                observation["changes"][0]["t"] = clock.time() - clock.monotonic() + 1.0 + clock_offset
                 if not stopped:
                     observation["changes"][0]["detail"]["to"] = 60
             return observation
@@ -504,6 +636,35 @@ def test_failed_probe_keeps_progress_after_worker_change(clock, min_window, comp
     assert not any(action["refused"] for action in result["actions"])
     assert adapter.observations[:2] == [(5.0, 10.0), (8.5, 7.5)]
     assert all(window >= min_window for _, window in adapter.observations)
+
+
+@pytest.mark.parametrize("observed_at", ["missing", None, float("nan"), float("inf"), 0.0])
+def test_worker_refresh_retains_normal_history_without_a_valid_observation_time(clock, observed_at):
+    class UnknownObservationTime(QueueDuringProbe):
+        def __init__(self):
+            super().__init__(clock)
+            self.queue_started = 0.0
+            self.windows = []
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            self.windows.append(window_s)
+            if observed_at == "missing":
+                observation.pop("t")
+            else:
+                observation["t"] = observed_at
+            if not self.fixed:
+                observation["changes"][0]["t"] = clock.time() - clock.monotonic() + 1.0
+                observation["components"]["consumer"]["extra"]["processed_per_s"] = (
+                    1.0 if clock.monotonic() - window_s < 0.5 else 0.0)
+            return observation
+
+    clock.sleep(5)
+    adapter = UnknownObservationTime()
+    result = runbook.run_incident(adapter)
+    assert result["outcome"] == "escalated"
+    assert adapter.taken == result["actions"] == []
+    assert adapter.windows == [10.0, 10.0]
 
 
 @pytest.mark.parametrize("change_times,refresh_window", [

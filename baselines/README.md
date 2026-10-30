@@ -25,6 +25,14 @@ correction. The runbook checks component action lists before sending commands.
 It defers a caller's configuration change when a failing dependency edge is
 corroborated by the dependency's own symptoms. A failing edge to a healthy
 dependency still permits a local configuration fix, such as a timeout change.
+An external component reports only its callers' view. If a local numeric setting
+fell below one tenth of its previous positive value, that mirrored failure does
+not block a setting reversal. Small changes still defer to an apparent external
+outage, and an independently failing internal dependency still takes precedence.
+If the external outage remains after the reversal, the runbook escalates.
+For a down worker, a recorded stop takes priority over setting changes. A change
+made after its last exit cannot explain that exit; an earlier setting remains
+eligible for reversal if it could have caused the crash.
 Quarantine remains available in the common safety wrapper, but none of these
 six practice signatures justifies using it.
 
@@ -33,10 +41,14 @@ seconds, with no remaining matching rule. A healthy survey returns `no_incident`
 If a probe fails and the earlier observations match no rule, the runbook takes
 one fresh observation before escalating. A queue may have stalled while that
 probe waited. For an aged worker queue with a setting change, the fresh window
-excludes completions before that change. It retains progress after the earliest
-unresolved worker setting change, even if no work finished during the probe.
+excludes completions before its earliest severe unresolved change, when one
+exists. Earlier harmless changes to that worker's other settings do not mask
+the stall. Other workers' unresolved changes still bound the global window,
+retaining their progress even if no work finished during the probe.
 The usual window and the adapter's minimum still bound the read; unknown change
-times retain the usual window. A queue still making progress does not trigger
+or observation times retain the usual window. Change ages use the target's
+observation clock plus local monotonic elapsed time, so a clock offset does not
+discard valid progress. A queue still making progress does not trigger
 a setting reversal just because its setting changed. This extra read uses the
 same step and time budgets.
 An unresolved failed journey goes to a human with a short SBAR. Advise mode
