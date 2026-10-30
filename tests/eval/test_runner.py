@@ -244,6 +244,44 @@ def test_injection_error_is_distinct_and_retried_once(tmp_path, monkeypatch):
     assert all(r["error"]["stage"] == "inject" and r["injection_complete"] is False for r in records)
 
 
+@pytest.mark.parametrize("failure", ["alert_wait", "progress_write"])
+def test_failure_after_injection_does_not_invalidate_the_case(tmp_path, monkeypatch, failure):
+    from eval.metrics import assess_validity
+
+    monkeypatch.chdir(tmp_path)
+    case = fakes.case(1)
+    destination = tmp_path / "results/fixture-run/cases/fixture-1/invented"
+    original_write = runner.write_json
+
+    def fail_wait(deadline):
+        raise OSError("invented alert wait failure")
+
+    def fail_progress(path, value):
+        if Path(path).name == "progress.json":
+            raise OSError("invented progress-file lock")
+        original_write(path, value)
+
+    if failure == "alert_wait":
+        monkeypatch.setattr(runner, "_wait_until", fail_wait)
+    else:
+        monkeypatch.setattr(runner, "write_json", fail_progress)
+    hooks = Hooks(platform=fakes.platform, checker=fakes.checker,
+                  inject=fakes.inject, load_arm=fakes.load_arm)
+
+    runner._run_case(tmp_path, "fixture-run", case, "invented", 8400, "dev", None,
+                     Timing(warmup_s=0, alert_delay_s=0), hooks, destination, 1, "main")
+
+    record = read_json(destination / "record.json")
+    assert record["result"]["outcome"] == "harness_error"
+    assert record["injection_complete"] is True
+    assert record["error"]["stage"] == "alert"
+    assert record["manifest"]
+    assert (tmp_path / "runs/invented-8400/stopped").exists()
+    validity = assess_validity([record], split="dev", arms=["invented"])[case["id"]]
+    assert validity["valid"] is True
+    assert validity["reasons"] == []
+
+
 @pytest.mark.parametrize("source", ["case", "arm"])
 def test_child_interrupt_cannot_publish_a_failure_or_start_next_pair(tmp_path, monkeypatch, source):
     arm = "noop" if source == "case" else "interrupted"

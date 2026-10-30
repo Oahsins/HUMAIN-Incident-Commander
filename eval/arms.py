@@ -63,11 +63,16 @@ def oracle(adapter, *, root_causes, manifest, budget_s=90.0, max_steps=40,
     try:
         profile = guarded.describe()
         components = {c["name"]: c for c in profile.get("components", [])}
+        remaining_manifest = list(manifest)
         for cause in root_causes:
             result["root_causes"].append({k: cause[k] for k in ("target", "class")})
-            match = next((m for m in manifest if (m.get("target"), m.get("class")) == (cause["target"], cause["class"])), None)
-            if match is None:
+            match_index = next((i for i, entry in enumerate(remaining_manifest)
+                if (entry.get("target"), entry.get("class")) == (cause["target"], cause["class"])), None)
+            if match_index is None:
                 raise ValueError("oracle label has no matching manifest entry")
+            # Repeated pairs can need different runtime values. Each cause and
+            # its follow-up actions share one injection entry, used only once.
+            match = remaining_manifest.pop(match_index)
             pending = [cause["fix"]]
             while pending:
                 fix = pending.pop(0)

@@ -1,5 +1,7 @@
 """The mitigation mean must keep its censoring evidence beside the value."""
 
+import pytest
+
 from eval.presentation import results_tables, strata_section
 
 
@@ -26,3 +28,43 @@ def test_missing_mitigation_censor_status_is_not_printed_as_zero():
 def test_single_stratum_label_includes_healthy_cases():
     text = "\n".join(strata_section([{"name": "runbook", "strata": {"single": {"n": 1}}}]))
     assert "Single-fault and healthy cases" in text
+
+
+def test_unfinished_harness_retry_is_reported_as_unresolved():
+    from eval.presentation import retries_section
+    text = "\n".join(retries_section({"retries": [{
+        "case_id": "fixture-pending", "arm": "runbook",
+        "initial": "harness_error", "retry": "not completed"}]}))
+    row = next(line for line in text.splitlines() if line.startswith("| fixture-pending"))
+    assert "unresolved" in row.lower()
+    assert "not counted as a failure" in row
+    assert "the retry is scored" not in row
+
+
+def test_completed_second_harness_error_remains_a_reported_failure():
+    from eval.presentation import retries_section
+    text = "\n".join(retries_section({"retries": [{
+        "case_id": "fixture-repeated", "arm": "runbook",
+        "initial": "harness_error", "retry": "harness_error"}]}))
+    row = next(line for line in text.splitlines() if line.startswith("| fixture-repeated"))
+    assert "second harness error counts as a failure" in row
+
+
+@pytest.mark.parametrize("initial,retry,unresolved", [
+    ("harness_error", "api_error", True),
+    ("harness_error", "harness_timeout", True),
+    ("api_error", "harness_error", True),
+    ("api_error", "gave_up", False),
+    ("harness_timeout", "arm_error", False),
+])
+def test_retry_row_matches_the_completed_retry_outcome(initial, retry, unresolved):
+    from eval.presentation import retries_section
+    text = "\n".join(retries_section({"retries": [{
+        "case_id": "fixture-retry", "arm": "runbook",
+        "initial": initial, "retry": retry}]}))
+    row = next(line for line in text.splitlines() if line.startswith("| fixture-retry"))
+    if unresolved:
+        assert "unresolved; not counted as a failure" in row
+    else:
+        assert "completed retry is scored by its outcome" in row
+        assert "not counted" not in row
