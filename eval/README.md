@@ -41,6 +41,10 @@ model, source hash, timing or port configuration is refused under that name.
 Use a new name for a changed experiment. Completed original results remain
 on disk; an eligible retry is kept in `retry/`, and the oracle's validity
 recheck in `oracle-validation/`. Only one retry of each kind is made.
+An infrastructure failure during that validity recheck gets one retry under
+`oracle-validation/retry/`. Both remain separate from the arm's scored result.
+Errored control runs cannot establish a validity exclusion; missing control
+evidence leaves the case pending.
 
 The harness prints one line per completed pair. Every run updates
 `results/runs.csv`, including partial runs. That file is a raw run ledger;

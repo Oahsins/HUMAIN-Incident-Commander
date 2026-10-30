@@ -144,6 +144,62 @@ def test_validity_fault_noop_green_and_double_red_oracle():
     assert assess_validity(rows)["invented-1"]["valid"] is True
 
 
+def test_harness_error_oracle_recheck_is_pending_not_exclusion():
+    rows = valid_fixture()
+    rows[3]["checker"]["recovered"] = False
+    recheck = record("oracle", recovered=False, verdict="harness_error")
+    recheck.update(purpose="oracle_recheck", attempt=3,
+                   error={"stage": "arm", "type": "CallError", "kind": "refused"})
+    rows.append(recheck)
+    value = assess_validity(rows)["invented-1"]
+    assert value["valid"] is None and value["reasons"] == []
+    recheck["result"]["outcome"] = "gave_up"
+    recheck["error"] = None
+    assert assess_validity(rows)["invented-1"]["valid"] is False
+
+
+@pytest.mark.parametrize("arm, green", [("noop", True), ("oracle", False)])
+@pytest.mark.parametrize("verdict", ["harness_error", "harness_timeout", "api_error", "arm_error"])
+def test_errored_primary_controls_never_validate_or_exclude(arm, green, verdict):
+    rows = valid_fixture()
+    control = next(row for row in rows if row["arm"] == arm)
+    control["result"]["outcome"] = verdict
+    control["checker"]["recovered"] = green
+    value = assess_validity(rows)["invented-1"]
+    assert value["valid"] is None and value["reasons"] == []
+
+
+@pytest.mark.parametrize("retry_verdict, green, expected", [("harness_error", False, None),
+                                                          ("recovered", True, True),
+                                                          ("gave_up", False, False)])
+def test_oracle_validation_retry_is_separate_evidence(retry_verdict, green, expected):
+    rows = valid_fixture()
+    main = rows[3]
+    main["checker"]["recovered"] = False
+    first = record("oracle", recovered=False, verdict="harness_error")
+    first.update(purpose="oracle_recheck", attempt=3)
+    retry = record("oracle", recovered=green, verdict=retry_verdict)
+    retry.update(purpose="oracle_recheck_retry", attempt=4)
+    rows += [first, retry]
+    assert assess_validity(rows)["invented-1"]["valid"] is expected
+    assert select_records(rows) == rows[:4]
+    assert select_records(rows)[3] is main
+    # A later third validation attempt never changes the registered result.
+    extra = record("oracle", recovered=not green)
+    extra.update(purpose="oracle_recheck_retry", attempt=5)
+    assert assess_validity(rows + [extra])["invented-1"]["valid"] is expected
+
+
+def test_clean_oracle_validation_never_replaced_by_a_spurious_retry():
+    rows = valid_fixture()
+    rows[3]["checker"]["recovered"] = False
+    first = record("oracle", recovered=False, verdict="gave_up")
+    first.update(purpose="oracle_recheck", attempt=3)
+    retry = record("oracle", recovered=True)
+    retry.update(purpose="oracle_recheck_retry", attempt=4)
+    assert assess_validity(rows + [first, retry])["invented-1"]["valid"] is False
+
+
 def test_validity_injection_and_manifest_are_mechanical():
     rows = valid_fixture()
     rows[0]["manifest"] = []

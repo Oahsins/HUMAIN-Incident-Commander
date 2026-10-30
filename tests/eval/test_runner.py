@@ -13,6 +13,8 @@ import psutil
 
 from eval.runner import Hooks, Timing, case_order, classify_result, kill_tree, replace_outcome, run_cases
 from eval.storage import load_records, run_lock
+from eval import runner
+from eval.storage import write_json, read_json
 from tests.eval import fakes
 
 
@@ -134,6 +136,40 @@ def test_red_oracle_validation_retained_and_not_repeated(tmp_path, monkeypatch):
     assert load_records(run_dir, effective=False)[-1]["result"]["t_declared"] == declared
 
 
+@pytest.mark.parametrize("outcome", ["harness_error", "harness_timeout", "api_error"])
+def test_oracle_validation_infrastructure_failure_has_one_separate_retry(tmp_path, monkeypatch, outcome):
+    kwargs = options(tmp_path, monkeypatch, names=("oracle",), cases=[fakes.case(1)])
+    kwargs["hooks"] = Hooks(platform=fakes.platform, checker=fakes.red_checker, inject=fakes.inject, load_arm=fakes.load_arm)
+    original_pair = runner.run_pair
+
+    def fail_validation(root, name, case, arm, port, split, model, timing, hooks, destination,
+                        attempt=1, purpose="main", stop=None):
+        if purpose != "oracle_recheck":
+            return original_pair(root, name, case, arm, port, split, model, timing, hooks,
+                                 destination, attempt, purpose, stop)
+        if (destination / "record.json").exists():
+            return
+        record = read_json(destination.parent / "record.json")
+        record.update(attempt=attempt, purpose=purpose, error={"type": "InventedFailure"})
+        record["result"]["outcome"] = outcome
+        write_json(destination / "record.json", record)
+
+    monkeypatch.setattr(runner, "run_pair", fail_validation)
+    assert run_cases(**kwargs)
+    run_dir = tmp_path / "results/fixture-run"
+    records = load_records(run_dir, effective=False)
+    assert [r["purpose"] for r in records] == ["main", "oracle_recheck", "oracle_recheck_retry"]
+    assert records[1]["result"]["outcome"] == outcome
+    assert records[2]["result"]["outcome"] == "recovered"
+    effective = load_records(run_dir)[0]
+    assert effective["result"]["outcome"] == "recovered"
+    assert effective["oracle_validation"]["purpose"] == "oracle_recheck_retry"
+    assert [r["purpose"] for r in effective["oracle_validation"]["attempts"]] == ["oracle_recheck", "oracle_recheck_retry"]
+    mtimes = {p: p.stat().st_mtime_ns for p in run_dir.rglob("record.json")}
+    assert run_cases(**kwargs)
+    assert mtimes == {p: p.stat().st_mtime_ns for p in mtimes}
+
+
 def test_must_escalate_oracle_is_never_rechecked(tmp_path, monkeypatch):
     case = fakes.case(1)
     case["target"]["must_escalate"] = True
@@ -206,6 +242,43 @@ def test_injection_error_is_distinct_and_retried_once(tmp_path, monkeypatch):
     records = load_records(tmp_path / "results/fixture-run", effective=False)
     assert len(records) == 2
     assert all(r["error"]["stage"] == "inject" and r["injection_complete"] is False for r in records)
+
+
+@pytest.mark.parametrize("source", ["case", "arm"])
+def test_child_interrupt_cannot_publish_a_failure_or_start_next_pair(tmp_path, monkeypatch, source):
+    arm = "noop" if source == "case" else "interrupted"
+    kwargs = options(tmp_path, monkeypatch, names=(arm,), cases=[fakes.case(1), fakes.case(2)])
+    kwargs["copies"] = 1
+    kwargs["hooks"] = Hooks(platform=fakes.child_interrupt_platform if source == "case" else fakes.platform,
+                            checker=fakes.checker, inject=fakes.inject, load_arm=fakes.load_arm)
+    with pytest.raises(KeyboardInterrupt):
+        run_cases(**kwargs)
+    run_dir = tmp_path / "results/fixture-run"
+    assert not list(run_dir.glob("cases/*/*/record.json"))
+    assert not (run_dir / "cases/fixture-2").exists()
+    assert json.loads((run_dir / "manifest.json").read_text())["complete"] is False
+    if source == "case":
+        pids = json.loads((tmp_path / "runs/invented-8400/child-interrupt-pids.json").read_text())
+        assert all(not psutil.pid_exists(pid) or psutil.Process(pid).status() == psutil.STATUS_ZOMBIE for pid in pids)
+    kwargs["hooks"] = Hooks(platform=fakes.platform, checker=fakes.checker, inject=fakes.inject,
+                            load_arm=fakes.load_arm if source == "case" else fakes.resumed_arm)
+    assert run_cases(**kwargs)
+    assert all(record["attempt"] == 1 for record in load_records(run_dir, effective=False))
+
+
+def test_read_error_classification_preserves_later_exception(tmp_path, monkeypatch):
+    kwargs = options(tmp_path, monkeypatch, names=("caught_read_then_error",), cases=[fakes.case(1)])
+    kwargs["hooks"] = Hooks(platform=fakes.unreadable_platform, checker=fakes.checker,
+                            inject=fakes.inject, load_arm=fakes.load_arm)
+    assert run_cases(**kwargs)
+    records = load_records(tmp_path / "results/fixture-run", effective=False)
+    assert len(records) == 2
+    for record in records:
+        assert record["result"]["outcome"] == "harness_error"
+        assert record["error"]["type"] == "CallError"
+        assert record["error"]["kind"] == "refused"
+        assert record["error"]["original"]["type"] == "ValueError"
+        assert record["error"]["original"]["stage"] == "arm"
 
 
 def test_case_order_reproducible():

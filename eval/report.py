@@ -144,9 +144,14 @@ def _composition_notes(run_dir, configuration, records, condition):
     counts = {name: sum(name in metrics.case_strata(case) for case in cases.values()) for name in metrics.STRATA}
     counts["total"] = len(cases)
     aliases = {"singles": "single", "doubles": "double", "triples": "triple"}
-    return [f"SEALED.json composition difference — {name}: labels {counts[aliases.get(name, name)]}, seal {expected}."
-            for name, expected in composition.items()
-            if aliases.get(name, name) in counts and counts[aliases.get(name, name)] != expected]
+    notes = []
+    for name, expected in composition.items():
+        key = aliases.get(name, name)
+        if key not in counts:
+            notes.append(f"SEALED.json composition key '{name}' not compared: unrecognised count.")
+        elif counts[key] != expected:
+            notes.append(f"SEALED.json composition difference — {name}: labels {counts[key]}, seal {expected}.")
+    return notes
 
 
 def _baseline_text(summary, validity):
@@ -218,6 +223,14 @@ def build_summary(run_dir, against=None):
             selected = effective[(record["case"]["id"], record["arm"])]
             retries.append({"case_id": record["case"]["id"], "arm": record["arm"], "initial": initial,
                             "retry": metrics.outcome(selected["result"]) if selected is not record else "not completed"})
+    for record in records:
+        if record.get("purpose") != "oracle_recheck" or metrics.outcome(record["result"]) not in metrics.RETRY_OUTCOMES:
+            continue
+        case_id = record["case"]["id"]
+        selected = metrics.select_validation([r for r in records if r["case"]["id"] == case_id and r["arm"] == "oracle"])
+        retried = metrics.outcome(selected["result"]) if selected is not record else "not completed"
+        notes.add(f"Oracle validation retry — {case_id}: first {metrics.outcome(record['result'])}; retry {retried}. "
+                  "This is validity evidence only; an errored control verdict cannot validate or exclude the case.")
     comparisons = _comparisons(records, validity)
     condition = _condition(records)
     notes.update(_composition_notes(run_dir, configuration, records, condition))

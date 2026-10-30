@@ -106,7 +106,7 @@ def pair_dir(run_dir, case_id, arm):
     return Path(run_dir) / "cases" / safe_name(case_id) / safe_name(arm)
 
 
-def effective_record(directory):
+def _effective_attempt(directory):
     """Retry infrastructure failures once; preserve both pieces of evidence."""
     directory = Path(directory)
     first = read_json(directory / "record.json")
@@ -115,8 +115,13 @@ def effective_record(directory):
     retry = read_json(directory / "retry" / "record.json")
     effective = dict(retry if retry is not None and first["result"]["outcome"] in RETRY_OUTCOMES | {"harness_error"} else first)
     effective["attempts"] = [first] + ([retry] if retry is not None else [])
-    validation = read_json(directory / "oracle-validation" / "record.json")
-    effective["oracle_validation"] = validation
+    return effective
+
+
+def effective_record(directory):
+    effective = _effective_attempt(directory)
+    if effective is not None:
+        effective["oracle_validation"] = _effective_attempt(Path(directory) / "oracle-validation")
     return effective
 
 
@@ -128,7 +133,7 @@ def load_records(run_dir, effective=True):
             records.append(effective_record(path.parent))
         else:
             records.append(read_json(path))
-            for kind in ("retry", "oracle-validation"):
+            for kind in ("retry", "oracle-validation", "oracle-validation/retry"):
                 extra = read_json(path.parent / kind / "record.json")
                 if extra is not None:
                     records.append(extra)

@@ -15,6 +15,7 @@ from . import stats
 TRANSIENT_ERRORS = {"http_429", "http_500", "http_502", "http_503", "http_529", "timeout", "unavailable"}
 INFRASTRUCTURE_OUTCOMES = {"api_error", "harness_timeout"}
 RETRY_OUTCOMES = INFRASTRUCTURE_OUTCOMES | {"harness_error"}
+VALIDATION_PURPOSES = {"oracle_recheck", "oracle_recheck_retry"}
 NAMED_TYPES = {"poison_payment", "stale_balances", "double_posting"}
 STRATA = ("healthy", "must_escalate", "practice_only", "named_heldout", "blind", "single", "double", "triple")
 
@@ -47,7 +48,7 @@ def select_records(records):
     """
     grouped = defaultdict(list)
     for record in records:
-        if record.get("purpose", "main") != "oracle_recheck":
+        if record.get("purpose", "main") not in VALIDATION_PURPOSES:
             grouped[_key(record)].append(record)
     selected = []
     for entries in grouped.values():
@@ -57,6 +58,23 @@ def select_records(records):
             first = entries[1]
         selected.append(first)
     return selected
+
+
+def select_validation(records):
+    """Keep the first oracle validation, or its one infrastructure retry."""
+    records = sorted(records, key=lambda row: row.get("attempt", 1))
+    first = next((record for record in records if record.get("purpose") == "oracle_recheck"), None)
+    retry = next((record for record in records if record.get("purpose") == "oracle_recheck_retry"), None)
+    if first is not None and outcome(first.get("result") or {}) in RETRY_OUTCOMES and retry is not None:
+        return retry
+    return first
+
+
+def _control_recovered(record):
+    """A retained checker verdict cannot validate an interrupted control run."""
+    if record is None or record.get("error") or outcome(record.get("result") or {}) in RETRY_OUTCOMES | {"arm_error"}:
+        return None
+    return _checker_recovered(record)
 
 
 def assess_validity(records, *, split="heldout", arms=None):
@@ -94,7 +112,7 @@ def assess_validity(records, *, split="heldout", arms=None):
             pending.append("complete injection manifest unavailable")
         if not no_controls:
             noop = selected.get((case_id, "noop"))
-            noop_green = _checker_recovered(noop) if noop else None
+            noop_green = _control_recovered(noop)
             if noop_green is None:
                 pending.append("noop horizon verdict unavailable")
             elif target.get("healthy"):
@@ -107,13 +125,13 @@ def assess_validity(records, *, split="heldout", arms=None):
         # evidence of validity for a must-escalate case.
         if not no_controls and truth and not target.get("healthy") and not target.get("must_escalate"):
             oracle = selected.get((case_id, "oracle"))
-            oracle_green = _checker_recovered(oracle) if oracle else None
+            oracle_green = _control_recovered(oracle)
             if oracle_green is None:
                 pending.append("oracle horizon verdict unavailable")
             elif not oracle_green:
                 validations = [r for r in entries if r["arm"] == "oracle"
-                               and r.get("purpose") == "oracle_recheck"]
-                validation_green = _checker_recovered(validations[0]) if validations else None
+                               and r.get("purpose") in VALIDATION_PURPOSES]
+                validation_green = _control_recovered(select_validation(validations))
                 if validation_green is None:
                     pending.append("second oracle horizon verdict unavailable")
                 elif not validation_green:

@@ -173,10 +173,26 @@ def caught_read_arm(adapter, **kwargs):
         return result
 
 
+def caught_read_then_error_arm(adapter, **kwargs):
+    try:
+        adapter.observe()
+    except CallError:
+        raise ValueError("invented later failure") from None
+
+
+def interrupted_arm(adapter, **kwargs):
+    raise KeyboardInterrupt
+
+
+def resumed_arm(name):
+    return noop
+
+
 def load_arm(name):
     return {"invented": fake_arm, "noop": noop, "slow": slow_arm, "transient": transient_arm,
             "crashed": crashed_arm, "unreachable": unreachable_arm, "caught_read": caught_read_arm,
-            "bare_callerror": bare_callerror_arm}[name]
+            "bare_callerror": bare_callerror_arm, "caught_read_then_error": caught_read_then_error_arm,
+            "interrupted": interrupted_arm}[name]
 
 
 def spawning_parent(folder):
@@ -200,6 +216,18 @@ class InterruptPlatform(Platform):
 
 def interrupt_platform(system, **kwargs):
     return InterruptPlatform(system, **kwargs)
+
+
+class ChildInterruptPlatform(Platform):
+    def start(self, warmup_s=0):
+        super().start(warmup_s)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        (self.folder / "child-interrupt-pids.json").write_text(json.dumps([child.pid]))
+        raise KeyboardInterrupt
+
+
+def child_interrupt_platform(system, **kwargs):
+    return ChildInterruptPlatform(system, **kwargs)
 
 
 def case(number, *, healthy=False, condition="default"):

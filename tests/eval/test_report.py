@@ -194,13 +194,44 @@ def test_full_heldout_compares_label_counts_with_public_composition(tmp_path):
     # A mistaken public total must not hide the composition discrepancy.
     write_json(tmp_path / "scenarios" / "heldout" / "SEALED.json", {
         "composition": {"total": 59, "singles": 60, "doubles": 0, "triples": 0,
-                        "healthy": 1, "must_escalate": 0, "named_heldout": 0, "blind": 0, "practice_only": 60}})
+                        "healthy": 1, "must_escalate": 0, "named_heldout": 0, "blind": 0, "practice_only": 60,
+                        "unrecognised_stratum": 7}})
     summary = build_summary(folder)
     differences = [note for note in summary["notes"] if "composition difference" in note]
     assert differences == ["SEALED.json composition difference — healthy: labels 0, seal 1.",
                            "SEALED.json composition difference — total: labels 60, seal 59."]
+    assert "SEALED.json composition key 'unrecognised_stratum' not compared: unrecognised count." in summary["notes"]
     assert "composition difference" in write_report(folder).read_text(encoding="utf-8")
     # A partial selected exam does not claim a full composition comparison.
     manifest["configuration"]["case_ids"] = manifest["configuration"]["case_ids"][:3]
     write_json(folder / "manifest.json", manifest)
     assert not any("composition difference" in note for note in build_summary(folder)["notes"])
+
+
+def test_oracle_validation_retry_is_reported_separately_from_arm_retry(tmp_path):
+    folder = fixture_run(tmp_path / "results" / "validation-retry")
+    directory = folder / "cases" / "fixture-0" / "oracle"
+    main = read_json(directory / "record.json")
+    main["checker"]["recovered"] = False
+    main["result"]["outcome"] = "gave_up"
+    write_json(directory / "record.json", main)
+    validation = deepcopy(main)
+    validation.update(purpose="oracle_recheck", attempt=3,
+                      error={"stage": "arm", "type": "CallError", "kind": "refused"})
+    validation["result"]["outcome"] = "harness_error"
+    write_json(directory / "oracle-validation" / "record.json", validation)
+    summary = build_summary(folder)
+    assert summary["measurements"]["validity"]["fixture-0"]["valid"] is None
+    assert summary["retries"] == []
+    assert any("Oracle validation retry" in note and "retry not completed" in note for note in summary["notes"])
+    retry = deepcopy(main)
+    retry.update(purpose="oracle_recheck_retry", attempt=4)
+    retry["checker"]["recovered"] = True
+    retry["result"]["outcome"] = "recovered"
+    write_json(directory / "oracle-validation" / "retry" / "record.json", retry)
+    summary = build_summary(folder)
+    assert summary["measurements"]["validity"]["fixture-0"]["valid"] is True
+    assert summary["retries"] == []
+    assert any("Oracle validation retry" in note and "retry recovered" in note for note in summary["notes"])
+    scored = [row for row in summary["measurements"]["cases"] if row["case_id"] == "fixture-0" and row["arm"] == "oracle"]
+    assert len(scored) == 1 and scored[0]["outcome"] == "gave_up"

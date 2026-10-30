@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import random
 import shutil
+import signal
 import threading
 import time
 
@@ -104,9 +105,49 @@ def classify_read_errors(record):
     """The wrapper records failed reads even when an arm catches the error."""
     read_errors = [entry for entry in record["audit"] if entry.get("event") == "read_error"]
     if read_errors:
+        original = record.get("error")
         replace_outcome(record, "harness_error", record["timing"].get("t_alert"))
         record["error"] = {"stage": "arm", "type": "CallError", "kind": read_errors[0].get("kind"),
                            "message": "The guard recorded a target-system read failure."}
+        if original is not None:
+            record["error"]["original"] = original
+
+
+def mark_interrupted(directory):
+    """A child can receive console Ctrl+C before the coordinating parent does."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    write_json(Path(directory) / "interrupted.json", {"event": "interrupted", "pid": os.getpid(), "t": time.time()})
+    # Keep descendants from becoming orphans if this child finishes before the
+    # parent notices the marker. The parent also kills any still-running tree.
+    parent = psutil.Process()
+    children = {}
+    direct = set()
+    while True:
+        new = [child for child in parent.children(recursive=True) if child.pid not in children]
+        if not new:
+            break
+        for child in new:
+            try:
+                child.suspend()
+                children[child.pid] = child
+                if child.ppid() == parent.pid:
+                    direct.add(child.pid)
+            except psutil.NoSuchProcess:
+                pass
+    for child in reversed(list(children.values())):
+        try:
+            child.kill()
+        except psutil.NoSuchProcess:
+            pass
+    # Direct children may belong to multiprocessing. Only their owning
+    # Process.join may reap them on POSIX, or it loses their exit status.
+    psutil.wait_procs([child for pid, child in children.items() if pid not in direct], timeout=5)
+
+
+def was_interrupted(process, directory):
+    # Windows reports STATUS_CONTROL_C_EXIT; POSIX may report SIGINT.
+    return ((Path(directory) / "interrupted.json").exists()
+            or process.exitcode in {-signal.SIGINT, 130, 0xC000013A, -1073741510})
 
 
 def kill_tree(process):
@@ -160,6 +201,9 @@ def _arm_worker(adapter, arm, model, seed, timing, audit, output, hooks, oracle_
         if not isinstance(result, dict) or "outcome" not in result:
             raise ValueError("arm did not return a result")
         payload = {"result": classify_result(result), "error": None}
+    except KeyboardInterrupt:
+        mark_interrupted(Path(output).parent)
+        return
     except CallError as exc:
         payload = {"result": failed_result(arm, "harness_error", started),
                    "error": {"stage": "arm", "type": "CallError", "kind": exc.kind,
@@ -208,6 +252,13 @@ def _base_record(case, arm, port, attempt, purpose):
 
 
 def _case_worker(root, name, case, arm, port, split, model, timing, hooks, destination, attempt, purpose):
+    try:
+        _run_case(root, name, case, arm, port, split, model, timing, hooks, destination, attempt, purpose)
+    except KeyboardInterrupt:
+        mark_interrupted(destination)
+
+
+def _run_case(root, name, case, arm, port, split, model, timing, hooks, destination, attempt, purpose):
     os.chdir(root)
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
@@ -250,6 +301,8 @@ def _case_worker(root, name, case, arm, port, split, model, timing, hooks, desti
             args=(platform.adapter(), arm, model, data["seed"], timing, audit, output, hooks, oracle_data))
         arm_process.start()
         arm_process.join(timeout=timing.budget_s + timing.arm_grace_s)
+        if was_interrupted(arm_process, destination):
+            raise KeyboardInterrupt
         if arm_process.is_alive():
             kill_tree(arm_process)
             record["result"] = failed_result(arm, "budget_exhausted", alert)
@@ -268,6 +321,10 @@ def _case_worker(root, name, case, arm, port, split, model, timing, hooks, desti
         record["timing"]["verdict_t"] = time.time()
         stage = "evidence"
         record["actions"], record["audit"] = _copy_evidence(control, destination, audit)
+    except KeyboardInterrupt:
+        # Publish before cleanup, which may itself have to wait on a service.
+        mark_interrupted(destination)
+        raise
     except Exception as exc:
         replace_outcome(record, "harness_error", record["timing"].get("t_alert"))
         record["error"] = {"stage": stage, "type": type(exc).__name__,
@@ -305,7 +362,7 @@ def run_pair(root, name, case, arm, port, split, model, timing, hooks, destinati
     if not destination.resolve().is_relative_to(expected_root):
         raise ValueError("case output path escapes its run")
     # A crash can leave partial evidence. It must not contaminate a resumed try.
-    for filename in ("result.json", "progress.json", "arm-output.json", "evidence-paths.json", "actions.jsonl", "changes.jsonl", "customers.jsonl", "audit.jsonl"):
+    for filename in ("result.json", "progress.json", "arm-output.json", "evidence-paths.json", "actions.jsonl", "changes.jsonl", "customers.jsonl", "audit.jsonl", "interrupted.json"):
         (destination / filename).unlink(missing_ok=True)
     logs = destination / "logs"
     if logs.exists():
@@ -322,6 +379,8 @@ def run_pair(root, name, case, arm, port, split, model, timing, hooks, destinati
     try:
         deadline = time.monotonic() + timing.watchdog_s
         while process.is_alive():
+            if was_interrupted(process, destination):
+                raise KeyboardInterrupt
             if stop is not None and stop.is_set():
                 cancelled = True
                 break
@@ -329,9 +388,13 @@ def run_pair(root, name, case, arm, port, split, model, timing, hooks, destinati
             if remaining <= 0:
                 break
             process.join(timeout=min(0.1, remaining))
+        if was_interrupted(process, destination):
+            raise KeyboardInterrupt
         cancelled = cancelled or (stop is not None and stop.is_set())
     except BaseException:
         cancelled = True
+        if stop is not None:
+            stop.set()
         raise
     finally:
         if cancelled:
@@ -437,12 +500,19 @@ def run_cases(root, *, name, cases, arm_names, split, models, copies, port_bases
                             or case["input"].get("condition", "default") not in {"default", "four_faults", "extra_service"}):
                             continue
                         destination, attempt, purpose = directory / "oracle-validation", 3, "oracle_recheck"
+                    elif phase == "oracle_retry":
+                        validation = read_json(directory / "oracle-validation" / "record.json")
+                        if (arm != "oracle" or case["target"].get("must_escalate") or validation is None
+                            or validation["result"]["outcome"] not in RETRY_OUTCOMES | {"harness_error"}):
+                            continue
+                        destination = directory / "oracle-validation" / "retry"
+                        attempt, purpose = 4, "oracle_recheck_retry"
                     model = models.get(case["id"])
                     run_pair(root, name, case, arm, ports[copy], split, model, timing, hooks,
                              destination, attempt, purpose, stop)
 
         try:
-            for phase in ("main", "retry", "oracle"):
+            for phase in ("main", "retry", "oracle", "oracle_retry"):
                 pool = ThreadPoolExecutor(max_workers=copies)
                 try:
                     futures = [pool.submit(copy_work, copy, phase) for copy in range(copies)]
