@@ -2,7 +2,10 @@
 
 Each cycle, in this order:
 1. station alerts that did not go through are sent again every 0.3 s, until one is delivered or the
-   acknowledgement timer gives up on the unit;
+   acknowledgement timer gives up on the unit. When an alert gets no answer (or a server error), the station
+   alerting path is down, not that alert: the other alerts wait their turn for 0.3 s instead of each waiting out
+   alert_timeout_s, so a path that does not answer costs a cycle at most one timeout, and the timer and new
+   commits keep their pace;
 2. the acknowledgement timer: an assignment still assigned or alerted after ack_timeout_s becomes no_ack, and
    an incident left with no other unit goes back to pending, never to be offered that unit again;
 3. pending incidents are taken in priority order, oldest first within a priority. Each gets a free unit of its
@@ -69,6 +72,7 @@ class Release(Worker):
                 "ack_timeout_s": ("num", 0, 60), "alert_timeout_s": ("num", 0, 10),
                 "recommend_by": ("enum", ("closest", "station_order"))}
     OPERATION = "dispatch"
+    alerts_held_until = 0.0   # after the alerting path fails, the other alerts wait until then (send_alert)
 
     def cycle(self, conn, settings):
         self.retry_alerts(conn, settings)
@@ -87,7 +91,8 @@ class Release(Worker):
             assignment = self.assign(conn, incident, unit)
             if assignment is None:
                 continue
-            self.send_alert(conn, assignment, settings)
+            if not self.alerts_held():   # else its alert is due at once, and the next retry sends it
+                self.send_alert(conn, assignment, settings)
             if not incident["test"]:
                 committed += 1
                 if committed >= settings["batch_size"]:
@@ -98,9 +103,13 @@ class Release(Worker):
         """Is any real unit free at all, whatever incident it would go to?"""
         return conn.execute(FREE + " LIMIT 1", (0, None)).fetchone() is not None   # no incident excludes a unit
 
+    def alerts_held(self):
+        """Did the station alerting path fail in the last 0.3 s? Then alerts wait for their next turn."""
+        return time.time() < self.alerts_held_until
+
     def retry_alerts(self, conn, settings):
         """Send again each alert that is due: still assigned, with next_alert_t come. The rows are read first,
-        then each alert goes out with no transaction open."""
+        then each alert goes out with no transaction open. Once the alerting path fails, the rest stay due."""
         rows = conn.execute(
             "SELECT a.id AS assignment_id, a.incident_id, a.unit_id AS unit, u.station, i.priority, i.nature, "
             "i.x, i.y, i.unit_type, i.test FROM assignments a JOIN incidents i ON i.id = a.incident_id "
@@ -108,6 +117,8 @@ class Release(Worker):
             "ORDER BY a.id", (time.time(),)).fetchall()
         sent = 0
         for row in rows:
+            if self.alerts_held():
+                break   # the path did not answer: these go on their next turn, not each after a timeout
             assignment = dict(row)
             if self.unreadable(assignment, assignment["incident_id"]):
                 continue   # the acknowledgement timer returns it to pending
@@ -221,6 +232,8 @@ class Release(Worker):
         try:
             self.call(dep, "POST", url, body, timeout=settings["alert_timeout_s"])
         except net.CallError as exc:
+            if exc.kind != "http" or (exc.status or 0) >= 500:   # the path failed, not this alert's content
+                self.alerts_held_until = time.time() + RETRY_S
             conn.execute("UPDATE assignments SET next_alert_t = ? WHERE id = ? AND status = 'assigned'",
                          (time.time() + RETRY_S, assignment_id))
             self.log_every(f"alert_failed:{exc.kind}", 2.0, "WARN", "alert_failed",

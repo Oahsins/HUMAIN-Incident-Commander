@@ -336,6 +336,7 @@ def test_an_alert_that_is_not_delivered_is_sent_again_after_0_3_s(dispatch):
     assert len(dispatch.alerting.sent) == 1   # not due yet
     dispatch.alerting.down = False
     conn.execute("UPDATE assignments SET next_alert_t = next_alert_t - 1")
+    dispatch.release.alerts_held_until -= 1   # as if a second had passed
     dispatch.cycle()
     (first,) = assignments(conn, cardiac)
     assert first["status"] == "alerted" and first["alerted_t"] is not None and first["next_alert_t"] is None
@@ -346,6 +347,42 @@ def test_an_alert_that_is_not_delivered_is_sent_again_after_0_3_s(dispatch):
     assert all(s["timeout"] == 1.0 and s["method"] == "POST" for s in dispatch.alerting.sent)
     failed = [r for r in dispatch.logs() if r["event"] == "alert_failed"]
     assert failed and failed[0]["kind"] == "timeout" and failed[0]["assignment_id"] == first["id"]
+
+
+def test_an_alerting_path_that_does_not_answer_costs_a_cycle_one_timeout_not_one_per_alert(dispatch):
+    conn = dispatch.conn
+    dispatch.alerting.down = True
+    incidents = [add_incident(conn, "cardiac", (4.0 + i, 4.0)) for i in range(3)]
+    dispatch.cycle()
+    assert len(dispatch.alerting.sent) == 1   # the first alert got no answer: the others wait their turn
+    assert [a["status"] for i in incidents for a in assignments(conn, i)] == ["assigned"] * 3   # all committed
+    probe = add_incident(conn, "test", area.TEST_XY)
+    conn.execute("UPDATE assignments SET next_alert_t = next_alert_t - 1")   # as if a second had passed
+    dispatch.release.alerts_held_until -= 1
+    dispatch.cycle()
+    assert len(dispatch.alerting.sent) == 2   # one try a turn while the path does not answer
+    assert [a["unit_id"] for a in assignments(conn, probe)] == [area.TEST_UNIT]   # the test call is still committed
+    dispatch.alerting.down = False
+    conn.execute("UPDATE assignments SET next_alert_t = next_alert_t - 1")
+    dispatch.release.alerts_held_until -= 1
+    dispatch.cycle()
+    assert [a["status"] for i in incidents + [probe] for a in assignments(conn, i)] == ["alerted"] * 4
+
+
+def test_an_alert_the_path_refuses_as_bad_holds_no_other_alert(dispatch, monkeypatch):
+    calls = []
+
+    def alerting(dep, method, url, payload=None, timeout=2.0):
+        calls.append(payload["assignment_id"])
+        if len(calls) == 1:
+            raise net.CallError("http", status=400, body={"error": "unit: not a unit"})
+        return 200, {"delivered": True}
+
+    monkeypatch.setattr(dispatch.release, "call", alerting)
+    incidents = [add_incident(dispatch.conn, "cardiac", (4.0 + i, 4.0)) for i in range(2)]
+    dispatch.cycle()
+    assert len(calls) == 2 and not dispatch.release.alerts_held()
+    assert [a["status"] for i in incidents for a in assignments(dispatch.conn, i)] == ["assigned", "alerted"]
 
 
 def test_the_alert_goes_to_the_primary_through_the_link_by_default(dispatch):

@@ -20,7 +20,7 @@ import pytest
 
 from ic.kit import net
 from ic.kit.store import read_json, write_json
-from targets.dispatch import area, cadstore, control, fieldmsg, people, surge
+from targets.dispatch import area, cadstore, control, fieldmsg, people, spec, surge
 from targets.dispatch.control import paths_for
 from targets.dispatch.jobs import incident_archive
 
@@ -612,11 +612,15 @@ def copy_dir(tmp_path):
     return d
 
 
+STARTED = T0 - 5.0   # the start time every made-up helper registered with
+
+
 @pytest.fixture()
 def running(monkeypatch):
-    """Made-up process ids; the ones in this set are running."""
+    """Made-up process ids; the ones in this set are running, each the process that started at STARTED."""
     pids = set()
     monkeypatch.setattr(surge, "alive", lambda pid: pid in pids)
+    monkeypatch.setattr(surge, "started_as", lambda pid, started_t: pid in pids and started_t == STARTED)
     return pids
 
 
@@ -675,21 +679,23 @@ def test_the_helper_refuses_as_a_process_in_the_line_control_reads(copy_dir):
 
 
 def test_the_registry_caps_all_surges_together_at_three_per_second(copy_dir, running):
-    running.update({101, 103})
+    running.update({101, 103, 104})
     path = os.path.join(copy_dir, "surge.json")
-    write_json(path, {"helpers": [{"pid": 101, "rate": 2.0, "until_t": T0 + 60},     # running
-                                  {"pid": 102, "rate": 2.0, "until_t": T0 + 60},     # its process has gone
-                                  {"pid": 103, "rate": 1.5, "until_t": T0 - 1}]})    # its time has passed
+    write_json(path, {"helpers": [{"pid": 101, "rate": 2.0, "until_t": T0 + 60, "started_t": STARTED},  # running
+                                  {"pid": 102, "rate": 2.0, "until_t": T0 + 60, "started_t": STARTED},  # gone
+                                  {"pid": 103, "rate": 1.5, "until_t": T0 - 1, "started_t": STARTED},   # time passed
+                                  {"pid": 104, "rate": 2.0, "until_t": T0 + 60, "started_t": T0 - 90},  # pid reused
+                                  {"pid": 104, "rate": 2.0, "until_t": T0 + 60}]})                      # no start time
     with pytest.raises(surge.Refused, match=r"3\.50 emergencies per second, above the cap of 3"):
-        surge.register(copy_dir, 201, 1.5, T0 + 100, now=T0)
-    assert len(registry(copy_dir)["helpers"]) == 3 and os.listdir(os.path.join(copy_dir, "surge-slots")) == []
-    assert surge.register(copy_dir, 200, 1.0, T0 + 150, now=T0) == (0, 0)   # 2.0 + 1.0: exactly the cap
-    assert registry(copy_dir) == {"helpers": [{"pid": 101, "rate": 2.0, "until_t": T0 + 60},
-                                              {"pid": 200, "rate": 1.0, "until_t": T0 + 150}]}
+        surge.register(copy_dir, 201, 1.5, T0 + 100, STARTED, now=T0)
+    assert len(registry(copy_dir)["helpers"]) == 5 and os.listdir(os.path.join(copy_dir, "surge-slots")) == []
+    assert surge.register(copy_dir, 200, 1.0, T0 + 150, STARTED, now=T0) == (0, 0)   # 2.0 + 1.0: exactly the cap
+    assert registry(copy_dir) == {"helpers": [{"pid": 101, "rate": 2.0, "until_t": T0 + 60, "started_t": STARTED},
+                                              {"pid": 200, "rate": 1.0, "until_t": T0 + 150, "started_t": STARTED}]}
     assert slot(copy_dir, 0) == {"pid": 200, "next": 0}
     running.add(200)
     with pytest.raises(surge.Refused):
-        surge.register(copy_dir, 202, 0.1, T0 + 100, now=T0)
+        surge.register(copy_dir, 202, 0.1, T0 + 100, STARTED, now=T0)
     surge.unregister(copy_dir, 200)
     assert [h["pid"] for h in registry(copy_dir)["helpers"]] == [101]
 
@@ -717,12 +723,12 @@ def test_a_lock_left_by_a_dead_helper_is_removed_and_a_held_one_refuses(copy_dir
     lock = os.path.join(copy_dir, "surge.lock")
     open(lock, "w", encoding="utf-8").close()
     os.utime(lock, (time.time() - 10, time.time() - 10))
-    assert surge.register(copy_dir, 500, 1.0, time.time() + 60) == (0, 0)
+    assert surge.register(copy_dir, 500, 1.0, time.time() + 60, STARTED) == (0, 0)
     assert not os.path.exists(lock)
     open(lock, "w", encoding="utf-8").close()
     monkeypatch.setattr(surge, "LOCK_WAIT_S", 0.2)
     with pytest.raises(surge.Refused, match="stayed locked"):
-        surge.register(copy_dir, 501, 1.0, time.time() + 60)
+        surge.register(copy_dir, 501, 1.0, time.time() + 60, STARTED)
     assert [h["pid"] for h in registry(copy_dir)["helpers"]] == [500]
 
 
@@ -732,7 +738,7 @@ def test_a_surge_registers_before_its_first_call_and_logs_surge_lines(copy_dir, 
 
     def centre(url, payload, timeout):
         if url.endswith("/dial"):
-            registered.append([h["pid"] for h in registry(copy_dir)["helpers"]])
+            registered.append([(h["pid"], h["started_t"]) for h in registry(copy_dir)["helpers"]])
             return 200, {"call_id": f"C-{len(registered):08x}", "location": None, "position": 1}
         return 200, {"told": True, "incident_id": len(registered), "linked": False}
 
@@ -745,12 +751,59 @@ def test_a_surge_registers_before_its_first_call_and_logs_surge_lines(copy_dir, 
     assert lines and all(list(line) == CALLER_KEYS for line in lines)
     assert all(line["source"] == "surge" and line["nature"] in area.FIRE_NATURES for line in lines)
     assert all(re.fullmatch(rf"E-S{pid}-\d{{6}}", e) for e in emergencies)
-    assert registered and all(pids == [pid] for pids in registered)
+    assert registered and all(entries == [(pid, spec.process_started(pid))] for entries in registered)
     assert {line["ani"] for line in lines} <= {area.surge_number(0, i) for i in range(len(emergencies))}
     out = capsys.readouterr().out.splitlines()
     assert len(out) >= 2 and all(line.startswith(f"call-surge {pid}: ") for line in out)
     assert registry(copy_dir) == {"helpers": []}
     assert slot(copy_dir, 0) == {"pid": None, "next": len(emergencies)}
+
+
+def helper_process():
+    """A real process that is not this one, as a surge helper would be; ended by the caller."""
+    return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def test_a_registered_start_time_tells_a_helper_from_a_process_that_reused_its_pid():
+    child = helper_process()
+    try:
+        started = spec.process_started(child.pid)
+        assert isinstance(started, float) and abs(started - time.time()) < 60
+        assert spec.started_as(child.pid, started)
+        assert not spec.started_as(child.pid, started - 30)   # the pid now belongs to a later process
+        assert not spec.started_as(child.pid, started + 30)
+    finally:
+        child.kill()
+        child.wait()
+    assert not spec.started_as(child.pid, started)            # gone
+    assert spec.process_started(child.pid) is None
+    for bad in (None, "1", True, float("nan"), float("inf")):
+        assert not spec.started_as(os.getpid(), bad)
+
+
+def test_cleanup_ends_only_helpers_still_running_as_the_process_that_registered(tmp_path, monkeypatch):
+    d = str(tmp_path)
+    write_json(cadstore.locks_path(d), {"holders": []})
+    helper, other = helper_process(), helper_process()
+    try:
+        started = spec.process_started(helper.pid)
+        write_json(os.path.join(d, "surge.json"), {"helpers": [
+            {"pid": helper.pid, "rate": 1.0, "until_t": time.time() + 60, "started_t": started},
+            {"pid": other.pid, "rate": 1.0, "until_t": time.time() + 60,            # as if other had reused the pid
+             "started_t": spec.process_started(other.pid) - 30},
+            {"pid": other.pid, "rate": 1.0, "until_t": time.time() + 60},           # no start time: never trusted
+            {"pid": 0, "rate": 1.0, "until_t": time.time() + 60, "started_t": started}, "junk"]})
+        assert [h["pid"] for h in spec.live_helpers(d)] == [helper.pid]
+        ended = []
+        monkeypatch.setattr(spec.proc, "kill", lambda pid, grace_s=0.0: ended.append(pid) or True)
+        spec.Spec().cleanup(types.SimpleNamespace(data_dir=d))
+        assert ended == [helper.pid]
+    finally:
+        for child in (helper, other):
+            child.kill()
+            child.wait()
+    assert spec.live_helpers(d) == []
 
 
 # ----- the incident archive job -----

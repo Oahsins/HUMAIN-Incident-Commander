@@ -105,10 +105,30 @@ CONTACTS = [{"role": "shift supervisor", "for": ["call-handling", "dispatcher"]}
 
 ALERT_INBOXES = {"alerting": "alerts-alerting.jsonl", "alerting-backup": "alerts-alerting-backup.jsonl"}
 WRITERS = ("cad", "dispatcher", "unit-sync")   # the processes that write cad-db and count failed writes
+START_TOL_S = 1.0   # how far a process's start time, read again later, may be from the one it registered
 
 
 def surge_registry_path(data_dir):
     return os.path.join(data_dir, "surge.json")
+
+
+def process_started(pid):
+    """When the process with this pid started (psutil's create time, seconds since the epoch), or None."""
+    try:
+        return round(psutil.Process(pid).create_time(), 3)
+    except (psutil.Error, OSError, TypeError, ValueError, OverflowError):
+        return None
+
+
+def started_as(pid, started_t):
+    """Is pid still the process that registered with this start time: running, and started at started_t? A pid
+    the system has since given to a new process belongs to one that started later, so it is not."""
+    try:
+        process = psutil.Process(pid)
+        return (process.is_running() and process.status() != psutil.STATUS_ZOMBIE
+                and abs(process.create_time() - started_t) <= START_TOL_S)
+    except (psutil.Error, OSError, TypeError, ValueError, OverflowError):
+        return False
 
 
 def same_process(pid, t):
@@ -129,7 +149,9 @@ def live_holders(data_dir):
 
 
 def live_helpers(data_dir):
-    """surge.json's helpers still running: well-formed entries whose process started before its until_t."""
+    """surge.json's helpers still running: well-formed entries whose pid still belongs to the process that wrote
+    them (the start time the helper registered, started_t, is that process's own). A pid the system has given to
+    another process since is never listed, so cleanup never ends that process."""
     try:
         doc = read_json(surge_registry_path(data_dir), {"helpers": []})
     except OSError:
@@ -138,7 +160,7 @@ def live_helpers(data_dir):
     if not isinstance(helpers, list):
         return []
     return [h for h in helpers if isinstance(h, dict) and _whole(h.get("pid")) and h["pid"] > 0
-            and _real(h.get("until_t")) and same_process(h["pid"], h["until_t"])]
+            and _real(h.get("started_t")) and started_as(h["pid"], h["started_t"])]
 
 
 class Spec:

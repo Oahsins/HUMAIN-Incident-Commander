@@ -1,0 +1,551 @@
+{
+ "describe": {
+  "system": "dispatch",
+  "contract_version": 1,
+  "capabilities": {
+   "probe": true,
+   "act": true,
+   "changes": true,
+   "baseline": "warmup",
+   "max_mode": "auto",
+   "min_window_s": 2
+  },
+  "journeys": [
+   {
+    "name": "emergency_call",
+    "default": true,
+    "entry": "call-handling",
+    "slo": {
+     "success_rate": 0.99,
+     "p95_ms": 1000
+    },
+    "side_effects": "test_data",
+    "description": "a 9-1-1 caller is answered, gives the location and the emergency, is told help is on the way, and a crew is en route soon after"
+   }
+  ],
+  "slo": {
+   "success_rate": 0.99,
+   "p95_ms": 1000
+  },
+  "components": [
+   {
+    "name": "call-handling",
+    "kind": "service",
+    "depends_on": [
+     "call-network",
+     "cad"
+    ],
+    "impact_weight": 1.0,
+    "actions": [
+     "restart",
+     "rollback",
+     "revert_config"
+    ],
+    "description": "9-1-1 call handling: queues each 9-1-1 call for the call-taker positions, gets the caller's location from the call network, and enters the incident in CAD",
+    "standby": null
+   },
+   {
+    "name": "cad",
+    "kind": "service",
+    "depends_on": [
+     "cad-db"
+    ],
+    "impact_weight": 1.0,
+    "actions": [
+     "restart",
+     "rollback",
+     "revert_config"
+    ],
+    "description": "computer-aided dispatch server: creates incidents from calls, links a repeat call from the same number to its open incident, and takes in status reports from unit terminals",
+    "standby": null
+   },
+   {
+    "name": "dispatcher",
+    "kind": "worker",
+    "depends_on": [
+     "cad-db",
+     "alerting"
+    ],
+    "impact_weight": 1.0,
+    "actions": [
+     "restart",
+     "rollback",
+     "revert_config"
+    ],
+    "description": "automated dispatch: takes pending incidents in priority order, recommends the closest free unit, commits it and sends the station alert",
+    "standby": null
+   },
+   {
+    "name": "alerting",
+    "kind": "dependency",
+    "depends_on": [],
+    "impact_weight": 1.0,
+    "actions": [
+     "restart",
+     "failover"
+    ],
+    "description": "station alerting controller: alerts the unit's station over the county network",
+    "standby": "alerting-backup"
+   },
+   {
+    "name": "alerting-backup",
+    "kind": "dependency",
+    "depends_on": [],
+    "impact_weight": 0.0,
+    "actions": [
+     "restart"
+    ],
+    "description": "backup station alerting over the radio tone path; carries alerts only after a failover",
+    "standby": null
+   },
+   {
+    "name": "unit-sync",
+    "kind": "worker",
+    "depends_on": [
+     "cad-db"
+    ],
+    "impact_weight": 0.6,
+    "actions": [
+     "restart",
+     "rollback",
+     "revert_config",
+     "quarantine"
+    ],
+    "description": "unit status interface: applies status reports from unit terminals to CAD's unit records",
+    "standby": null
+   },
+   {
+    "name": "call-network",
+    "kind": "external",
+    "depends_on": [],
+    "impact_weight": 0.5,
+    "actions": [],
+    "description": "the 9-1-1 call network provider's location service (ALI), run by another organisation; we cannot change it",
+    "standby": null
+   },
+   {
+    "name": "cad-db",
+    "kind": "datastore",
+    "depends_on": [],
+    "impact_weight": 1.0,
+    "actions": [
+     "release_lock"
+    ],
+    "description": "the CAD database (SQLite): incidents, calls, units, assignments and the queue of reports from unit terminals",
+    "standby": null
+   },
+   {
+    "name": "incident-archive",
+    "kind": "job",
+    "depends_on": [
+     "cad-db"
+    ],
+    "impact_weight": 0.0,
+    "actions": [],
+    "description": "export of closed incidents to the records system; normal when not running",
+    "standby": null
+   }
+  ],
+  "actions": {
+   "restart": {
+    "est_seconds": 3,
+    "undo": null,
+    "params": {},
+    "description": "restart the component's process; work in progress is dropped: on call-handling, calls being answered are cut off and the callers must redial"
+   },
+   "rollback": {
+    "est_seconds": 4,
+    "undo": "deploy the newer release again",
+    "params": {},
+    "description": "return the component to its previous release"
+   },
+   "revert_config": {
+    "est_seconds": 1,
+    "undo": "set the value again",
+    "params": {
+     "key": {
+      "optional": true,
+      "description": "the setting to undo; default: the newest change not made by the incident commander"
+     }
+    },
+    "description": "undo one setting change on the component"
+   },
+   "release_lock": {
+    "est_seconds": 1,
+    "undo": null,
+    "params": {},
+    "description": "end the session holding the datastore lock; its unfinished transaction rolls back"
+   },
+   "failover": {
+    "est_seconds": 1,
+    "undo": "fail over again with to=primary",
+    "params": {
+     "to": {
+      "enum": [
+       "standby",
+       "primary"
+      ]
+     }
+    },
+    "description": "switch the component's callers to its standby, or back to the primary"
+   },
+   "quarantine": {
+    "est_seconds": 1,
+    "undo": "operations can put the item back",
+    "params": {
+     "item": {
+      "from": "extra.head_item.id"
+     }
+    },
+    "description": "set one queued field report aside so unit-sync skips it; the unit's next report repeats its state"
+   }
+  },
+  "forbidden": [
+   "close or cancel an incident",
+   "change a call's priority",
+   "stand down or reassign a unit committed to an incident",
+   "contact a caller"
+  ],
+  "escalation_contacts": [
+   {
+    "role": "shift supervisor",
+    "for": [
+     "call-handling",
+     "dispatcher"
+    ]
+   },
+   {
+    "role": "CAD administrator",
+    "for": [
+     "cad",
+     "cad-db",
+     "unit-sync",
+     "incident-archive"
+    ]
+   },
+   {
+    "role": "radio and alerting technician",
+    "for": [
+     "alerting",
+     "alerting-backup"
+    ]
+   },
+   {
+    "role": "call network provider",
+    "for": [
+     "call-network"
+    ]
+   }
+  ]
+ },
+ "observe": {
+  "t": 1793396048.6635528,
+  "window_s": 10.0,
+  "components": {
+   "call-handling": {
+    "up": true,
+    "p95_ms": 6.0,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 4.8,
+    "cpu_pct": 4.2,
+    "mem_mb": 22.0,
+    "restarts": 0,
+    "release": "5.2",
+    "config_version": 1,
+    "extra": {
+     "dependencies": {
+      "call-network": {
+       "n": 24,
+       "rps": 2.4,
+       "p95_ms": 5.7,
+       "error_rate": 0.0,
+       "reject_rate": 0.0
+      },
+      "cad": {
+       "n": 24,
+       "rps": 2.4,
+       "p95_ms": 2.2,
+       "error_rate": 0.0,
+       "reject_rate": 0.0
+      }
+     },
+     "queue_depth": 0,
+     "oldest_pending_s": 0.0,
+     "processed_per_s": 2.4
+    }
+   },
+   "cad": {
+    "up": true,
+    "p95_ms": 2.9,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 29.3,
+    "cpu_pct": 8.4,
+    "mem_mb": 42.9,
+    "restarts": 0,
+    "release": "3.4",
+    "config_version": 1,
+    "extra": {
+     "integrity": {
+      "unit_status_timers_expired": 0,
+      "possible_duplicate_incidents": 0
+     }
+    }
+   },
+   "dispatcher": {
+    "up": true,
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": 0.0,
+    "cpu_pct": 4.2,
+    "mem_mb": 22.6,
+    "restarts": 0,
+    "release": "2.1",
+    "config_version": 1,
+    "extra": {
+     "dependencies": {
+      "alerting": {
+       "n": 22,
+       "rps": 2.2,
+       "p95_ms": 2.1,
+       "error_rate": 0.0,
+       "reject_rate": 0.0
+      }
+     },
+     "queue_depth": 0,
+     "oldest_pending_s": 0.0,
+     "processed_per_s": 2.3,
+     "integrity": {
+      "units_not_acknowledging": 0
+     }
+    }
+   },
+   "alerting": {
+    "up": true,
+    "p95_ms": 0.4,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 2.2,
+    "cpu_pct": 0.0,
+    "mem_mb": 20.0,
+    "restarts": 0,
+    "release": "1.6",
+    "config_version": 1,
+    "extra": {
+     "active": "primary"
+    }
+   },
+   "alerting-backup": {
+    "up": true,
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": 0.0,
+    "cpu_pct": 0.0,
+    "mem_mb": 19.9,
+    "restarts": 0,
+    "release": "1.6",
+    "config_version": 1,
+    "extra": {}
+   },
+   "unit-sync": {
+    "up": true,
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": 0.0,
+    "cpu_pct": 0.0,
+    "mem_mb": 22.5,
+    "restarts": 0,
+    "release": "4.0",
+    "config_version": 1,
+    "extra": {
+     "queue_depth": 5,
+     "oldest_pending_s": 0.1,
+     "processed_per_s": 27.0,
+     "head_item": {
+      "id": 6262,
+      "age_s": 0.1,
+      "attempts": 0
+     },
+     "quarantined_items": 0,
+     "integrity": {
+      "unit_reports_overdue": 0
+     }
+    }
+   },
+   "call-network": {
+    "up": true,
+    "p95_ms": 5.7,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 2.4,
+    "cpu_pct": null,
+    "mem_mb": null,
+    "restarts": null,
+    "release": null,
+    "config_version": null,
+    "extra": {
+     "view": "as our callers see it; its own metrics and logs are not visible"
+    }
+   },
+   "cad-db": {
+    "up": true,
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": null,
+    "cpu_pct": null,
+    "mem_mb": null,
+    "restarts": 0,
+    "release": null,
+    "config_version": null,
+    "extra": {
+     "write_errors": 0,
+     "lock_holders": []
+    }
+   },
+   "incident-archive": {
+    "up": null,
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": null,
+    "cpu_pct": null,
+    "mem_mb": null,
+    "restarts": 0,
+    "release": null,
+    "config_version": null,
+    "extra": {
+     "running": false,
+     "runs": 0
+    }
+   }
+  },
+  "baseline": {
+   "call-handling": {
+    "p95_ms": 6.5,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 4.3,
+    "release": "5.2",
+    "config_version": 1
+   },
+   "cad": {
+    "p95_ms": 2.4,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 27.3,
+    "release": "3.4",
+    "config_version": 1
+   },
+   "dispatcher": {
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": 0.0,
+    "release": "2.1",
+    "config_version": 1
+   },
+   "alerting": {
+    "p95_ms": 0.4,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 2.0,
+    "release": "1.6",
+    "config_version": 1
+   },
+   "alerting-backup": {
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": 0.0,
+    "release": "1.6",
+    "config_version": 1
+   },
+   "unit-sync": {
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": 0.0,
+    "release": "4.0",
+    "config_version": 1
+   },
+   "call-network": {
+    "p95_ms": 6.0,
+    "error_rate": 0.0,
+    "reject_rate": 0.0,
+    "rps": 2.2,
+    "release": null,
+    "config_version": null
+   },
+   "cad-db": {
+    "p95_ms": null,
+    "error_rate": null,
+    "reject_rate": null,
+    "rps": null,
+    "release": null,
+    "config_version": null
+   }
+  },
+  "changes": []
+ },
+ "probe": {
+  "journey": "emergency_call",
+  "ok": true,
+  "ms": 317.3,
+  "steps": [
+   {
+    "step": "call-handling",
+    "component": "call-handling",
+    "ok": true,
+    "ms": 6.7,
+    "detail": "answered"
+   },
+   {
+    "step": "cad",
+    "component": "cad",
+    "ok": true,
+    "ms": 2.5,
+    "detail": "told; incident 523"
+   },
+   {
+    "step": "cad-db",
+    "component": "cad-db",
+    "ok": true,
+    "ms": 0.5,
+    "detail": "incident recorded"
+   },
+   {
+    "step": "call-network",
+    "component": "call-network",
+    "ok": true,
+    "ms": 9.8,
+    "detail": "location verified"
+   },
+   {
+    "step": "dispatcher",
+    "component": "dispatcher",
+    "ok": true,
+    "ms": 201.6,
+    "detail": "TEST-1 committed (assignment 523)"
+   },
+   {
+    "step": "alerting",
+    "component": "alerting",
+    "ok": true,
+    "ms": 0.1,
+    "detail": "alert delivered on primary"
+   },
+   {
+    "step": "unit-sync",
+    "component": "unit-sync",
+    "ok": true,
+    "ms": 102.6,
+    "detail": "unit record updated"
+   }
+  ]
+ }
+}

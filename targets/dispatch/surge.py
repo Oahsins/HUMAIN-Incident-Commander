@@ -33,6 +33,7 @@ from ic.kit.proc import alive
 from ic.kit.store import read_json, write_json
 from targets.dispatch import area, people
 from targets.dispatch.control import paths_for
+from targets.dispatch.spec import process_started, started_as
 
 CAP_PER_S = 3.0              # all surges together, emergencies per second (docs/DISPATCH.md, Call surge)
 MAX_EMERGENCIES = 1000       # one block of numbers: rate x seconds may not pass it
@@ -135,14 +136,19 @@ def _remove_if_left(path):
 
 
 def live_helpers(doc, now):
-    """The registry's entries for helpers that are still running and still inside their --seconds."""
+    """The registry's entries for helpers that are still running and still inside their --seconds. An entry's
+    pid counts only while it belongs to the process that wrote it (its registered start time, started_t), so a
+    pid the system has given to another process never holds a share of the cap."""
     helpers = doc.get("helpers") if isinstance(doc, dict) else None
     return [h for h in helpers or [] if isinstance(h, dict) and _pid(h.get("pid")) and _real(h.get("rate"))
-            and _real(h.get("until_t")) and h["until_t"] > now and alive(h["pid"])]
+            and _real(h.get("until_t")) and h["until_t"] > now and _real(h.get("started_t"))
+            and started_as(h["pid"], h["started_t"])]
 
 
-def register(data_dir, pid, rate, until_t, now=None):
-    """Join the registry and take a number block, under surge.lock and before any call is placed.
+def register(data_dir, pid, rate, until_t, started_t, now=None):
+    """Join the registry and take a number block, under surge.lock and before any call is placed. The entry
+    carries the helper's own start time (started_t, its process's create time), which every reader checks, so a
+    reused pid is never taken for this helper.
 
     Raises Refused when the live helpers' rates plus this one would pass the cap, or no block is free.
     Returns (block, the index of its next number)."""
@@ -156,7 +162,8 @@ def register(data_dir, pid, rate, until_t, now=None):
                           f"of {CAP_PER_S:g}")
         block, first = claim_block(data_dir, pid)
         try:
-            write_json(registry, {"helpers": helpers + [{"pid": pid, "rate": rate, "until_t": round(until_t, 3)}]})
+            write_json(registry, {"helpers": helpers + [{"pid": pid, "rate": rate, "until_t": round(until_t, 3),
+                                                          "started_t": started_t}]})
         except BaseException:
             write_json(slot_path(data_dir, block), {"pid": None, "next": first})
             raise
@@ -354,7 +361,10 @@ def main(argv=None):
     try:
         args = parse_args(sys.argv[1:] if argv is None else argv)
         base_url = call_handling_url(args.data)
-        number_block, first = register(args.data, pid, args.rate, time.time() + args.seconds)
+        started_t = process_started(pid)
+        if started_t is None:
+            raise Refused("this helper's own start time cannot be read")
+        number_block, first = register(args.data, pid, args.rate, time.time() + args.seconds, started_t)
     except Refused as exc:
         say(pid, f"refused: {exc}")
         return 2
