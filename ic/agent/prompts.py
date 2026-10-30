@@ -125,7 +125,10 @@ def reassess_note():
     return ("This is a reassessment after remediation did not bring the system back. List every fault you now "
             "believe was present in this incident, including ones already fixed (give those an empty fix list). "
             "Give new fix steps only for faults that remain. Do not repeat an action that already failed to help "
-            "unless the evidence shows it will work now.")
+            "unless the evidence shows it will work now. A component that is down now is brought back, even if it "
+            "went down again after an earlier fix, rather than left down until a person comes: give it the allowed "
+            "action most likely to keep it up (restart it again if nothing points to a cause an allowed action "
+            "fixes), followed by \"escalate\" if why it went down is still unknown.")
 
 
 def sbar_system():

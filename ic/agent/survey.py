@@ -78,7 +78,8 @@ def component_signals(name, entry, base, component, baselines, entry_point=False
     exits = _num(extra.get("exits_15m"))
     if exits:
         ago = _num(extra.get("last_exit_s_ago"))
-        text = f"process exited {exits:.0f} time(s) in 15 min, last {ago:.0f} s ago (exit code {extra.get('last_exit_code')})"
+        text = (f"process exited {exits:.0f} time(s) in 15 min" + (f", last {ago:.0f} s ago" if ago is not None else "")
+                + f" (exit code {extra.get('last_exit_code')})")
         # Up again after one exit (restarted, say) is context; exiting again and again is a fault, unless every
         # exit came before the action taken on it: that is the history the action ended.
         before_action = acted_ago is not None and ago is not None and ago > acted_ago

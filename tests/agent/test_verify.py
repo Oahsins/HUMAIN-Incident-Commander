@@ -230,3 +230,40 @@ def test_when_nothing_is_left_to_try_and_users_get_through_it_checks_again(monke
     result = load_arm("abcde")(fake, model=mock_model.install(), budget_s=90.0)
     assert len(checks) == 2 and result["outcome"] == "recovered" and result["escalation"] is None
     assert any(e["summary"].startswith("nothing new to try") for e in result["trace"])
+
+
+def test_exits_without_a_time_do_not_break_the_survey():
+    entry = {"up": True, "extra": {"exits_15m": 2}}
+    [(letter, severity, text)] = survey.component_signals("web", entry, {}, {"kind": "service"}, {})
+    assert severity == "info" and text == "process exited 2 time(s) in 15 min (exit code None)"
+
+
+def run_capped(monkeypatch, **capabilities):
+    from tests.agent import mock_model
+    from tests.agent.fake_system import PROFILE, FakeSystem
+    from ic.agent import load_arm
+    monkeypatch.setattr(common, "SLEEP", lambda seconds: None)
+    fake = FakeSystem({"web_down"})
+    profile = {**PROFILE, "capabilities": {**PROFILE["capabilities"], **capabilities}}
+    fake.describe = lambda: profile
+    windows, observe = [], fake.observe
+    fake.observe = lambda window_s=10.0: windows.append(window_s) or observe(window_s)
+    return fake, windows, load_arm("abcde")(fake, model=mock_model.install(), budget_s=90.0)
+
+
+@pytest.mark.parametrize("capabilities", [{"max_mode": "advise"}, {"act": False}])
+def test_a_read_only_system_gets_advice_and_no_action(monkeypatch, capabilities):
+    fake, _, result = run_capped(monkeypatch, **capabilities)
+    assert result["mode"] == "advise" and result["outcome"] == "advised"
+    assert fake.acts == [] and result["proposed_actions"]
+
+
+def test_a_confirm_cap_with_nobody_to_ask_declines_every_action(monkeypatch):
+    fake, _, result = run_capped(monkeypatch, max_mode="confirm")
+    assert result["mode"] == "confirm" and fake.acts == []
+    assert result["actions"] and all(a["declined"] and not a["sent"] for a in result["actions"])
+
+
+def test_observe_windows_are_never_shorter_than_the_system_can_measure(monkeypatch):
+    _, windows, _ = run_capped(monkeypatch, min_window_s=30)
+    assert windows and min(windows) == 30.0
