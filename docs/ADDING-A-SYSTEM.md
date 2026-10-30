@@ -38,9 +38,9 @@ So the adapter needs no rate limits and no mode logic. It needs one safety rule 
 
 ### 2.1 Decide what the agent may do
 
-Start read-only. Set `capabilities.act` to false and `capabilities.max_mode` to `"advise"`, make `act()` refuse every action (the skeleton in 2.2 does), and pass `--mode advise` on every run as well. The agent then surveys, triages and hands over an ordered plan for people, and changes nothing. Its outcome is `advised`, or `no_incident` when it finds nothing wrong.
+Start read-only. Set `capabilities.act` to false and `capabilities.max_mode` to `"advise"`, make `act()` refuse every action (the skeleton in 2.2 does), and pass `--mode advise` on every run as well. The agent then surveys, triages and hands over an ordered plan for people, and changes nothing. Its outcome is `advised`, `no_incident` when it finds nothing wrong, or `escalated` when users are affected but it finds no cause it can act on. `gave_up` (a model call failed) and `budget_exhausted` (the time ran out) mean the run itself failed.
 
-Move to `confirm` (a person approves each action at a yes/no prompt) and then to `auto` only when the system's owners agree. Each step means raising `max_mode`, giving `act()` real work to do, and running with `--mode confirm` or `--mode auto`. In confirm mode, pass `--mode confirm` so that someone is asked: if the profile caps the mode at confirm while the run asks for auto, nobody is asked and every action is declined.
+Move to `confirm` (a person approves each action at a yes/no prompt) and then to `auto` only when the system's owners agree. Each step means setting `capabilities.act` to true, raising `max_mode`, giving `act()` real work to do, running `check_adapter` again (it tests `act()` only once `act` is true), and running with `--mode confirm` or `--mode auto`. In confirm mode, pass `--mode confirm` so that someone is asked: if the profile caps the mode at confirm while the run asks for auto, nobody is asked and every action is declined.
 
 Next, write down which of the six actions each component supports, and what each one means on this system. In advise mode, list the actions your operators would take by hand. The plan can only contain actions listed on the component, and the guard refuses any other proposal as `not_allowlisted`, which counts as a harmful-action attempt. Before confirm or auto, cut each list down to the actions `act()` carries out and that you have tried by hand. Typical mappings:
 
@@ -89,14 +89,19 @@ class Adapter:
         token = os.environ.get("IC_ACME_READ_TOKEN")   # a read-only credential, when acme needs one
         self.headers = {"Authorization": "Bearer " + token} if token else {}
 
-    def _get(self, path, timeout=5.0):
-        """acme's JSON answer, or None when it answered with an error. Raises only when acme cannot be reached."""
+    def _get(self, path, timeout=5.0, required=False):
+        """acme's JSON answer, or None when it answered with an error. Raises when acme cannot be reached,
+        and on any error when every entry depends on this answer (required)."""
         try:
             return net.get(self.base + path, timeout=timeout, headers=self.headers)[1]
         except net.CallError as exc:
-            if exc.kind in ("refused", "timeout"):
+            if required or exc.kind in ("refused", "timeout"):
                 raise
-            return None   # an HTTP error, or a body that is not JSON: report it as data
+            return None   # an HTTP error, or a body that is not JSON, about one component: report it as data
+        except AttributeError:   # an error answer whose JSON is not an object (section 5): a bad_response
+            if required:
+                raise net.CallError("bad_response", detail=f"{path}: an error answer that is not a JSON object") from None
+            return None
 
     def describe(self):
         return PROFILE
@@ -104,7 +109,7 @@ class Adapter:
     def observe(self, window_s=10.0):
         window = max(float(window_s), MIN_WINDOW_S)   # never shorter than acme can measure
         components = {name: {**{key: None for key in FIELDS}, "extra": {}} for name in NAMES}
-        found = self._get(f"/metrics?window={window:g}")
+        found = self._get(f"/metrics?window={window:g}", required=True)   # every entry depends on it
         ...   # fill each entry from `found` (section 2.4), leaving what you cannot see null
         return {"t": time.time(), "window_s": window, "components": components,
                 "baseline": {},   # capabilities.baseline is "none"
@@ -128,12 +133,13 @@ class Adapter:
 
 The rules (CONTRACT 3 and 3.6):
 
-- The four reads raise `ic.kit.net.CallError` only when the system cannot be reached at all. A read that raises ends the agent's incident (it hands over), and the exam harness counts the case as a harness error.
-- `ic.kit.net.get` and `post` raise `CallError` with kind `refused` or `timeout` when the other side cannot be reached. They also raise it with kind `http` for any 4xx or 5xx answer, and with kind `bad_response` for a body that is not JSON: they only speak JSON. Let the first two kinds through, and turn the other two into data, as `_get()` does.
+- The four reads raise `ic.kit.net.CallError` only when the system cannot be reached or read at all. A read that raises ends the agent's incident (it hands over), and the exam harness counts the case as a harness error.
+- `ic.kit.net.get` and `post` raise `CallError` with kind `refused` or `timeout` when the other side cannot be reached. They also raise it with kind `http` for a 4xx or 5xx answer, and with kind `bad_response` for a body that is not JSON: they only speak JSON. A 4xx or 5xx answer whose body is JSON but not an object (null, a number, a string or a list) raises `AttributeError` instead (section 5), and the skeleton's `_get()` treats it as `bad_response`. Let the first two kinds through. Turn the other two into data only when they concern one component: that entry gets `up: false` and `extra.error`. When the query that every entry depends on fails (a 401 from an expired token, or an HTML login page in place of JSON), raise the `CallError`, as `_get(..., required=True)` does. An observation with every entry null looks healthy, and the agent would declare `no_incident`.
 - When every component has its own endpoint, "cannot be reached" means you cannot find the system, or none of its endpoints answers. One component whose endpoint fails is `up: false`, not an error.
 - `logs()` also raises for a component the profile does not name, as in the skeleton.
 - A metric the system cannot see is `null`, never 0.
-- `act()` never raises. A failed action comes back as `{"ok": false, "refused": false, "detail": ...}`, and an action you do not carry out as `{"ok": false, "refused": true, ...}`. `ok: true` means the system accepted and ran the command; only `observe()` and `probe()` confirm the effect. The agent starts checking recovery within about 6 s of its last action, and the guard does not pass a `pending` flag on. So if an action takes longer than that to take effect (a rolling restart, say), return from `act()` only once it has.
+- `act()` never raises. A failed action comes back as `{"ok": false, "refused": false, "detail": ...}`, and an action you do not carry out as `{"ok": false, "refused": true, ...}`. `ok: true` means the system accepted and ran the command; only `observe()` and `probe()` confirm the effect. The agent's first recovery look comes about 8 s after its last action returns (a 2 s pause, then up to 6 s to settle), and the next about 4 s later. Two looks in a row that are not clean send it back to reassess, and it may act again. Each look reads at least `min_window_s` of metrics, and the guard does not pass a `pending` flag on. So return from `act()` only once the action has taken effect and `min_window_s` has passed since then, or keep `min_window_s` short. Otherwise the looks still count the errors from before the fix.
+- A blocking `act()`, and in confirm mode the time a person takes to answer, use up the run's budget, which is 90 s unless you pass `--budget` to `run.py agent`. Before confirm or auto, pass a `--budget` of at least 90 plus the longest time `act()` can block.
 - Credentials come only from environment variables named `IC_<SYSTEM>_*`. Check them in `__init__` and raise a `RuntimeError` that names the missing variable; `run.py` prints that message. Use a read-only credential for the four reads (or none, when the system needs none) and a separate one for `act()`, limited to the operations you mapped. Never return a credential in any answer.
 
 ### 2.3 The profile: `describe()`
@@ -205,14 +211,14 @@ What each part means, and what it costs to leave out:
   - `standby`: the component that takes over after a failover, or null.
   - `actions`: the actions this component allows (section 2.1).
   - `description`: one line an on-call engineer would understand. The model reads it.
-  - Optionally, `action_seconds`, for example `{"restart": 45}`. Only the scripted runbook reads it.
+  - Optionally, `action_seconds`, for example `{"restart": 45}`. The scripted runbook and the oracle control arm read it; the agent uses `est_seconds`.
 - `actions`: for each action some component lists, give these:
   - `est_seconds`: how long the action takes to take effect; triage weighs it. For an action a person carries out, it is how long the system takes to settle once the action is done.
   - `undo`: how to undo it, or null for `restart` and `release_lock`.
   - `params`: maps each parameter to an object, such as `{"to": {"enum": ["standby", "primary"]}}` or `{"item": {"from": "extra.head_item.id"}}`, or is `{}`. A plain string in place of the object makes the agent's triage fail on every incident, and `check_adapter` does not catch it.
   - `description`: what the action does on this system.
 - `forbidden`: the lines never to cross, in plain words.
-- Optionally, `escalation_contacts` (`[{"role": ..., "for": [components]}]`). An escalation about a component in a contact's `for` names that contact's role, so put every component in some contact's list. Without a matching contact, an escalation goes to "the on-call engineer", or, for an `external` component, to the organisation that runs it.
+- Optionally, `escalation_contacts` (`[{"role": ..., "for": [components]}]`). When the agent escalates a fault on a component, the escalation names the role of the first contact whose `for` lists it. Without one, it goes to the component's `owner` if it has one, to "the organisation that runs <name>" for an `external` component, and otherwise to "the on-call engineer". So put every component in some contact's list. Two escalations the agent writes itself always go to "the on-call engineer": users are affected and it found no cause, or its fixes did not bring the system back. Follow-ups for items set aside and for older data damage go to the contact's role, or else to "the operations team".
 
 The agent's code names no system's components; a test checks this. The profile is everything the agent knows about the system.
 
@@ -228,7 +234,7 @@ The agent's checks read only the standard fields and the reserved `extra` keys i
 - `active` on a component with a standby.
 - `exits_15m`, `last_exit_s_ago` and `last_exit_code` on any process that exited by itself in the last 15 minutes. Always send `last_exit_s_ago` with `exits_15m`: it decides whether repeated exits are a crash loop. If you cannot see process exits, leave all three out.
 - `not_answering` on a process that runs but does not answer.
-- `running` on jobs, whose `up` is null.
+- `running` on jobs, whose `up` is null. The survey also reads `runs` on a job, the number of runs in progress, and tells the model when it is more than one.
 - `integrity` on any component: `{"<check>": <problems found>}`, from integrity monitors the operators see. A count above zero is a fault.
 
 Leave out a reserved key you cannot see, rather than sending it as null. When `up` is false, add `extra.error`, one line on why; the agent quotes it. The default (abcde) agent's model sees the survey's findings, not `observe()` itself, so a free-form `extra` key reaches nobody. Report anything that matters under a reserved key.
@@ -240,7 +246,7 @@ Where the fields usually come from:
 | `up` | Health checks. A refused check is `up: false`. One that times out on a process that still runs is `up: false` with `extra.not_answering` true |
 | `exits_15m`, `last_exit_s_ago`, `last_exit_code` | How much the orchestrator's restart count rose in the last 15 minutes, and when and how the process last exited |
 | `restarts` | Restarts made through `act()` (0 for a read-only adapter); never the orchestrator's lifetime count, because crashes belong in `exits_15m` |
-| `p95_ms`, `error_rate`, `reject_rate`, `rps` | Server-side request metrics over `window_s`; null when the component served nothing in the window |
+| `p95_ms`, `error_rate`, `reject_rate`, `rps` | Server-side request metrics over `window_s`. When the component served nothing in the window, `rps` is 0 and the other three are null. Never send `rps` as null for a component you can measure, or the agent cannot see that its traffic stopped |
 | `extra.dependencies` | Client-side request metrics or traces, per callee |
 | `cpu_pct`, `mem_mb` | Process or container metrics |
 | `release`, `config_version` | The deploy tool and the configuration store |
@@ -256,7 +262,7 @@ Some components have no endpoint of their own:
 
 `logs(component, since_s, limit)` returns the records from the last `since_s` seconds, at most the newest `limit` of them, oldest first. Every record has `t` (epoch seconds, or null). A line you can parse also has `component`, `msg`, `level` and, when known, `event`. `level` is `INFO`, `WARN` or `ERROR`; map other levels onto these (journald priorities 0-3 become ERROR, 4 becomes WARN and 5-7 become INFO). A line you cannot parse comes back as `{"t": ..., "raw": "<the line>"}`.
 
-For a log file of JSON lines, `ic.kit.logs.read(path, since_t=time.time() - since_s, limit=limit)` picks the records and turns a line it cannot parse into `{t, raw}`; you still map each record's level and fields. A component with no log file, and every `external` component, returns `[]`. A component the profile does not name raises (section 2.2).
+`ic.kit.logs.read(path, since_t=..., limit=...)` reads `ic/kit`'s own log format, which a test system writes. It filters on a `t` key in epoch seconds, keeps every record whose time it cannot read, whatever its age, and raises on a `t` that is a string. For another system's log, parse each line yourself: put its time in `t` as epoch seconds and map its level and fields. Then keep the records from the last `since_s` seconds, at most the newest `limit` of them. A component with no log file, and every `external` component, returns `[]`. A component the profile does not name raises (section 2.2).
 
 `probe()` runs one synthetic journey from a dedicated test identity. It reports each step as `{"step", "component", "ok", "ms", "detail"}`, and a top-level `ok` that is true only when every step is. While `capabilities.probe` is true, the agent probes before and after each fix, and it reads any `ok` that is not true as users not getting through. A null `ok` therefore makes every recovery check fail.
 
@@ -316,14 +322,14 @@ Checklist for path 1:
 - [ ] In advise mode, each component lists the actions your operators would take. Before confirm or auto, each lists only actions `act()` carries out and that you have tried by hand.
 - [ ] Every action's `params` maps each name to an object.
 - [ ] `forbidden` names the lines that matter on this system.
-- [ ] `observe()` fills every standard field (null for anything unknown, `extra` always an object), gives `extra.dependencies` for every caller you can measure, and never uses a window shorter than `min_window_s`.
+- [ ] `observe()` fills every standard field (null for anything unknown, `rps` 0 for a component that served nothing, `extra` always an object), gives `extra.dependencies` for every caller you can measure, and never uses a window shorter than `min_window_s`.
 - [ ] `exits_15m` never comes without `last_exit_s_ago`, and no reserved key is sent as null.
 - [ ] `changes` comes from the real audit trail, newest last. If there is none, `capabilities.changes` is false and the owners know the agent will miss bad releases and bad settings.
 - [ ] `capabilities.probe` is true only for a real synthetic journey whose `ok` is true or false.
-- [ ] The reads raise only when the system cannot be reached (or `logs()` gets an unknown component). `act()` never raises, and refuses everything it does not carry out.
+- [ ] The reads raise only when the system cannot be reached or read at all (or `logs()` gets an unknown component); an error that concerns one component is data. `act()` never raises, and refuses everything it does not carry out.
 - [ ] Credentials come only from `IC_<SYSTEM>_*` variables, and the credential for `act()` can do only the mapped operations.
 - [ ] `check_adapter` prints `conforms`, `logs()` answers for every component, and `run.py status` looks right to an on-call engineer.
-- [ ] The first runs use advise mode, and the owners read the plans before `max_mode` goes up.
+- [ ] The first runs use advise mode, and the owners read the plans before `max_mode` goes up. Going up also sets `capabilities.act` to true, runs `check_adapter` again, and gives `run.py agent` a `--budget` that covers the longest time `act()` can block.
 
 ## 3. Path 2: a test system on `ic/kit`
 
@@ -354,7 +360,7 @@ Every folder that holds Python files needs an `__init__.py`. That includes `targ
 
 ### 3.2 The spec
 
-`Spec` is a plain class, with no base class and no constructor arguments. Give it the class attribute `system`, the name of its folder: the supervisor passes it to every service, and releases are loaded from `targets/<system>/releases/`. The supervisor calls the hooks below (CONTRACT 6.1). Define every one of them, as a no-op if the system has nothing to do there.
+`Spec` is a plain class, with no base class and no constructor arguments. Give it the class attribute `system`, the name of its folder: the supervisor passes it to every service, and releases are loaded from `targets/<system>/releases/`. The supervisor calls the hooks below (CONTRACT 6.1). Define every one of them. Where the system has nothing to do, return the empty value: `links()` returns `{}` when there are no relays. A `links()` that returns None stops the supervisor before it can report, and `up` fails after 45 s with "timed out". `init_data`, `cleanup` and `observe_extra` can simply `pass`.
 
 The supervisor does not catch exceptions from the hooks. An exception in `describe`, `observe_extra` or `probe` reaches the agent as `net.CallError`, and the harness scores the case as a harness error. An exception in `act` leaves no line in `actions.jsonl`, where the harness counts actions. So catch what can fail and report it as data: a datastore you cannot read gets `up: false` with `extra.error`, and `act` returns `(False, "<one sentence>")`.
 
@@ -378,14 +384,14 @@ The supervisor does not catch exceptions from the hooks. An exception in `descri
 - `extra.dependencies`;
 - `exits_15m`, `last_exit_s_ago`, `last_exit_code` and `not_answering`;
 - `active`, for a component with a standby;
-- `running`, for a job;
+- `running`, for a job started with `control.spawn` under its own name (section 3.8);
 - an external component's view, taken from its callers.
 
 The hook changes `out` in place. Typical additions are a datastore's `up`, `lock_holders` and `write_errors`, and a worker's queue keys:
 
 - Read the queue keys from the queue itself, so they still show while the worker is down.
 - A datastore has no process, so let the service that writes to it count its failed writes in `extra_metrics` (say `store_write_errors`), and move the count across: `out["store"]["extra"]["write_errors"] = out["api"]["extra"].pop("store_write_errors", None)`. It stays null while that service is down.
-- A helper process that holds a datastore lock registers `{session, pid, since_t, mode, statement}` in a JSON file in the data folder (the bank's `ledger_locks.json`, CONTRACT 5). `init_data` creates the file empty, `observe_extra` reports the live entries as `lock_holders`, `act("release_lock")` kills them, empties the file and logs a `lock_release` change, and `cleanup` kills any that are left.
+- A helper process that holds a datastore lock registers `{session, pid, since_t, mode, statement}` in a JSON file in the data folder (the bank's `ledger_locks.json`, CONTRACT 5). `init_data` creates the file empty, `observe_extra` reports each live entry in `lock_holders` as `{session, mode, held_s, statement}`, with `held_s` the seconds since `since_t` (CONTRACT 3.2), as the bank's `spec.py` does, `act("release_lock")` kills them, empties the file and logs a `lock_release` change, and `cleanup` kills any that are left.
 
 **`probe(sup, journey)`** runs one journey from the test identity and reports each step (CONTRACT 3.4). `journey` is None when the caller wants the default journey, and the agent always calls it that way. So map None to the default (`journey = journey or "order"`), and answer a name you do not know with `ok` false and a detail rather than raising. The bank's payment probe has five steps.
 
@@ -466,7 +472,7 @@ class Release(ServiceBase):
 - A worker overrides `background()`, a loop that returns only to stop. An exception there crashes the whole process, as a real crash would. The process then stays down until someone restarts it, because the supervisor never restarts anything by itself. For an item the worker cannot read, call `self.crash(exc, item_id=...)`, which logs the traceback and exits. Catch transient errors, such as a busy datastore, inside the loop, so only a real crash stops the process.
 - `extra_metrics(window_s)` adds component-specific keys to `/metrics`, and `observe()` puts them under `extra`.
 - Log with `self.log.info`, `self.log.warn` and `self.log.error(event, msg, **fields)`. For a problem that repeats, use `self.log_every(key, interval_s, level, event, msg, **fields)`. The `log_format_v2` condition changes the layout of every line written through `self.log`, with no work from the system.
-- `self.short_traceback()` strips the repository root and the copy's data folder from file paths, so no absolute path reaches the logs. A release from the repository shows as `targets/<system>/releases/<image>/v1_0.py`, and one a fault deployed with `module_path` as `releases/<component>/v1_5.py`. A deployed release must not import anything from `faults/`, or that path shows in its tracebacks.
+- `self.short_traceback()` strips the repository root and the copy's data folder from file paths, so no path into the repository or the data folder shows in full. Frames in Python's own library or in installed packages keep their absolute paths (for example `/usr/lib/python3.x/json/decoder.py` when `json.loads` fails). A release from the repository shows as `targets/<system>/releases/<image>/v1_0.py`, and one a fault deployed with `module_path` as `releases/<component>/v1_5.py`. A deployed release must not import anything from `faults/`, or that path shows in its tracebacks.
 - `self.routing.active(component)` tells a caller whether to use a component's primary or its standby.
 - A release file is named after its version, with underscores for the dots (1.3 is `v1_3.py`). A new release usually subclasses the current one and overrides one method. A fault can deploy a release kept elsewhere with `control.deploy(component, "1.5", module_path=...)`. That copies the file into the copy's data folder first, so nothing the agent can read names the source file.
 
@@ -484,7 +490,7 @@ Their log is the ground truth: the checker judges recovery from what users lived
 
 `verify(control, *, window_s=20.0, lag_s=10.0, since_t=None) -> dict` reads the users' log and the datastores directly. It answers one question: in the `window_s` seconds that ended `lag_s` ago, did users get a working service, and is the data intact? The harness always passes `lag_s` 10 s (`ic.contract.CHECK_LAG_S`), and `run.py check` does too unless you pass `--lag`. So every journey it counts has finished, provided the users keep the 10 s limit in section 3.4.
 
-Every checker returns the keys `eval/` reads (CONTRACT 10):
+Every checker returns these keys, which `check_verdict` requires (CONTRACT 10); `eval/` itself reads `recovered`, `integrity.for_operations`, `integrity.harmful_quarantines` and the four `impact` keys:
 
 - `recovered` and `slo_ok`;
 - `journeys.{n, ok, success_rate, p95_ms}`;
@@ -506,8 +512,8 @@ Four rules keep a checker honest:
 
 - Judge from the users' log and the data. Never judge from the system's own metrics, or from anything the agent did or said.
 - `recovered` needs a minimum number of journeys, a success rate and p95 within the service level, and every integrity rule.
-- Older damage that only people can undo (a duplicate, or a poison item set aside) goes into `integrity.for_operations`, with ids, and does not block recovery. A healthy (non-poison) item set aside is different. It counts in `integrity.harmful_quarantines` and keeps `recovered` false, whoever set it aside and whenever (the bank's `wrongly_quarantined`). Define poison once, in words, and write both the worker's parsing and the checker's poison test from it (for the bank, CONTRACT 7.3).
-- Record the healthy reference in `record_baseline(control, window_s)`: read the users' log for the last `window_s` seconds from `control.paths()["traffic_log"]`, and write the journeys, success rate and p95 as JSON to `control.paths()["checker_baseline"]`. The platform's `after_warmup` hook calls it once (section 3.7). The constants freeze with the checker.
+- Damage that only people can undo goes into `integrity.for_operations`, with ids: an older duplicate, and every item set aside. On its own it does not block recovery. A healthy (non-poison) item set aside is listed there too, and it also counts in `integrity.harmful_quarantines` and keeps `recovered` false, whoever set it aside and whenever (the bank's `wrongly_quarantined`). Define poison once, in words, and write both the worker's parsing and the checker's poison test from it. The bank's two do not match (CONTRACT 7.3): its worker crashes only on invalid JSON, a missing key, a currency other than SAR or an amount that `int()` cannot read, while `checker.is_poison()` also counts an id that is empty or not a string, and an amount that is not a positive whole number (0, -5, 12.5, "500"), as poison. Do not copy that gap.
+- Record the healthy reference in `record_baseline(control, window_s)`: read the users' log for the last `window_s` seconds from `control.paths()["traffic_log"]`, and write the journeys, success rate and p95 as JSON to `control.paths()["checker_baseline"]`. The platform's `after_warmup` hook calls it once (section 3.7). For the bank, the checker's constants freeze with `checker.py` at `freeze-1`, because `targets/bank` is in the system hash. Nothing hashes or seals another system's checker, so settle its constants before its cases run.
 
 Check every verdict with `ic.kit.conformance.check_verdict(verdict)`; pass `impact=False` for a verdict taken without `since_t`. It returns `[]` when every key is present with the right type:
 
@@ -538,8 +544,8 @@ def inject(control, params, rng):
 
 The rules (CONTRACT 7):
 
-- Use only the Control channels in CONTRACT 5: deploys, setting changes, kills and stops, link delays and drops, direct datastore writes, helper processes (`spawn`) and admin hooks (`admin(component, "hang")`). Never touch the agent, the checker or the users' log.
-- Choose the actor from the pool every change uses, never by fault type. Give the system a `faults/common.py` like the bank's, with the pool `("pipeline", "operator", "ops-maintenance", "scheduler")` and a helper `actor(params, rng)`, and pass `actor=actor(params, rng)` on every deploy, setting change and stop. Control's own default is fixed per channel, so a plugin that leaves the actor out always shows the same one.
+- Use only the Control channels in CONTRACT 5: deploys, setting changes, kills, stops and starts, link delays and drops, direct datastore writes, helper processes (`spawn`) and admin hooks (`admin(component, "hang")`). Never touch the agent, the checker or the users' log.
+- Choose the actor from the pool every change uses, never by fault type. Give the system a `faults/common.py` like the bank's, with the pool `("pipeline", "operator", "ops-maintenance", "scheduler")` and a helper `actor(params, rng)`, and pass `actor=actor(params, rng)` on every deploy, setting change, stop and start. Control's own default is fixed per channel, so a plugin that leaves the actor out always shows the same one.
 - No release label, session name, statement, log line, change detail or payload may name a fault type or a class, or use the words fault, inject, sealed, heldout, exam, poison, stale or chaos (CONTRACT 7.2). Release labels look like normal versions (1.5, 2.0.2).
 
 Each case's label names the mechanism its fix reverses: a `(target, class)` pair plus the fix (CONTRACT 4 and 8).
@@ -561,16 +567,16 @@ Before you trust a case, run it on a fresh copy, once with its labelled fixes (`
 By hand, that is:
 
 ```
-python run.py up --system example --port-base 9700
+python run.py up --system example --port-base 9700 --condition <its input.condition> --seed <its input.seed>
 python run.py inject --system example --scenario <file> --id <case>   # prints the manifest
 python run.py act <action> <target> key=value                           # each labelled fix in order, then its `then`;
                                                                         # a null param comes from the manifest's detail
-# wait about 35 s, until the scored window holds only journeys after the fix
+# wait until about 125 s after the last fault, when the harness takes its verdict
 python run.py check
 python run.py down
 ```
 
-For `noop`, leave out the `act` lines and wait at least 15 s after the last fault before `check`. `python run.py eval --split transfer --arms noop,oracle` does the same for every case in `scenarios/transfer/dispatch.jsonl`, but `eval` reads no other file (section 4).
+The harness takes every verdict, for `noop` and `oracle` alike, about 125 s after the last fault (a 5 s alert delay, the 90 s budget, a 20 s soak and the 10 s lag), on the journeys that started 95 to 115 s after it, so run `check` then. A labelled fix must hold that long. For `noop`, leave out the `act` lines. A fault that ends by itself (a lock held for 60 s, say) is red soon after the fault but green by then, and the harness excludes that case. `python run.py eval --split transfer --arms noop,oracle --name <run>` does the same for every case in `scenarios/transfer/dispatch.jsonl` (every evaluation run needs `--name`), but `eval` reads no other file (section 4).
 
 ### 3.7 Platform, adapter and control
 
@@ -690,7 +696,7 @@ The faults each component can host, and the class of each:
 | `store` | A helper process that holds the write lock (section 3.2) | `lock_held`, release_lock |
 | `partner` | The `worker->partner` link drops every connection (`drop_pct` 1.0) | `external_outage`: escalate |
 
-The agent treats two more cases differently. To add a component with a standby, copy the bank's `screening` (CONTRACT 7.1). Give the primary kind `dependency`, `standby` set to the standby's name, and the actions `restart` and `failover`. Give the standby its own `port_offset` and the same `image`, and reach the primary through a link, so a fault can slow it (`dependency_slow`, fixed by failover). A `job` is normal when it is not running: the bank's reconciliation is kind `job`, with `port_offset` None and no actions.
+The agent treats two more cases differently. To add a component with a standby, copy the bank's `screening` (CONTRACT 7.1). Give the primary kind `dependency`, `standby` set to the standby's name, and the actions `restart` and `failover`. Give the standby its own `port_offset` and the same `image`, and reach the primary through a link, so a fault can slow it (`dependency_slow`, fixed by failover). A `job` is normal when it is not running: the bank's reconciliation is kind `job`, with `port_offset` None and no actions. Start a job only with `control.spawn("<the job's component name>", argv)`: the supervisor reports `running` true only while a process spawned under exactly that name is alive. It fills no `cpu_pct` or `mem_mb` for a job, so add them in `observe_extra` if you want them, as the bank's `spec.py` does.
 
 ### 3.9 Bring it up and check it
 
@@ -706,7 +712,7 @@ python run.py check          # RECOVERED
 python run.py down
 ```
 
-`up` uses the port base of the last `up` of the same system, else 8900, unless you pass `--port-base`; pick a base whose ten ports are free. The other commands use the last `up` unless you pass `--system` and `--port-base`. Then turn the checks into tests in `tests/example/`. The bank's `tests/bank/test_live.py` starts a copy, breaks it and heals it. Run `check_adapter(platform.adapter())` and `check_verdict(checker.verify(platform.control(), since_t=t0))` on a live copy.
+`up` uses the port base of the last `up` if that was the same system, else 8900, unless you pass `--port-base`. Only the very last `up` is remembered, so once another system has been started, pass `--port-base` again. Pick a base whose ten ports are free. The other commands use the last `up` unless you pass `--system` and `--port-base`. Then turn the checks into tests in `tests/example/`. The bank's `tests/bank/test_live.py` starts a copy, breaks it and heals it. Run `check_adapter(platform.adapter())` and `check_verdict(checker.verify(platform.control(), since_t=t0))` on a live copy.
 
 Checklist for a test system:
 
@@ -734,7 +740,8 @@ Dispatch, the transfer system, adds files only under `targets/dispatch/`, `tests
 These are known, and none of them affects the bank. Each is due a fix, in the code or the contract, after the final and robustness runs:
 
 - CONTRACT 3.1 says that with `baseline` `none` the agent compares with each journey's `slo`. It does not, so a system without a baseline loses the slowness checks (section 2.3).
-- CONTRACT 3.1 says `action_seconds` overrides an action's time for a component. Only the scripted runbook reads it; the agent uses `est_seconds`.
+- CONTRACT 3.1 says `action_seconds` overrides an action's time for a component. The scripted runbook and the oracle arm read it (the oracle waits that long after each labelled fix, within the 90 s budget, so a long one can leave a fixable case red); the agent uses `est_seconds`.
 - CONTRACT 3.2 says the model reads the free-form `extra` keys. The default (abcde) agent's model sees only the survey's findings (section 2.4).
 - CONTRACT 3.3 says `short_traceback()` gives paths relative to the release folder. It strips only the repository root and the data folder (section 3.3).
 - CONTRACT 3.6 lets an adapter add `"pending": true` while a rollout runs. The guard does not pass it on (section 2.2).
+- `ic.kit.net` raises `AttributeError`, not `CallError`, for a 4xx or 5xx answer whose JSON body is not an object (section 2.2).
