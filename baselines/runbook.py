@@ -99,11 +99,12 @@ def _upstream_bad(component, observation):
 
 
 def _severe_change(change):
-    """A large numeric reduction is stronger evidence than a small adjustment."""
+    """A large numeric reduction, or a number replaced by a non-number, is stronger
+    evidence than a small adjustment."""
     detail = change.get("detail") or {}
     before, after = detail.get("from"), detail.get("to")
     return (isinstance(before, (int, float)) and before > 0
-            and isinstance(after, (int, float)) and after < before / 10)
+            and (not isinstance(after, (int, float)) or after < before / 10))
 
 
 def _propagated_failure(component, observation, component_kinds, severe_local_change=False):
