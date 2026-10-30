@@ -5,6 +5,7 @@ know the target system's names or its private state. A changed release or
 setting is evidence only when the same component is also behaving badly.
 """
 
+from math import isfinite
 from time import monotonic, sleep, time
 
 from ic.contract import GUARD_MAX_ACTIONS, GUARD_MAX_REPEATS, empty_result
@@ -44,6 +45,30 @@ def _changes(observation, name, kind):
         elif change.get("actor") != "incident-commander":
             current[key] = change
     return list(current.values())
+
+
+def _worker_change_time(profile, observation):
+    """Keep every worker's post-change progress when refreshing an aged queue."""
+    timestamps = []
+    aged_changed_queue = False
+    now = time()
+    for comp in profile.get("components", []):
+        if comp.get("kind") != "worker" or "revert_config" not in comp.get("actions", []):
+            continue
+        extra = observation.get("components", {}).get(comp["name"], {}).get("extra") or {}
+        changes = _changes(observation, comp["name"], "config")
+        if (changes and _number(extra.get("queue_depth")) > 0
+                and _number(extra.get("oldest_pending_s")) >= 3):
+            aged_changed_queue = True
+        # One observe window applies to every component. A second worker's
+        # young queue can age during the probe, so retain its progress too.
+        for change in changes:
+            changed_at = change.get("t")
+            if (not isinstance(changed_at, (int, float)) or isinstance(changed_at, bool)
+                    or not isfinite(changed_at) or not 0 < changed_at <= now):
+                return None  # Unknown timing cannot justify discarding history.
+            timestamps.append(changed_at)
+    return min(timestamps) if aged_changed_queue and timestamps else None
 
 
 def _upstream_bad(component, observation):
@@ -221,13 +246,13 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
             raise _BudgetReached
         sleep(max(0.0, seconds))
 
-    def observe(*, since=None):
+    def observe(*, since_change=None):
         # Old downstream errors can outlive a repair in a rolling window.
         # Judge the next rule using only traffic since the action returned.
-        if last_action_end is not None:
-            since = last_action_end if since is None else max(since, last_action_end)
-        fresh_window = window_s if since is None else min(
-            window_s, max(min_window_s, monotonic() - since))
+        fresh_window = window_s if last_action_end is None else min(
+            window_s, max(min_window_s, monotonic() - last_action_end))
+        if since_change is not None:
+            fresh_window = min(fresh_window, max(min_window_s, time() - since_change))
         return call("observe", window_s=fresh_window)
 
     def diagnose(proposal):
@@ -264,14 +289,13 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None,
         window_s = max(10.0, min_window_s)
         while True:
             observation = observe()
-            probe_started = monotonic()
             probe = call("probe")
             candidates = _rules(profile, observation)
             if not candidates and probe.get("ok") is False:
                 # A slow failed probe can expose a queue that was young or
-                # empty in the earlier snapshot. Check the probe interval once:
-                # older healthy completions must not hide a stopped worker.
-                observation = observe(since=probe_started)
+                # empty in the earlier snapshot. Exclude pre-change completions
+                # for an aged queue, but retain progress after its setting changed.
+                observation = observe(since_change=_worker_change_time(profile, observation))
                 candidates = _rules(profile, observation)
             if mode == "advise":
                 for order, proposal in enumerate(candidates, 1):

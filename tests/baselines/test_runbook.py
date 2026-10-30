@@ -469,8 +469,10 @@ def test_failed_probe_refreshes_queue_before_escalation(clock):
 
 
 @pytest.mark.parametrize("min_window", [2, 6])
-@pytest.mark.parametrize("stopped", [True, False])
-def test_failed_probe_excludes_old_worker_completions(clock, min_window, stopped):
+@pytest.mark.parametrize("completion", [0.5, 4.0, None], ids=["stopped", "intermittent", "steady"])
+def test_failed_probe_keeps_progress_after_worker_change(clock, min_window, completion):
+    stopped = completion == 0.5
+
     class RecentWorkerChange(QueueDuringProbe):
         def __init__(self):
             super().__init__(clock)
@@ -482,11 +484,12 @@ def test_failed_probe_excludes_old_worker_completions(clock, min_window, stopped
             observation = super().observe(window_s)
             self.observations.append((clock.monotonic(), window_s))
             if not self.fixed:
-                # Work finished just before the setting changed. A ten-second
-                # average still includes it, even though the queue is now stuck.
-                old_completion_visible = clock.monotonic() - window_s < -0.5
+                # The setting changed at one second. Retain completions after
+                # that change even when none fell inside the failed probe.
+                completion_visible = completion is None or clock.monotonic() - window_s < completion
                 observation["components"]["consumer"]["extra"]["processed_per_s"] = (
-                    2.0 if old_completion_visible or not stopped else 0.0)
+                    2.0 if completion_visible else 0.0)
+                observation["changes"][0]["t"] = clock.time() - clock.monotonic() + 1.0
                 if not stopped:
                     observation["changes"][0]["detail"]["to"] = 60
             return observation
@@ -499,8 +502,91 @@ def test_failed_probe_excludes_old_worker_completions(clock, min_window, stopped
     assert result["outcome"] == ("recovered" if stopped else "escalated")
     assert adapter.taken == ([adapter.expected] if stopped else [])
     assert not any(action["refused"] for action in result["actions"])
-    assert adapter.observations[:2] == [(5.0, 10.0), (8.5, max(3.5, min_window))]
+    assert adapter.observations[:2] == [(5.0, 10.0), (8.5, 7.5)]
     assert all(window >= min_window for _, window in adapter.observations)
+
+
+@pytest.mark.parametrize("change_times,refresh_window", [
+    ([1.0, 4.5], 7.5),  # Progress between two changes must remain visible.
+    ([-20.0], 10.0),    # An old change does not extend the normal window.
+    ([None], 10.0),
+    (["missing"], 10.0),
+    ([float("nan")], 10.0),
+    ([float("inf")], 10.0),
+    ([100.0], 10.0),    # A future timestamp cannot justify a narrow window.
+])
+def test_worker_refresh_keeps_history_when_change_time_is_uncertain(clock, change_times, refresh_window):
+    class IntermittentWorker(FakeAdapter):
+        def __init__(self):
+            super().__init__("unrecognised")
+            self.windows = []
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            self.windows.append(window_s)
+            observation["components"]["consumer"]["extra"] = {
+                "queue_depth": 2, "oldest_pending_s": 4,
+                "processed_per_s": 1.0 if clock.monotonic() - window_s < 4.0 else 0.0}
+            for index, changed_at in enumerate(change_times):
+                change = {"component": "consumer", "kind": "config",
+                          "detail": {"key": f"setting_{index}", "from": 50, "to": 60}}
+                if changed_at != "missing":
+                    change["t"] = (clock.time() - clock.monotonic() + changed_at
+                                   if isinstance(changed_at, (int, float)) else changed_at)
+                observation["changes"].append(change)
+            return observation
+
+        def probe(self, journey=None):
+            clock.sleep(3.5)
+            return {"ok": False, "steps": [{"component": "consumer", "ok": False}]}
+
+    clock.sleep(5)
+    adapter = IntermittentWorker()
+
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "escalated"
+    assert adapter.taken == result["actions"] == []
+    assert adapter.windows == [10.0, refresh_window]
+
+
+def test_worker_refresh_keeps_other_workers_post_change_progress(clock):
+    class TwoQueues(FakeAdapter):
+        def __init__(self):
+            super().__init__("unrecognised")
+
+        def describe(self):
+            profile = super().describe()
+            profile["components"].append({"name": "other_consumer", "kind": "worker",
+                "depends_on": [], "actions": ["revert_config"]})
+            return profile
+
+        def observe(self, window_s=10):
+            observation = super().observe(window_s)
+            for name, changed_at, queued_at, value in (
+                    ("consumer", 0.1, 4.0, 60), ("other_consumer", 1.0, 1.0, 0)):
+                observation["components"][name]["extra"] = {
+                    "queue_depth": 2, "oldest_pending_s": clock.monotonic() - queued_at,
+                    "processed_per_s": 1.0 if clock.monotonic() - window_s < 0.5 else 0.0}
+                observation["changes"].append({"component": name, "kind": "config",
+                    "t": clock.time() - clock.monotonic() + changed_at,
+                    "detail": {"key": "batch_count", "from": 50, "to": value}})
+            return observation
+
+        def probe(self, journey=None):
+            clock.sleep(3.5)
+            return {"ok": False, "steps": []}
+
+        def act(self, action, target, params=None):
+            raise AssertionError("The global window must retain the other worker's progress.")
+
+    clock.sleep(5)
+    adapter = TwoQueues()
+
+    result = runbook.run_incident(adapter)
+
+    assert result["outcome"] == "escalated"
+    assert result["actions"] == []
 
 
 @pytest.mark.parametrize("limits", [{"max_steps": 3}, {"budget_s": 3}])

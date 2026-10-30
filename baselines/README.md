@@ -32,11 +32,13 @@ Recovery requires three consecutive passing probes spanning at least ten
 seconds, with no remaining matching rule. A healthy survey returns `no_incident`.
 If a probe fails and the earlier observations match no rule, the runbook takes
 one fresh observation before escalating. A queue may have stalled while that
-probe waited. The fresh window covers the probe interval, bounded by the usual
-window and the adapter's minimum, so earlier healthy completions do not hide a
-worker that has stopped processing. A queue still making progress does not
-trigger a setting reversal just because its setting changed. This extra read
-uses the same step and time budgets.
+probe waited. For an aged worker queue with a setting change, the fresh window
+excludes completions before that change. It retains progress after the earliest
+unresolved worker setting change, even if no work finished during the probe.
+The usual window and the adapter's minimum still bound the read; unknown change
+times retain the usual window. A queue still making progress does not trigger
+a setting reversal just because its setting changed. This extra read uses the
+same step and time budgets.
 An unresolved failed journey goes to a human with a short SBAR. Advise mode
 returns the proposed actions without calling `act`; confirm mode honours the
 confirmation decision. Time and step limits still return an SBAR.
