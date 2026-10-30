@@ -49,7 +49,7 @@ Each turn, choose exactly one step:
 - act: one action (set action, target and params). Only the actions listed for a component can be sent. Params: failover needs "to"; quarantine needs "item"; revert_config may name "key"; otherwise null.
 - escalate: hand a fault no allowed action fixes to a person (target = the component, note = what they must do).
 - done: you believe the system is back. List every root cause you found in root_causes. A sustained check then runs; if it fails you are told and carry on.
-Several faults can be present at once. A change made shortly before a component's symptoms is strong evidence. Never act on a healthy component. Keep thought to one or two sentences."""
+Several faults can be present at once. A change made shortly before a component's symptoms is strong evidence. {prompts.HIDDEN_FAULTS} Never act on a healthy component. Keep thought to one or two sentences."""
 
 
 def _escalation(reply, incident):
@@ -71,7 +71,7 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None, log=None, 
                  audit_path=None, **_):
     incident = Incident(adapter, "react", budget_s=budget_s, max_steps=max_steps, model=model, log=log, mode=mode,
                         confirm=confirm, seed=seed, audit_path=audit_path)
-    escalations, summary = [], ""
+    escalations, handoffs, summary = [], [], ""
     try:
         profile = incident.describe()
         system = system_prompt(profile)
@@ -116,6 +116,8 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None, log=None, 
                 ok, findings = verify.sustained(incident, incident.result["actions"], ignore_components=ignore,
                                                 keep_s=HANDOVER_KEEP_S)
                 if ok:
+                    sbar.settle_urgency(escalations, incident.result["actions"], findings)
+                    handoffs = sbar.damage_handoffs(verify.damage(findings, ignore), incident.describe())
                     incident.declare("escalated" if any(e["urgency"] == "now" for e in escalations) else "recovered")
                     break
                 if escalations and not [f for f in abcde_survey.faults(findings) if f.get("component") not in ignore]:
@@ -135,9 +137,10 @@ def run_incident(adapter, *, budget_s=90.0, max_steps=40, model=None, log=None, 
     finally:
         if not incident.result["t_declared"]:
             incident.declare(incident.result["outcome"])
-        incident.result["escalation"] = sbar.merge_escalations(escalations)
-        if incident.result["escalation"] and incident.result["outcome"] in ("gave_up", "budget_exhausted"):
+        if escalations and incident.result["outcome"] in ("gave_up", "budget_exhausted"):
             incident.result["outcome"] = "escalated"
+        incident.result["escalation"] = sbar.merge_escalations(
+            escalations + handoffs + sbar.quarantine_handoffs(incident.result, incident.profile or {}))
         try:
             sbar.write(incident, summary)
         except OutOfTime:
