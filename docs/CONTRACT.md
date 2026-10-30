@@ -345,7 +345,7 @@ class Spec:
     def snapshot(self, sup) -> dict              # ground truth for the checker
 ```
 
-Releases live in `targets/<system>/releases/<image>/v<release>.py`, with the dots of the release replaced by underscores (1.3 is `v1_3.py`, 2.0.1 is `v2_0_1.py`), as `class Release(ServiceBase)`. A copy owns ports `port_base`+0 to +9; +9 is the control plane. The bank uses offsets 0 to 7, and the `extra_service` component takes 8 (section 8). `docs/ADDING-A-SYSTEM.md` (Claude, after `freeze-1`, with the dispatch system) walks through the hooks, release modules, the four per-system files, a 5-component template and a checklist for an adapter to an existing system.
+Releases live in `targets/<system>/releases/<image>/v<release>.py`, with the dots of the release replaced by underscores (1.3 is `v1_3.py`, 2.0.1 is `v2_0_1.py`), as `class Release(ServiceBase)`. A copy owns ports `port_base`+0 to +9; +9 is the control plane. The bank uses offsets 0 to 7, and the `extra_service` component takes 8 (section 8). `docs/ADDING-A-SYSTEM.md` (Claude) walks through the hooks, release modules, the four per-system files, a 5-component template and a checklist for an adapter to an existing system. Dispatch, built after `freeze-1`, follows it.
 
 ## 7. Fault plugins
 
