@@ -46,11 +46,13 @@ def slow(now_ms, base_ms):
     return now_ms > max(P95_FACTOR * base_ms, base_ms + P95_SLACK_MS)
 
 
-def component_signals(name, entry, base, component, baselines, entry_point=False):
+def component_signals(name, entry, base, component, baselines, entry_point=False, acted_ago=None):
     """[(letter, severity, text)] for one component. severity is "fault" or "info".
 
     entry_point: users reach the system here (a journey's entry). Lost traffic is a
     fault only there; further in, less traffic usually means its callers are failing.
+    acted_ago: seconds since the incident commander last acted on this component, if
+    it has. Exits from before that action are the history the action ended.
     """
     found = []
     base = base or {}
@@ -76,9 +78,14 @@ def component_signals(name, entry, base, component, baselines, entry_point=False
     exits = _num(extra.get("exits_15m"))
     if exits:
         ago = _num(extra.get("last_exit_s_ago"))
-        text = f"process exited {exits:.0f} time(s) in 15 min, last {ago:.0f} s ago (exit code {extra.get('last_exit_code')})"
-        # Up again after one exit (restarted, say) is context; exiting again and again is a fault.
-        flapping = exits >= FLAPPING_EXITS and ago is not None and ago < RECENT_EXIT_S
+        text = (f"process exited {exits:.0f} time(s) in 15 min" + (f", last {ago:.0f} s ago" if ago is not None else "")
+                + f" (exit code {extra.get('last_exit_code')})")
+        # Up again after one exit (restarted, say) is context; exiting again and again is a fault, unless every
+        # exit came before the action taken on it: that is the history the action ended.
+        before_action = acted_ago is not None and ago is not None and ago > acted_ago
+        if before_action:
+            text += f"; none since the action taken on it {acted_ago:.0f} s ago"
+        flapping = exits >= FLAPPING_EXITS and ago is not None and ago < RECENT_EXIT_S and not before_action
         found.append(("C", "fault" if entry.get("up") is False or flapping else "info", text))
 
     # A (or D for systems run by others): requests failing or refused, traffic lost.
@@ -158,9 +165,13 @@ def journey_down(probe):
     return False
 
 
-def survey(profile, obs, probe, *, now=None, change_horizon_s=900.0):
-    """Run the five checks over every component. Returns {"findings", "coverage", "journey_down"}."""
+def survey(profile, obs, probe, *, now=None, change_horizon_s=900.0, acted_ago=None):
+    """Run the five checks over every component. Returns {"findings", "coverage", "journey_down"}.
+
+    acted_ago: {component: seconds since the incident commander last acted on it successfully}.
+    """
     now = now or obs.get("t") or time.time()
+    acted_ago = acted_ago or {}
     components = {c["name"]: c for c in profile["components"]}
     baselines = obs.get("baseline") or {}
     entry_points = {j.get("entry") for j in profile.get("journeys") or [] if j.get("entry")}
@@ -174,7 +185,8 @@ def survey(profile, obs, probe, *, now=None, change_horizon_s=900.0):
             raw.append(("C", "fault", name, "missing from observe()"))
             continue
         for letter, severity, text in component_signals(name, entry, baselines.get(name), comp, baselines,
-                                                        entry_point=name in entry_points):
+                                                        entry_point=name in entry_points,
+                                                        acted_ago=acted_ago.get(name)):
             raw.append((letter, severity, name, text))
     for letter, severity, step, text in probe_signals(probe):
         raw.append((letter, severity, step if step in components else None, text))

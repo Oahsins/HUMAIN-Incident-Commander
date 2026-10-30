@@ -8,7 +8,7 @@ through the safety wrapper in ic/guard.py.
 import time
 
 from ic import llm
-from ic.contract import empty_result
+from ic.contract import MODES, empty_result
 from ic.guard import Guard, StepLimit
 
 AGENT_ACTOR = "incident-commander"
@@ -78,6 +78,10 @@ class Incident:
     # ----- the adapter, through the guard -----
 
     def tool(self, phase, name, *args, **kwargs):
+        if name == "observe" and args:   # never a window shorter than the system can measure
+            floor = ((self.profile or {}).get("capabilities") or {}).get("min_window_s")
+            if isinstance(floor, (int, float)) and args[0] < floor:
+                args = (float(floor),) + args[1:]
         started = time.perf_counter()
         try:
             value = getattr(self.guard, name)(*args, **kwargs)
@@ -92,7 +96,18 @@ class Incident:
         if self.profile is None:
             self.profile = self.tool("survey", "describe")
             self.components = {c["name"]: c for c in self.profile.get("components", [])}
+            self._cap_mode((self.profile.get("capabilities") or {}))
         return self.profile
+
+    def _cap_mode(self, capabilities):
+        """The system's access cap (CONTRACT.md section 9): max_mode, and advise when it allows no act()."""
+        cap = "advise" if capabilities.get("act") is False else capabilities.get("max_mode")
+        if cap not in MODES or MODES.index(cap) <= MODES.index(self.mode):
+            return
+        self.guard.mode = self.mode = self.result["mode"] = cap
+        if cap == "confirm" and self.guard.confirm is None:
+            self.guard.confirm = lambda proposal: False     # nobody to ask: every action is declined, none sent
+        self.note("survey", "note", "mode", f"the system allows at most {cap} mode, so the incident runs in it")
 
     def allowed(self, action, target):
         return action in (self.components.get(target) or {}).get("actions", [])
