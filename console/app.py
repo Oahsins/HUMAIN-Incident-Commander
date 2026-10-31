@@ -3,8 +3,10 @@
     python console/app.py            # then open http://127.0.0.1:8088
 
 Pick a practice case and a mode, press Run, and watch the agent's steps arrive live.
-The console only drives run.py (up, inject, agent, check, down, or demo), the same
-commands as the README, so it adds no agent behaviour of its own. One run at a time.
+Or tick several cases and run them one after another with a scoreboard, or run the
+repository's own test suite. The console only drives run.py (up, inject, agent, check,
+down, or demo) and pytest, the same commands as the README, so it adds no agent
+behaviour of its own. One run at a time.
 
 A model key typed into the page goes only into that run's environment. It is never
 written to disk or logged. Without a key, only the two-fault demo runs (as a replay).
@@ -24,6 +26,8 @@ ROOT = os.path.dirname(HERE)
 CASES_FILE = os.path.join(ROOT, "scenarios", "dev", "dev.jsonl")
 KEY_VAR = "ANTHROPIC_API_KEY"
 MODES = ("auto", "confirm", "advise")
+SET_MODES = ("auto", "advise")   # confirm asks before every action, so it runs one case at a time
+KEY_VARS = (KEY_VAR, "IC_ANTHROPIC_API_KEY")
 ALERT_DELAY_S = 5      # the same delay as `run.py demo` between the faults and the alert
 CHECK_WAIT_S = 31      # the checker's 20 s window ends 10 s before the verdict, plus 1 s
 
@@ -53,8 +57,9 @@ def load_cases():
 class Job:
     """One run: a list of run.py commands, their output as lines, and a pending yes/no question."""
 
-    def __init__(self, steps, env, label, port_base):
+    def __init__(self, steps, env, label, port_base, meta=None):
         self.steps, self.env, self.label, self.port_base = steps, env, label, port_base
+        self.meta = meta or {"kind": "one"}
         self.lines = []
         self.state = "running"
         self.prompt = None
@@ -75,6 +80,10 @@ class Job:
                     break
                 if step[0] == "say":
                     self.emit(step[1], "note")
+                elif step[0] == "case":
+                    self.emit(step[1], "case")
+                elif step[0] == "py":
+                    self._command(step[1], script=False)
                 elif step[0] == "wait":
                     self.emit(step[2], "note")
                     end = time.time() + step[1]
@@ -100,10 +109,10 @@ class Job:
             self.prompt = None
             self.env = None   # drop the key as soon as the run ends
 
-    def _command(self, args, quiet=False):
-        cmd = [sys.executable, "-u", os.path.join(ROOT, "run.py")] + args
+    def _command(self, args, quiet=False, script=True):
+        cmd = [sys.executable, "-u"] + ([os.path.join(ROOT, "run.py")] if script else []) + args
         if not quiet:
-            self.emit("$ python run.py " + " ".join(args), "cmd")
+            self.emit("$ python " + ("run.py " if script else "") + " ".join(args), "cmd")
         self.proc = subprocess.Popen(cmd, cwd=ROOT, env=self.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT)
         buf = b""
@@ -158,6 +167,20 @@ def plan(case_id, mode, port_base):
     ]
 
 
+def plan_set(case_ids, mode, port_base):
+    """Several practice cases, one after another, each on a fresh bank."""
+    steps = []
+    for i, case_id in enumerate(case_ids):
+        steps.append(("case", f"{case_id} ({i + 1} of {len(case_ids)})"))
+        steps += plan(case_id, mode, port_base)
+    return steps
+
+
+def plan_selftest():
+    return [("say", "the repository's own test suite, as CI runs it (about a minute); no model calls"),
+            ("py", ["-m", "pytest", "-q", "-p", "no:cacheprovider"])]
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "IncidentConsole/1"
 
@@ -199,7 +222,7 @@ class Handler(BaseHTTPRequestHandler):
                 lines = job.lines[since:]
                 nxt = len(job.lines)
             return self._send(200, {"lines": lines, "state": job.state, "prompt": job.prompt, "next": nxt,
-                                    "label": job.label})
+                                    "label": job.label, "meta": job.meta})
         self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -212,26 +235,51 @@ class Handler(BaseHTTPRequestHandler):
             job = app["job"]
             if job and job.state == "running":
                 return self._send(409, {"error": "a run is already going; stop it first"})
-            case_id = str(body.get("case") or "demo")
+            env = dict(os.environ, COLUMNS="400", PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
+            env.pop("IC_RECORD", None)
+            if body.get("selftest"):
+                for var in KEY_VARS:      # the tests never need a model, so they never get a key
+                    env.pop(var, None)
+                app["job"] = Job(plan_selftest(), env, "self-test", app["port_base"], {"kind": "selftest"})
+                return self._send(200, {"ok": True})
             mode = body.get("mode") or "auto"
             if mode not in MODES:
                 return self._send(400, {"error": "unknown mode"})
-            if case_id != "demo" and case_id not in {c["id"] for c in app["cases"]}:
+            known = {c["id"] for c in app["cases"]}
+            many = body.get("cases")
+            if many is not None:
+                if not isinstance(many, list) or not many or len(set(map(str, many))) != len(many):
+                    return self._send(400, {"error": "pick one or more different practice cases"})
+                many = [str(c) for c in many]
+                if any(c not in known for c in many):
+                    return self._send(400, {"error": "unknown case"})
+                if mode not in SET_MODES:
+                    return self._send(400, {"error": "Confirm mode asks before every action, so it runs one "
+                                                     "case at a time. Pick auto or advise for a set."})
+            case_id = str(body.get("case") or "demo")
+            if many is None and case_id != "demo" and case_id not in known:
                 return self._send(400, {"error": "unknown case"})
-            env = dict(os.environ, COLUMNS="400", PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
-            env.pop("IC_RECORD", None)
             key = (body.get("key") or "").strip()
             if key:
                 env[KEY_VAR] = key
             if not env.get(KEY_VAR):
+                if many is not None:
+                    return self._send(400, {"error": "A set of practice cases needs a model key: every case "
+                                                     "after the demo calls the model."})
                 if case_id != "demo":
                     return self._send(400, {"error": "This case needs a model key. Paste one, or run the demo, "
                                                      "which replays a recorded run without a key."})
                 if mode == "advise":
                     return self._send(400, {"error": "Advise mode needs a model key: the recorded replay comes "
                                                      "from a run that acted, so its handover would not fit."})
+            if many is not None:
+                app["job"] = Job(plan_set(many, mode, app["port_base"]), env,
+                                 f"a set of {len(many)} cases, mode {mode}", app["port_base"],
+                                 {"kind": "set", "cases": many, "mode": mode})
+                return self._send(200, {"ok": True})
             label = ("the two-fault demo" if case_id == "demo" else case_id) + f", mode {mode}"
-            app["job"] = Job(plan(case_id, mode, app["port_base"]), env, label, app["port_base"])
+            app["job"] = Job(plan(case_id, mode, app["port_base"]), env, label, app["port_base"],
+                             {"kind": "one", "case": case_id, "mode": mode})
             return self._send(200, {"ok": True})
         if self.path == "/api/answer":
             job = app["job"]

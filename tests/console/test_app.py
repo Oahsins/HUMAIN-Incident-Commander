@@ -77,3 +77,58 @@ def test_job_runs_notes_and_waits():
     assert job.state == "done"
     assert [line["text"] for line in job.lines] == ["hello", "short wait"]
     assert job.env is None   # the key is dropped when the run ends
+
+
+def test_a_set_runs_each_case_on_a_fresh_bank():
+    steps = app.plan_set(["dev-03", "dev-10"], "auto", 27400)
+    markers = [step[1] for step in steps if step[0] == "case"]
+    assert markers == ["dev-03 (1 of 2)", "dev-10 (2 of 2)"]
+    commands = [step[1][0] for step in steps if step[0] in ("run", "quiet")]
+    assert commands == ["down", "up", "inject", "agent", "check", "down"] * 2
+
+
+def test_selftest_runs_pytest_only():
+    steps = app.plan_selftest()
+    assert [step for step in steps if step[0] == "py"] == [("py", ["-m", "pytest", "-q", "-p", "no:cacheprovider"])]
+    assert all(step[0] in ("say", "py") for step in steps)
+
+
+def test_refuses_sets_it_cannot_run(server, monkeypatch):
+    base, srv = server
+    assert _post(base + "/api/run", {"cases": ["dev-03"], "mode": "auto"})[0] == 400          # no key
+    monkeypatch.setenv(app.KEY_VAR, "test-placeholder")
+    assert _post(base + "/api/run", {"cases": ["dev-03"], "mode": "confirm"})[0] == 400       # one at a time
+    assert _post(base + "/api/run", {"cases": [], "mode": "auto"})[0] == 400
+    assert _post(base + "/api/run", {"cases": ["dev-03", "dev-03"], "mode": "auto"})[0] == 400
+    assert _post(base + "/api/run", {"cases": ["dev-03", "demo"], "mode": "auto"})[0] == 400
+    assert srv.app["job"] is None
+
+
+def test_selftest_never_gets_a_model_key(server, monkeypatch):
+    base, srv = server
+    monkeypatch.setenv(app.KEY_VAR, "test-placeholder")
+    monkeypatch.setattr(app, "plan_selftest", lambda: [("say", "stand-in for pytest")])
+    assert _post(base + "/api/run", {"selftest": True, "key": "test-placeholder"})[0] == 200
+    job = srv.app["job"]
+    assert job.meta == {"kind": "selftest"}
+    for _ in range(50):
+        if job.state != "running":
+            break
+        threading.Event().wait(0.05)
+    assert job.state == "done"
+
+
+def test_selftest_env_has_no_key(server, monkeypatch):
+    base, srv = server
+    seen = {}
+    monkeypatch.setenv(app.KEY_VAR, "test-placeholder")
+    monkeypatch.setenv("IC_ANTHROPIC_API_KEY", "test-placeholder")
+    real_job = app.Job
+
+    def spy(steps, env, label, port_base, meta=None):
+        seen.update(env)
+        return real_job([("say", "stand-in")], env, label, port_base, meta)
+
+    monkeypatch.setattr(app, "Job", spy)
+    assert _post(base + "/api/run", {"selftest": True})[0] == 200
+    assert app.KEY_VAR not in seen and "IC_ANTHROPIC_API_KEY" not in seen
