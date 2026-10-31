@@ -26,6 +26,10 @@ Codex commits carry Codex's name, so the history shows who wrote what. Every cha
 
 Needs Python 3.11 or later, on Windows or Linux.
 
+No install: [open it in GitHub Codespaces](https://codespaces.new/Oahsins/HUMAIN-Incident-Commander?quickstart=1) (a free GitHub account is enough). It installs the requirements and opens the incident console in your browser.
+
+**Incident console:** `python console/app.py`, then open http://127.0.0.1:8088. Pick one of the 32 practice incidents and a mode (auto, confirm or advise), press Run, and watch the frozen agent's survey, actions, rechecks, handover and the checker's verdict arrive live. It drives the same `run.py` commands as below. The two-fault demo runs without a key (as a replay); every other case needs an Anthropic key, typed into the page or set as `ANTHROPIC_API_KEY`. The key is passed only to that run and never saved.
+
 ```
 pip install -r requirements.txt -r requirements-eval.txt
 python run.py preflight      # laptop checks: Python, packages, model key, free ports, disk space
