@@ -805,19 +805,33 @@ def helper_process():
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def eventually(check, limit_s=10.0):
+    """True once check() holds, polled for up to limit_s. On Windows an ended process can stay listed under its
+    pid and start time for a moment, and for as long as a handle to it is open (a Popen holds one), so psutil can
+    still read it as running just after kill() and wait()."""
+    deadline = time.time() + limit_s
+    while not check():
+        if time.time() > deadline:
+            return False
+        time.sleep(0.05)
+    return True
+
+
 def test_a_registered_start_time_tells_a_helper_from_a_process_that_reused_its_pid():
     child = helper_process()
+    pid = child.pid
     try:
-        started = spec.process_started(child.pid)
+        started = spec.process_started(pid)
         assert isinstance(started, float) and abs(started - time.time()) < 60
-        assert spec.started_as(child.pid, started)
-        assert not spec.started_as(child.pid, started - 30)   # the pid now belongs to a later process
-        assert not spec.started_as(child.pid, started + 30)
+        assert spec.started_as(pid, started)
+        assert not spec.started_as(pid, started - 30)   # the pid now belongs to a later process
+        assert not spec.started_as(pid, started + 30)
     finally:
         child.kill()
         child.wait()
-    assert not spec.started_as(child.pid, started)            # gone
-    assert spec.process_started(child.pid) is None
+        del child   # closes the Popen's handle to the process (see eventually)
+    assert eventually(lambda: not spec.started_as(pid, started))   # gone
+    assert spec.process_started(pid) is None
     for bad in (None, "1", True, float("nan"), float("inf")):
         assert not spec.started_as(os.getpid(), bad)
 
@@ -843,7 +857,8 @@ def test_cleanup_ends_only_helpers_still_running_as_the_process_that_registered(
         for child in (helper, other):
             child.kill()
             child.wait()
-    assert spec.live_helpers(d) == []
+        del helper, other, child   # closes the Popens' handles to the processes (see eventually)
+    assert eventually(lambda: spec.live_helpers(d) == [])
 
 
 # ----- the incident archive job -----
