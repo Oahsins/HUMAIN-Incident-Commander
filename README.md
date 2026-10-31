@@ -11,7 +11,7 @@ It keeps a failing multi-service system running using the method emergency medic
 
 The agent is portable: it needs only a 5-function adapter (describe, observe, logs, probe, act). So far it has been tested on two systems, both built on the same kit. A test system also supplies a control layer for fault injection and a checker. The main test system is a small bank around a double-entry ledger. The transfer test runs the frozen agent on dispatch, an emergency-dispatch system built after the freeze ([docs/DISPATCH.md](docs/DISPATCH.md)).
 
-> **Status (31 Oct 2026):** built, frozen and measured. The agent, the bank, the runbook and the scorer were frozen at the `freeze-1` tag on 30 Oct; their hashes are in the [decision log](DECISIONS.md). The final run used the pre-registered core40 cut of the sealed exam, and the transfer run used 20 sealed dispatch incidents. Its AI arms (`abcde`, `react`, `naive_verify`, `fifo`), and `abcde` in the four-faults and model-swap runs, first ran without the model key, so none of their model calls reached the provider. As CONTRACT section 11 requires for a model-provider failure, they are re-run on the same cases and seeds from the same frozen code; the decision was logged before any re-run result existed ([decision log](DECISIONS.md), 31 Oct). The runbook, `noop` and `oracle` make no model calls and keep their first runs. Cells marked "running" wait for a re-run that had not finished when this README was last updated (15:54 Riyadh, 31 Oct). Work started on 29 Oct, before the event, and is disclosed here. The commit history shows the dates.
+> **Status (31 Oct 2026):** built, frozen and measured. The agent, the bank, the runbook and the scorer were frozen at the `freeze-1` tag on 30 Oct; their hashes are in the [decision log](DECISIONS.md). The final run used the pre-registered core40 cut of the sealed exam, and the transfer run used 20 sealed dispatch incidents. Its AI arms (`abcde`, `react`, `naive_verify`, `fifo`), and `abcde` in the four-faults and model-swap runs, first ran without the model key, so none of their model calls reached the provider. As CONTRACT section 11 requires for a model-provider failure, they are re-run on the same cases and seeds from the same frozen code; the decision was logged before any re-run result existed ([decision log](DECISIONS.md), 31 Oct). The runbook, `noop` and `oracle` make no model calls and keep their first runs. Cells marked "running" wait for a re-run that had not finished when this README was last updated (16:25 Riyadh, 31 Oct). Work started on 29 Oct, before the event, and is disclosed here. The commit history shows the dates.
 
 ## How it was built
 
@@ -89,9 +89,9 @@ Two more pre-registered conditions, a changed log format and an extra service, w
 
 | Condition | Arm | Success | Paired change vs the main run |
 |---|---|---|---|
-| Four faults at once | `abcde` | running | running |
-| Four faults at once | `runbook` | running | running |
-| Model swap (Claude Haiku 5.5, not tuned on) | `abcde` | running | running |
+| Four faults at once | `abcde` | 19 / 20 | -5 pts [-15 pts to +0 pts] |
+| Four faults at once | `runbook` | 9 / 20 | +0 pts [+0 pts to +0 pts] |
+| Model swap (Claude Haiku 5.5, not tuned on) | `abcde` | 15 / 20 | -25 pts [-45 pts to -5 pts] |
 
 Each change is in points, paired case by case with the main run: a negative change is a drop under the condition.
 
@@ -116,6 +116,7 @@ The frozen agent and the frozen runbook ran on 20 sealed dispatch incidents, whi
 - **Some scores need context.**
   - Time to mitigate follows the service target only, so a silent fault can score 0 s while the checker is red.
   - `react` fails a case on any off-list attempt that reaches the guard. `abcde`'s code drops off-list proposals before the guard, so that rule can fail `react` but never `abcde`; the exploratory table shows `react` both ways.
+- **A smaller model does worse.** In the model-swap condition, on a smaller model it was not tuned on, the agent's success fell by 25 points (95% CI -45 to -5), and 2 of its 15 all-clear claims were false, against none of 35 on the main exam.
 - **More tuning for the agent.** Beyond the 20 practice cases both tuned on, the agent was also tuned on harder incidents built from practice fault types, one with four faults at once ([decision log](DECISIONS.md), 30 Oct).
 - **What the checker cannot see.** A payment lost silently before the scored window changes neither the verdict nor the handover score ([decision log](DECISIONS.md), 30 Oct).
 - **"No incident" can skip the checks.** If the model dismisses every finding and none shows customers affected, the agent declares "no incident" without the two confirming checks (`ic/agent/abcde.py`).
