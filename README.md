@@ -24,6 +24,8 @@ Codex commits carry Codex's name, so the history shows who wrote what. Every cha
 
 ## Quick start
 
+**Watch it first:** the [incident console page](https://oahsins.github.io/HUMAIN-Incident-Commander/) replays one recorded run step by step in your browser, with nothing to install, and lists every practice case with its command.
+
 Needs Python 3.11 or later, on Windows or Linux.
 
 No install: [open it in GitHub Codespaces](https://codespaces.new/Oahsins/HUMAIN-Incident-Commander?quickstart=1) (a free GitHub account is enough). It installs the requirements and opens the incident console in your browser.
