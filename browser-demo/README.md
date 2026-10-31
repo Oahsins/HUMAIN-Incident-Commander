@@ -15,9 +15,18 @@ the held-out results do that. Label any clip from it "demo, not evidence".
 python browser-demo/run_demo.py --port-base 27800
 ```
 
-It needs the repository's requirements, Node, and the Playwright and Chromium already in the
-container (`PLAYWRIGHT_NODE_MODULE` defaults to `/opt/node-tools/node_modules/playwright`). It
-sets no model key: the agent's model answers come from the keyless replay
+It needs the repository's requirements, Node 18 or later, and Playwright with its Chromium. The
+project's cloud container already has them. Elsewhere, install them once in this folder:
+
+```
+cd browser-demo
+npm install --no-save playwright
+npx playwright install chromium
+```
+
+`run_demo.py` looks for Playwright in `PLAYWRIGHT_NODE_MODULE` first, then `browser-demo/node_modules`,
+then the container's copy. ffmpeg is optional: without it you get the WebM video, but no MP4 and no
+highlight cut. The demo sets no model key: the agent's model answers come from the keyless replay
 `replays/demo-frozen.jsonl`. Everything lands in `browser-demo/out/<time>/`, which git ignores:
 
 | File | What it is |
@@ -51,6 +60,7 @@ sets no model key: the agent's model answers come from the keyless replay
   terminal log. Its post-incident payments fall inside the checker's scored window; its "already
   paid" retry happens before the handover, so the window holds only fresh payments.
 - `run_demo.py` runs everything, `cut.py` cuts the highlight clip and `report.py` writes the report.
+- `fonts/` holds IBM Plex, embedded in the report, under the SIL Open Font License (`fonts/OFL.txt`).
 
 ## What it does not touch
 

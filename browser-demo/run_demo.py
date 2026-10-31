@@ -23,7 +23,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 REPLAY = "replay:replays/demo-frozen.jsonl"
-PLAYWRIGHT = os.environ.get("PLAYWRIGHT_NODE_MODULE", "/opt/node-tools/node_modules/playwright")
+CONTAINER_PLAYWRIGHT = "/opt/node-tools/node_modules/playwright"   # preinstalled in the project's cloud container
 
 
 def git(*argv):
@@ -31,6 +31,16 @@ def git(*argv):
         return subprocess.run(["git", *argv], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
+
+
+def playwright_module():
+    """Playwright for node: $PLAYWRIGHT_NODE_MODULE, else a copy installed in this folder, else the cloud
+    container's. None leaves it to node's own lookup of require("playwright")."""
+    for path in (os.environ.get("PLAYWRIGHT_NODE_MODULE"), os.path.join(HERE, "node_modules", "playwright"),
+                 CONTAINER_PLAYWRIGHT):
+        if path and os.path.isdir(path):
+            return path
+    return None
 
 
 def hashes():
@@ -47,7 +57,11 @@ def main():
     out = os.path.abspath(args.out or os.path.join(HERE, "out", time.strftime("%Y%m%d-%H%M%S")))
     os.makedirs(out, exist_ok=True)
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "IC_RECORD")}
-    env.update(PYTHONUNBUFFERED="1", COLUMNS="400", PLAYWRIGHT_NODE_MODULE=PLAYWRIGHT)
+    env.update(PYTHONUNBUFFERED="1", COLUMNS="400")
+    env.pop("PLAYWRIGHT_NODE_MODULE", None)
+    module = playwright_module()
+    if module:
+        env["PLAYWRIGHT_NODE_MODULE"] = module
 
     meta = {"label": "demo, not evidence", "port_base": args.port_base, "model": args.model,
             "commit": git("rev-parse", "HEAD"), "describe": git("describe", "--tags", "--always", "--dirty"),

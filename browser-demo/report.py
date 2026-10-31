@@ -906,8 +906,11 @@ def main():
     if not args.no_stills:
         stills = os.path.join(run["dir"], "stills")
         os.makedirs(stills, exist_ok=True)
-        env = {**os.environ, "PLAYWRIGHT_NODE_MODULE": os.environ.get("PLAYWRIGHT_NODE_MODULE",
-                                                                       "/opt/node-tools/node_modules/playwright")}
+        from run_demo import playwright_module   # the same lookup as the run
+        env = {k: v for k, v in os.environ.items() if k != "PLAYWRIGHT_NODE_MODULE"}
+        module = playwright_module()
+        if module:
+            env["PLAYWRIGHT_NODE_MODULE"] = module
         subprocess.run(["node", "-e", STILLS_JS, path, stills], env=env, check=False)
 
 
