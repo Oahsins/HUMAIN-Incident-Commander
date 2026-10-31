@@ -1,6 +1,11 @@
-# HUMAIN Incident Commander
+# ABCDE Incident Commander
 
 An AI incident commander for HUMAIN's Future AI Builders hackathon (Challenge 1: an AI agent that recovers a failing system).
+
+**In 60 seconds**
+- **What it is:** an agent that surveys every component of a failing system in a fixed order before fixing anything. It fixes upstream faults first, then the most harmful, using six bounded actions. It hands over with an SBAR, or escalates to a person.
+- **Result:** [FILL: the headline sentence from fill-values.md, the same one used on the slides and the project page]
+- **See it:** [the 3-minute video]([FILL: video link]) · [the slides]([FILL: slides link]) · or run `python run.py demo`, which needs no API key
 
 It keeps a failing multi-service system running using the method emergency medicine uses for several injuries at once. It surveys every component in a fixed ABCDE order (Access, Bottlenecks, Capacity, Dependencies, Events) before fixing anything, triages the faults by customer impact against time to fix, remediates with six bounded actions only (four can be undone, two lose no committed data), verifies recovery over a sustained window, and hands over with an SBAR, or escalates to a person when no safe action fixes the fault. A safety wrapper refuses any action outside the allowlist, and an independent checker decides whether the system really recovered, from evidence the agent never sees.
 
@@ -107,6 +112,6 @@ To check that a run used the frozen code, `python run.py hash` prints the freeze
 - [Build plan](docs/BUILD-PLAN.md): timetable, roles, go/no-go checks, cut lines, test design
 - [Interface contract](docs/CONTRACT.md): how the agent, the test systems, the faults, the checker and the evaluation fit together
 - [Dispatch](docs/DISPATCH.md): the transfer system, its facts and its fault channels
-- [Codex handoff](docs/CODEX-HANDOFF.md): the tasks Codex owns on the Windows laptop
 - [Adding a system](docs/ADDING-A-SYSTEM.md): how to connect the agent to a system that already runs, or build a new test system on `ic/kit`
 - [Decision log](DECISIONS.md)
+- [Codex handoff](docs/CODEX-HANDOFF.md): the tasks Codex owns on the Windows laptop
