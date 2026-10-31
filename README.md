@@ -12,6 +12,8 @@ The agent is system-agnostic: it needs only a 5-function adapter (describe, obse
 
 Needs Python 3.11 or later, on Windows or Linux.
 
+No install: [open it in GitHub Codespaces](https://codespaces.new/Oahsins/HUMAIN-Incident-Commander?quickstart=1) (a free GitHub account is enough). The browser terminal opens with the requirements installed, so `python run.py demo` works straight away.
+
 ```
 pip install -r requirements.txt
 python run.py preflight      # laptop checks (Codex adds them): Python, packages, model key, free ports, disk space
