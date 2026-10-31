@@ -37,7 +37,15 @@ Every table is in [Full results](#full-results) below.
 
 You need Python 3.11 or later. I've tested it on Windows and Linux. If you'd rather not install anything, the Codespaces link above sets everything up and opens the incident console in your browser.
 
-First make a virtual environment and install the requirements. On Linux or macOS:
+First get the code. These three lines work in any terminal, PowerShell included. Start from your home folder, because PowerShell often opens in `C:\Windows\system32`, where you can't save anything. You need git; without it, download the ZIP from the green Code button and open a terminal in that folder instead.
+
+```
+cd ~
+git clone https://github.com/Oahsins/HUMAIN-Incident-Commander.git
+cd HUMAIN-Incident-Commander
+```
+
+Then make a virtual environment and install the requirements. On Linux or macOS:
 
 ```
 python3 -m venv .venv
