@@ -5,13 +5,13 @@ An AI incident commander for HUMAIN's Future AI Builders hackathon (Challenge 1:
 **In 60 seconds**
 - **What it is:** an agent that surveys every component of a failing system in a fixed order before fixing anything. It fixes upstream faults first, then the most harmful, using six bounded actions. It hands over with an SBAR, or escalates to a person.
 - **Result:** On 40 sealed incidents it had never seen, the agent succeeded on 39 of 40 and a scripted runbook on 19 of 40 (paired test, p < 0.001). On the blind fault type, which neither had practised: 5 of 5 against 2 of 5.
-- **See it:** the [incident console](https://claude.ai/artifact/EJWMAk7KRGrQ7jJGhbMpE5) replays a recorded run of the agent in your browser. [GitHub Codespaces](https://codespaces.new/Oahsins/HUMAIN-Incident-Commander?quickstart=1) opens a ready copy of this repository with a Run-button console. Or run `python run.py demo` on your own machine; it needs no API key. The 3-minute video and the slides are linked here at submission.
+- **See it:** the [incident console page](https://oahsins.github.io/HUMAIN-Incident-Commander/) replays a recorded run of the agent in your browser. [GitHub Codespaces](https://codespaces.new/Oahsins/HUMAIN-Incident-Commander?quickstart=1) opens a ready copy of this repository with a Run-button console. Or run `python run.py demo` on your own machine; it needs no API key. The 3-minute video and the slides are linked here at submission.
 
 It keeps a failing multi-service system running using the method emergency medicine uses for several injuries at once. It surveys every component in a fixed ABCDE order (Access, Bottlenecks, Capacity, Dependencies, Events) before fixing anything, triages the faults by customer impact against time to fix, remediates with six bounded actions only (four can be undone, two lose no committed data), verifies recovery over a sustained window, and hands over with an SBAR, or escalates to a person when no safe action fixes the fault. A safety wrapper refuses any action outside the allowlist, and an independent checker decides whether the system really recovered, mainly from the customers' own log, which the agent never sees, and a full read of the ledger.
 
 The agent is portable: it needs only a 5-function adapter (describe, observe, logs, probe, act). So far it has been tested on two systems, both built on the same kit. A test system also supplies a control layer for fault injection and a checker. The main test system is a small bank around a double-entry ledger. The transfer test runs the frozen agent on dispatch, an emergency-dispatch system built after the freeze ([docs/DISPATCH.md](docs/DISPATCH.md)).
 
-> **Status (31 Oct 2026):** built, frozen and measured. The agent, the bank, the runbook and the scorer were frozen at the `freeze-1` tag on 30 Oct; their hashes are in the [decision log](DECISIONS.md). The final run used the pre-registered core40 cut of the sealed exam, and the transfer run used 20 sealed dispatch incidents. Its AI arms (`abcde`, `react`, `naive_verify`, `fifo`), and `abcde` in the four-faults and model-swap runs, first ran without the model key, so none of their model calls reached the provider. As CONTRACT section 11 requires for a model-provider failure, they are re-run on the same cases and seeds from the same frozen code; the decision was logged before any re-run result existed ([decision log](DECISIONS.md), 31 Oct). The runbook, `noop` and `oracle` make no model calls and keep their first runs. Cells marked "running" wait for a re-run that had not finished when this README was last updated (16:25 Riyadh, 31 Oct). Work started on 29 Oct, before the event, and is disclosed here. The commit history shows the dates.
+> **Status (31 Oct 2026):** built, frozen and measured. The agent, the bank, the runbook and the scorer were frozen at the `freeze-1` tag on 30 Oct; their hashes are in the [decision log](DECISIONS.md). The final run used the pre-registered core40 cut of the sealed exam, and the transfer run used 20 sealed dispatch incidents. Its AI arms (`abcde`, `react`, `naive_verify`, `fifo`), and `abcde` in the four-faults and model-swap runs, first ran without the model key, so none of their model calls reached the provider. As CONTRACT section 11 requires for a model-provider failure, they are re-run on the same cases and seeds from the same frozen code; the decision was logged before any re-run result existed ([decision log](DECISIONS.md), 31 Oct). The runbook, `noop` and `oracle` make no model calls and keep their first runs. Cells marked "running" wait for a re-run that had not finished when this README was last updated (17:40 Riyadh, 31 Oct). Work started on 29 Oct, before the event, and is disclosed here. The commit history shows the dates.
 
 ## How it was built
 
@@ -62,8 +62,8 @@ The incidents were written by a separate Codex session and sealed 39 minutes bef
 |---|---|---|---|
 | `abcde` | The full agent | 39 / 40 | 87%–100% |
 | `runbook` | A scripted runbook, no AI | 19 / 40 | 33%–63% |
-| `react` | A free-form baseline, not a one-part ablation: same model, tools and guard; no fixed survey, ordering, coverage check or off-list filter | running | running |
-| `naive_verify` | The full agent, but "errors stopped" counts as recovered | running | running |
+| `react` | A free-form baseline, not a one-part ablation: same model, tools and guard; no fixed survey, ordering, coverage check or off-list filter | 23 / 40 | 42%–71% |
+| `naive_verify` | The full agent, but "errors stopped" counts as recovered | 33 / 40 | 68%–91% |
 | `fifo` | The full agent, fixing faults in the order found | running | running |
 | `noop` | Does nothing (validity check) | 4 / 40 | 4%–23% |
 | `oracle` | Applies the labelled fixes (validity check) | 36 / 40 | 77%–96% |
@@ -78,10 +78,10 @@ The incidents were written by a separate Codex session and sealed 39 minutes bef
 
 | Comparison | Endpoint | b | c | Difference [95% CI] | p (adjusted) |
 |---|---|---|---|---|---|
-| `abcde` vs `runbook`, cases with a named held-out or blind fault | Case success | running | running | running | running |
-| `abcde` vs `react` | Case success | running | running | running | running |
-| `abcde` vs `naive_verify` | False all-clear | running | running | running | running |
-| `abcde` vs `runbook` | User-impact seconds (Wilcoxon) | - | - | running | running |
+| `abcde` vs `runbook`, cases with a named held-out or blind fault | Case success | 20 | 0 | +71 pts [+54 pts to +86 pts] | <0.001 |
+| `abcde` vs `react` | Case success | 16 | 0 | +40 pts [+25 pts to +55 pts] | <0.001 |
+| `abcde` vs `naive_verify` | False all-clear | 0 | 0 | +0 pts [+0 pts to +0 pts] | 1.000 |
+| `abcde` vs `runbook` | User-impact seconds (Wilcoxon) | - | - | - | 0.197 |
 
 In the primary and secondary comparisons, b counts the cases only `abcde` succeeded on and c the cases only the other arm succeeded on, and each difference is `abcde` minus the other arm. False all-clear is the exception, because lower is better: there b counts the cases where only `abcde` gave a false all-clear, so a larger b or a positive difference counts against `abcde`. The Wilcoxon test gives no b, c or difference.
 
@@ -91,9 +91,9 @@ In the primary and secondary comparisons, b counts the cases only `abcde` succee
 
 | Cases | `abcde` | `runbook` | `react` |
 |---|---|---|---|
-| Practice fault types only | 4 / 4 | 4 / 4 | running |
-| A named held-out type | 25 / 26 | 5 / 26 | running |
-| The blind type | 5 / 5 | 2 / 5 | running |
+| Practice fault types only | 4 / 4 | 4 / 4 | 4 / 4 |
+| A named held-out type | 25 / 26 | 5 / 26 | 13 / 26 |
+| The blind type | 5 / 5 | 2 / 5 | 3 / 5 |
 
 ### Robustness: robust20, descriptive
 
@@ -119,7 +119,7 @@ The frozen agent and the frozen runbook ran on 20 sealed dispatch incidents, whi
 ### Exploratory, declared before the final run
 
 - **Omar's own unblinded review of 12 drawn `abcde` cases (exploratory):** pending; the 12 cases are redrawn from the re-run by the declared rule.
-- **Off-list proposals by arm, with a `react` sensitivity row:** running (it needs `react`'s re-run).
+- **Off-list proposals by arm, with a `react` sensitivity row:** pending; it is built from `react`'s re-run, which has finished.
 
 ## Limitations
 
