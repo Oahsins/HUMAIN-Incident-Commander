@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ABCDE Incident Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>[hidden]{display:none!important}
+
+/* Layout: an operations console. Sticky control bar, a status banner, then three working panes
+   (customer | incident commander | safety guard and rechecks), with the handover and checker below. */
+:root{
+  --bg:#eef2f5; --panel:#ffffff; --sunk:#f6f8fa; --ink:#14202b; --muted:#566673; --line:#d3dce3;
+  --accent:#0a6a86; --accent-soft:#e1f0f5;
+  --ok:#0f7a55; --ok-soft:#e2f4ec; --warn:#a85407; --warn-soft:#fbeedd; --crit:#b42318; --crit-soft:#fbe5e2;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1318; --panel:#131d24; --sunk:#0f181e; --ink:#e2e9ee; --muted:#8c9daa; --line:#25343e;
+  --accent:#53b9d6; --accent-soft:#12303b;
+  --ok:#41c795; --ok-soft:#10322a; --warn:#f0a24c; --warn-soft:#3a2810; --crit:#f2675c; --crit-soft:#3c1715; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1318; --panel:#131d24; --sunk:#0f181e; --ink:#e2e9ee; --muted:#8c9daa; --line:#25343e;
+  --accent:#53b9d6; --accent-soft:#12303b;
+  --ok:#41c795; --ok-soft:#10322a; --warn:#f0a24c; --warn-soft:#3a2810; --crit:#f2675c; --crit-soft:#3c1715; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0;letter-spacing:.01em}
+.eyebrow{font:500 11px/1.2 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+
+/* header */
+header.top{background:var(--panel);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding-block:14px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0}
+.brand h1{font-size:22px}
+.brand .sub{color:var(--muted);font-size:14px}
+nav.tabs{margin-left:auto;display:flex;gap:4px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:3px}
+nav.tabs a{padding:6px 14px;border-radius:6px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px}
+nav.tabs a[aria-current="page"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* control bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.bar .wrap{display:grid;grid-template-columns:auto 1fr auto;gap:10px 16px;align-items:center;padding-block:10px}
+.ctl{display:flex;gap:6px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:500;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.speed{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.speed button{border:0;background:transparent;padding:7px 9px;cursor:pointer;font:500 13px var(--f-mono);color:var(--muted)}
+.speed button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.track{position:relative;height:38px;min-width:0}
+.track input{position:absolute;inset:auto 0 0 0;width:100%;margin:0;accent-color:var(--accent)}
+.marks{position:absolute;inset:0 0 18px 0}
+.mark{position:absolute;top:0;transform:translateX(-50%);font:500 10px/1 var(--f-mono);color:var(--muted);cursor:pointer;background:none;border:0;padding:2px;white-space:nowrap}
+.mark::after{content:"";display:block;width:1px;height:8px;background:var(--line);margin:3px auto 0}
+.mark.on{color:var(--ink)}
+.clock{text-align:right;font:500 13px/1.3 var(--f-mono)}
+.clock b{font-size:17px;font-weight:500}
+.clock span{color:var(--muted);display:block}
+
+/* status banner */
+.status{margin-block:18px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 18px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--st,var(--muted));border-radius:8px;padding:14px 18px}
+.status .state{font:600 26px/1.1 var(--f-display);letter-spacing:.03em;color:var(--st,var(--ink));text-transform:uppercase}
+.status .caption{color:var(--ink);font-size:15px;min-width:0}
+.status .caption small{display:block;color:var(--muted);font-size:13px}
+
+/* panes */
+.panes{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr) minmax(0,1fr);gap:14px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px 16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.pane h2{font-size:17px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.pane h2 .eyebrow{font-size:10px}
+.empty{color:var(--muted);font-size:13px;font-style:italic}
+
+/* customer */
+.receipt{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--sunk)}
+.receipt .ttl{font-weight:600}
+.receipt .det{font:12px/1.4 var(--f-mono);color:var(--muted);word-break:break-word}
+.receipt[data-o="ok"]{border-color:var(--ok);background:var(--ok-soft)}
+.receipt[data-o="ok"] .ttl{color:var(--ok)}
+.receipt[data-o="rejected"]{border-color:var(--crit);background:var(--crit-soft)}
+.receipt[data-o="rejected"] .ttl{color:var(--crit)}
+ol.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+ol.feed li{display:grid;grid-template-columns:52px 1fr;gap:8px}
+ol.feed .t{font:12px/1.5 var(--f-mono);color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--muted)}
+.dot.ok{background:var(--ok)} .dot.rejected{background:var(--crit)}
+
+/* phases */
+.phases{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.ph{border:1px solid var(--line);border-radius:6px;padding:6px 6px 7px;text-align:center;font:600 12px/1.2 var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--sunk)}
+.ph small{display:block;font:400 10px/1.3 var(--f-mono);letter-spacing:0;text-transform:none;margin-top:2px}
+.ph.done{color:var(--ink);border-color:var(--accent)}
+.ph.now{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.abcde{display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.abcde b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:4px;border:1px solid var(--line);font:600 13px var(--f-mono);color:var(--muted)}
+.abcde.lit b{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:420px;overflow:auto}
+.steps li{display:grid;grid-template-columns:44px 84px 1fr;gap:8px;padding:5px 6px;border-radius:4px;font-size:13px;align-items:baseline}
+.steps li.new{background:var(--accent-soft)}
+.steps .t{font:12px var(--f-mono);color:var(--muted);text-align:right}
+.steps .ph-tag{font:500 11px var(--f-mono);color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.steps .what{min-width:0}
+.steps .what b{font-weight:600}
+.steps .what code{display:block;font:12px/1.4 var(--f-mono);color:var(--muted);word-break:break-word}
+
+/* guard */
+.act{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.act .row{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.act .name{font:600 14px var(--f-mono)}
+.pill{font:500 11px/1 var(--f-mono);padding:4px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.muted{color:var(--muted)}
+.act .why{font-size:13px;color:var(--muted)}
+.looks{display:flex;gap:8px}
+.look{flex:1;border:1px dashed var(--line);border-radius:8px;padding:8px;text-align:center;font-size:12px;color:var(--muted)}
+.look b{display:block;font:600 15px var(--f-display);letter-spacing:.03em;text-transform:uppercase}
+.look.bad{border:1px solid var(--warn);background:var(--warn-soft);color:var(--warn)}
+.look.good{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok)}
+.rules{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:3px}
+
+/* lower */
+.lower{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;margin-top:14px}
+.sbar dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:8px 14px}
+.sbar dt{font:600 13px var(--f-display);letter-spacing:.08em;color:var(--accent);padding-top:1px}
+.sbar dd{margin:0;font-size:14px;min-width:0}
+.note{font-size:12px;color:var(--muted);background:var(--sunk);border-radius:6px;padding:8px 10px}
+.verdict{font:600 22px/1.1 var(--f-display);letter-spacing:.03em}
+.verdict.ok{color:var(--ok)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.stat{background:var(--sunk);border-radius:6px;padding:8px 10px}
+.stat b{display:block;font:500 20px var(--f-mono)}
+.stat span{font-size:12px;color:var(--muted)}
+
+footer{margin-block:22px 40px;color:var(--muted);font-size:13px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+footer h3{font-size:14px;color:var(--ink);margin-bottom:4px}
+footer p{margin:0 0 6px}
+.hash{overflow-x:auto}
+.hash table{border-collapse:collapse;font:12px var(--f-mono)}
+.hash td{padding:2px 10px 2px 0;white-space:nowrap}
+
+/* test view */
+.test{display:grid;gap:14px;margin-block:18px 40px}
+.lead{max-width:70ch;font-size:16px}
+.lead p{margin:6px 0}
+.cards2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.card h2{font-size:19px}
+.card .tag{align-self:flex-start}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--sunk);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px}
+.seg button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+.help{font-size:13px;color:var(--muted)}
+pre.cmd{position:relative;margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:12px 12px;overflow-x:auto;font:13px/1.6 var(--f-mono);white-space:pre}
+pre.cmd .c{color:var(--muted)}
+.copy{position:absolute;top:6px;right:6px;font-size:12px;padding:4px 8px}
+.caselist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;max-height:300px;overflow:auto;padding:2px}
+.case{border:1px solid var(--line);border-radius:6px;padding:7px 8px;background:var(--sunk);text-align:left;cursor:pointer;font-size:12px;line-height:1.35;display:flex;flex-direction:column;gap:2px}
+.case b{font:600 13px var(--f-mono)}
+.case[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.kind{font:500 10px var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.chosen{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.chosen .faults{font:13px var(--f-mono);word-break:break-word}
+details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:500}
+details .key{font-size:13px;margin-top:6px}
+.cs{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.cs a.btn{text-decoration:none;color:var(--panel)}
+
+@media (max-width:980px){
+  .panes{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .panes .pane.agent{grid-column:1 / -1;order:-1}
+  .lower,.cards2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .panes{grid-template-columns:minmax(0,1fr)}
+  .bar .wrap{grid-template-columns:1fr auto}
+  .track{grid-column:1 / -1;order:3}
+  .mark{display:none}
+  .mark.key{display:block}
+  .status{grid-template-columns:1fr}
+  .status .state{font-size:22px}
+  .phases{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .ph{font-size:10px;padding:5px 2px}
+  .ph small{display:none}
+  .steps li{grid-template-columns:38px 1fr}
+  .steps .ph-tag{display:none}
+  nav.tabs{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+.run{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:14px;margin-block:18px 40px;align-items:start}
+.side{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+.live{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panes2{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px}
+.lower{margin-top:0}
+.case.demo{border-width:2px}
+.caselist{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));max-height:230px}
+#key{width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);font:13px var(--f-mono)}
+.go{display:flex;gap:8px;flex-wrap:wrap}
+.go .btn{padding:9px 16px;font-size:15px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.err{margin:0;color:var(--crit);background:var(--crit-soft);border-radius:6px;padding:8px 10px;font-size:13px}
+.ask{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;background:var(--warn-soft);border:1px solid var(--warn);border-radius:8px;padding:12px 16px}
+.ask p{margin:4px 0 0;font:13px/1.5 var(--f-mono);word-break:break-word}
+.term summary{cursor:pointer;display:flex;gap:10px;align-items:baseline}
+.term pre{margin:10px 0 0;max-height:360px;overflow:auto;font:12px/1.5 var(--f-mono);white-space:pre-wrap;word-break:break-word;background:var(--sunk);border-radius:6px;padding:10px}
+.term .k-case{color:var(--ink);font-weight:600} .term .k-cmd{color:var(--accent)} .term .k-note{color:var(--muted)} .term .k-ask{color:var(--warn)} .term .k-error{color:var(--crit)}
+.verdict.bad{color:var(--crit)} .verdict.warn{color:var(--warn)}
+.act.proposed{border-style:dashed} .act.declined{border-color:var(--warn)}
+/* scoreboard for a set of cases, and the self-test card */
+.board .tbl{max-height:330px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.board table{border-collapse:collapse;width:100%;font-size:13px}
+.board th{position:sticky;top:0;background:var(--sunk);text-align:left;font:500 10px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px}
+.board td{padding:7px 8px;border-top:1px solid var(--line);vertical-align:top}
+.board tbody tr{cursor:pointer}
+.board tbody tr:hover{background:var(--sunk)}
+.board tbody tr[aria-selected="true"]{background:var(--accent-soft)}
+.board td.ok{color:var(--ok);font-weight:600} .board td.bad{color:var(--crit);font-weight:600} .board td.warn{color:var(--warn);font-weight:600}
+.board .sum{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.settools{display:flex;gap:6px;flex-wrap:wrap}
+.settools .btn{padding:4px 9px;font-size:12px}
+.seg button[disabled]{opacity:.45;cursor:not-allowed}
+.selftest .bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.selftest .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.selftest ul{margin:0;padding-left:18px;font:12px/1.5 var(--f-mono);color:var(--crit)}
+@media (max-width:980px){.run{grid-template-columns:minmax(0,1fr)}.side{position:static;max-height:none}.panes2{grid-template-columns:minmax(0,1fr)}}
+</style></head><body>
+<header class="top"><div class="wrap">
+  <div class="brand"><h1>ABCDE Incident Commander</h1><span class="sub">Run the frozen agent on a live test bank</span></div>
+  <span class="pill muted" id="keystate">checking for a model key…</span>
+</div></header>
+
+<div class="wrap run">
+  <aside class="card side">
+    <div class="seg" role="group" aria-label="What to run" id="what">
+      <button type="button" data-w="one" aria-pressed="true">One incident</button>
+      <button type="button" data-w="set" aria-pressed="false">A set, with a scoreboard</button>
+      <button type="button" data-w="selftest" aria-pressed="false">Self-test</button>
+    </div>
+    <p class="help" id="selftest-help" style="margin:0" hidden>Runs the repository's own test suite, the same <code>python -m pytest -q</code> that CI runs on every change: about 900 tests of the bank, checker, guard, agent and evaluation code, in about a minute. No model calls and no key.</p>
+    <span class="eyebrow" id="pick-title">1 · Choose an incident</span>
+    <button type="button" class="case demo" data-id="demo" aria-pressed="true"><b>Two-fault demo</b><span class="kind">no key needed · replay</span><span>A pipeline change cuts the transfer limit and fraud screening slows down.</span></button>
+    <div class="seg" role="group" aria-label="Filter incidents" id="filter">
+      <button type="button" data-f="all" aria-pressed="true">All 32</button>
+      <button type="button" data-f="single" aria-pressed="false">One fault</button>
+      <button type="button" data-f="multi" aria-pressed="false">Two or more</button>
+      <button type="button" data-f="escalate" aria-pressed="false">Must escalate</button>
+      <button type="button" data-f="healthy" aria-pressed="false">Healthy</button>
+    </div>
+    <div class="settools" id="settools" hidden>
+      <button type="button" class="btn" id="pickall">Pick all shown</button>
+      <button type="button" class="btn" id="clearset">Clear</button>
+    </div>
+    <div class="caselist" id="cases"></div>
+    <div class="chosen" id="chosen"></div>
+
+    <span class="eyebrow" id="mode-title">2 · How much may the agent do?</span>
+    <div class="seg" role="group" aria-label="Mode" id="mode">
+      <button type="button" data-m="auto" aria-pressed="true">auto</button>
+      <button type="button" data-m="confirm" aria-pressed="false">confirm</button>
+      <button type="button" data-m="advise" aria-pressed="false">advise</button>
+    </div>
+    <p class="help" id="mode-help" style="margin:0"></p>
+
+    <div id="keybox">
+      <label class="eyebrow" for="key">3 · Model key (Anthropic)</label>
+      <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+      <p class="help" style="margin:4px 0 0">Used only for this run, inside this machine. Never saved or logged.</p>
+    </div>
+
+    <div class="go">
+      <button class="btn primary" id="run" type="button">▶ Run</button>
+      <button class="btn" id="stop" type="button" hidden>■ Stop</button>
+    </div>
+    <p class="err" id="err" role="alert" hidden></p>
+  </aside>
+
+  <main class="live">
+    <div class="status" id="status" style="margin:0">
+      <div class="state" id="state">Ready</div>
+      <div class="caption" id="caption">Pick an incident and press Run. The bank starts fresh, the faults are injected, and the agent gets only an alert.<small id="clock"></small></div>
+    </div>
+
+    <div class="ask" id="ask" hidden>
+      <div><span class="eyebrow">The agent asks before acting</span><p id="ask-q"></p></div>
+      <div class="go"><button class="btn primary" id="yes" type="button">Yes, take it</button><button class="btn" id="no" type="button">No, decline</button></div>
+    </div>
+
+    <div class="pane board" id="board" hidden>
+      <h2>Scoreboard <span class="eyebrow" id="board-sub">one fresh bank per case</span></h2>
+      <div class="sum"><span id="board-sum" class="help"></span><button type="button" class="btn" id="follow" hidden>Follow the live case</button></div>
+      <div class="tbl"><table><thead><tr><th>#</th><th>Case</th><th>Answer key</th><th>Now</th><th>Agent</th><th>Actions sent</th><th>Checker</th></tr></thead><tbody id="board-rows"></tbody></table></div>
+      <p class="help" style="margin:0">Click a row to see that case below. For must-escalate cases and in advise mode the checker should read not recovered: nothing safe was sent. The official scores come from the evaluation harness (<code>python run.py eval</code>), not this table.</p>
+    </div>
+
+    <div class="pane selftest" id="selftest" hidden>
+      <h2>Self-test <span class="eyebrow">python -m pytest -q</span></h2>
+      <div class="verdict" id="st-verdict">Running…</div>
+      <div class="bar"><i id="st-bar"></i></div>
+      <div class="help" id="st-sum"></div>
+      <ul id="st-fail" hidden></ul>
+    </div>
+
+    <div class="panes2" id="panes2">
+      <div class="pane agent">
+        <h2>Incident commander <span class="eyebrow" id="armline">abcde arm</span></h2>
+        <div class="phases" id="phases"></div>
+        <div class="abcde" id="abcde"><b>A</b><b>B</b><b>C</b><b>D</b><b>E</b><span id="abcde-t">Primary survey: access, bottlenecks, capacity, dependencies, events</span></div>
+        <ol class="steps" id="steps"><li class="empty" style="display:block">The agent's steps appear here as they happen.</li></ol>
+      </div>
+      <div class="pane guard">
+        <h2>Safety guard <span class="eyebrow">every action passes here</span></h2>
+        <div id="acts"><p class="empty">No action yet.</p></div>
+        <div>
+          <div class="eyebrow" style="margin-bottom:6px">Rechecks · 2 clean in a row to hand over</div>
+          <div class="looks" id="looks"></div>
+        </div>
+        <div class="rules">
+          <span>Allowlist: restart, rollback, revert_config, release_lock, failover, quarantine.</span>
+          <span>At most 8 actions per incident and 2 repeats of the same action on the same target.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="lower" id="lower">
+      <div class="pane sbar">
+        <h2>Outcome and SBAR handover <span class="eyebrow">written by the agent</span></h2>
+        <div id="outcome"><p class="empty">The outcome, root causes and handover appear when the agent finishes.</p></div>
+      </div>
+      <div class="pane check">
+        <h2>Independent checker <span class="eyebrow">scores the customers' own logs</span></h2>
+        <div id="check"><p class="empty">Separate code that decides whether the bank really recovered.</p></div>
+      </div>
+    </div>
+
+    <details class="pane term" id="termbox">
+      <summary><b>Terminal</b> <span class="help">every line, exactly as run.py printed it</span></summary>
+      <pre id="term"></pre>
+    </details>
+  </main>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ACTIONS = ["restart","rollback","revert_config","release_lock","failover","quarantine","containment"];
+const GLOSS = {describe:"Map the system", observe:"Read every component's health", probe:"Test a real payment journey",
+  abcde:"ABCDE primary survey", containment:"Contain with a safe action", logs:"Read recent logs", assess:"Triage: rank faults by impact",
+  restart:"Restart a component", rollback:"Roll back a release", revert_config:"Undo a bad setting", release_lock:"Release a stuck lock",
+  failover:"Fail over to the standby", quarantine:"Quarantine a bad item", check:"Recheck recovery", outcome:"Declare the outcome",
+  sbar:"Write the SBAR handover", escalate:"Escalate to a person"};
+const PHASES = [["survey","Survey","look first"],["triage","Triage","rank"],["remediate","Remediate","safe fix"],["verify","Verify","recheck"],["hand_over","Hand over","SBAR"]];
+const MODE_HELP = {auto:"The agent acts on its own, inside the guard's limits.",
+  confirm:"The agent asks you before each action. A declined action is never sent.",
+  advise:"The agent never acts. It surveys, triages and hands over a plan for a person. Needs a key."};
+const KIND = {healthy:"healthy", escalate:"must escalate", multi:"two or more", single:"one fault"};
+const kindOf = c => c.healthy ? "healthy" : c.escalate ? "escalate" : c.faults.length > 1 ? "multi" : "single";
+const faultStr = f => f.type + (Object.keys(f.params).length ? "(" + Object.entries(f.params).map(([k,v]) => k + "=" + v).join(", ") + ")" : "");
+
+let INFO = {cases: [], key_in_env: false};
+const st = {id: "demo", mode: "auto", filter: "all", what: "one", set: new Set(), view: null};
+let lines = [], next = 0, jobState = "idle", runCase = null, runMode = "auto", polling = null, tStart = 0;
+let runKind = "one", runCases = [];
+const SET_CASE_S = 55;   // a fresh bank, the faults, the agent and the checker's window: about 55 s per case
+
+/* ---------- picker ---------- */
+function seg(id, key, attr) {
+  document.querySelectorAll(`#${id} button`).forEach(b => b.addEventListener("click", () => {
+    st[key] = b.dataset[attr];
+    document.querySelectorAll(`#${id} button`).forEach(x => x.setAttribute("aria-pressed", x === b));
+    drawPicker();
+  }));
+}
+seg("filter", "filter", "f"); seg("mode", "mode", "m"); seg("what", "what", "w");
+$("#pickall").addEventListener("click", () => { shownCases().forEach(c => st.set.add(c.id)); drawPicker(); });
+$("#clearset").addEventListener("click", () => { st.set.clear(); drawPicker(); });
+const shownCases = () => INFO.cases.filter(c => st.filter === "all" || kindOf(c) === st.filter);
+$(".case.demo").addEventListener("click", () => { st.id = "demo"; drawPicker(); });
+function needsKey() {
+  if (INFO.key_in_env || st.what === "selftest") return false;
+  return st.what === "set" || st.id !== "demo" || st.mode === "advise";
+}
+function drawPicker() {
+  const what = st.what, set = what === "set", self = what === "selftest";
+  if (set && st.mode === "confirm") {
+    st.mode = "auto";
+    document.querySelectorAll("#mode button").forEach(x => x.setAttribute("aria-pressed", x.dataset.m === "auto"));
+  }
+  document.querySelectorAll("#mode button").forEach(x => { x.disabled = set && x.dataset.m === "confirm";
+    x.title = x.disabled ? "Confirm mode asks before every action, so it runs one case at a time" : ""; });
+  ["#pick-title", "#filter", "#cases", "#chosen", "#mode-title", "#mode", "#mode-help"].forEach(q => $(q).hidden = self);
+  $(".case.demo").hidden = set || self;
+  $("#settools").hidden = !set;
+  $("#selftest-help").hidden = !self;
+  $("#pick-title").textContent = set ? "1 · Tick the incidents to run" : "1 · Choose an incident";
+  const list = shownCases();
+  $("#cases").innerHTML = list.map(c => `<button type="button" class="case" aria-pressed="${set ? st.set.has(c.id) : c.id === st.id}" data-id="${c.id}"><b>${c.id}</b><span class="kind">${KIND[kindOf(c)]}</span><span>${esc(c.notes.replace(/^[a-z ]+: /, ""))}</span></button>`).join("");
+  document.querySelectorAll("#cases .case").forEach(b => b.addEventListener("click", () => {
+    if (set) { st.set.has(b.dataset.id) ? st.set.delete(b.dataset.id) : st.set.add(b.dataset.id); } else st.id = b.dataset.id;
+    drawPicker();
+  }));
+  $(".case.demo").setAttribute("aria-pressed", st.id === "demo");
+  if (set) {
+    const n = st.set.size, mins = Math.max(1, Math.round(n * SET_CASE_S / 60));
+    const ids = INFO.cases.map(c => c.id).filter(id => st.set.has(id));
+    $("#chosen").innerHTML = n ? `<b>${n} case${n > 1 ? "s" : ""} picked · about ${mins} min</b><div class="faults">${esc(ids.join(", "))}</div><div class="help">They run one after another, each on a fresh bank, and fill the scoreboard as they finish.</div>`
+      : `<div class="help">Tick practice incidents above, or use a filter and press Pick all shown. Each takes about a minute.</div>`;
+  } else if (st.id === "demo") {
+    $("#chosen").innerHTML = `<b class="mono">demo</b><div>The incident from the filmed demo: two faults at once. With no key the model's answers are replayed from a recorded run; the bank, faults, actions, rechecks and checker run live.</div>`;
+  } else {
+    const c = INFO.cases.find(x => x.id === st.id);
+    $("#chosen").innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="mono">${c.id}</b><span class="kind">${KIND[kindOf(c)]}${c.decoys ? " · " + c.decoys + " harmless decoy" + (c.decoys > 1 ? "s" : "") : ""}</span></div>
+      <div>${esc(c.notes)}</div><div class="faults">faults: ${c.faults.length ? esc(c.faults.map(faultStr).join(" + ")) : "none (busy but healthy)"}</div>
+      <details><summary>Show the answer key</summary><div class="key">${esc(expectOf(c))}</div></details>`;
+  }
+  $("#mode-help").textContent = MODE_HELP[st.mode] + (set ? " Confirm mode runs one case at a time." : "");
+  $("#keybox").hidden = INFO.key_in_env || self;
+  $("#run").textContent = self ? "▶ Run the test suite" : set ? `▶ Run ${st.set.size || ""} case${st.set.size === 1 ? "" : "s"}`.replace("  ", " ") : "▶ Run " + (st.id === "demo" ? "the demo" : st.id);
+}
+function expectOf(c) {
+  return c.healthy ? "No incident: the agent should change nothing." : c.escalate ? "Escalate to a person: no safe action fixes this." : "Recover: " + c.fixes.map(f => `${f.action} ${f.target} (${f.cls.replace(/_/g, " ")})`).join(", then ");
+}
+function expectShort(c) { return !c ? "–" : c.healthy ? "no change" : c.escalate ? "escalate" : c.fixes.map(f => f.action + " " + f.target).join(" + "); }
+
+/* ---------- run ---------- */
+async function post(path, body) {
+  const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+  return [r.ok, await r.json().catch(() => ({}))];
+}
+$("#run").addEventListener("click", async () => {
+  $("#err").hidden = true;
+  const key = $("#key").value.trim();
+  if (st.what === "set" && !st.set.size) { showErr("Tick at least one practice incident."); return; }
+  if (needsKey() && !key) { showErr(st.what === "set" ? "A set of practice cases needs a model key. Paste one above." : st.id === "demo" ? "Advise mode needs a model key. Paste one, or pick auto or confirm." : "This case needs a model key. Paste one above, or run the two-fault demo, which needs none."); return; }
+  const ids = INFO.cases.map(c => c.id).filter(id => st.set.has(id));
+  const body = st.what === "selftest" ? {selftest: true} : st.what === "set" ? {cases: ids, mode: st.mode, key} : {case: st.id, mode: st.mode, key};
+  const [ok, res] = await post("/api/run", body);
+  if (!ok) { showErr(res.error || "The run could not start."); return; }
+  runKind = st.what; runCases = st.what === "set" ? ids : []; st.view = null;
+  lines = []; next = 0; jobState = "running"; runCase = st.what === "set" ? ids[0] : st.what === "selftest" ? "selftest" : st.id; runMode = st.mode; tStart = performance.now();
+  $("#termbox").open = st.what === "selftest" || $("#termbox").open;
+  $("#term").innerHTML = "";
+  setRunning(true); draw(); poll();
+});
+$("#stop").addEventListener("click", () => post("/api/stop"));
+$("#yes").addEventListener("click", () => { $("#ask").hidden = true; post("/api/answer", {yes: true}); });
+$("#no").addEventListener("click", () => { $("#ask").hidden = true; post("/api/answer", {yes: false}); });
+function showErr(m) { $("#err").textContent = m; $("#err").hidden = false; }
+function setRunning(on) { $("#run").disabled = on; $("#stop").hidden = !on; }
+function poll() {
+  clearTimeout(polling);
+  fetch("/api/events?since=" + next).then(r => r.json()).then(ev => {
+    if (ev.lines.length) {
+      lines = lines.concat(ev.lines); next = ev.next;
+      $("#term").insertAdjacentHTML("beforeend", ev.lines.map(l => `<span class="k-${l.kind}">${esc(l.kind === "case" ? "\n── " + l.text + " ──" : l.text)}</span>\n`).join(""));
+      $("#term").scrollTop = $("#term").scrollHeight;
+    }
+    jobState = ev.state;
+    $("#ask").hidden = !ev.prompt;
+    if (ev.prompt) $("#ask-q").textContent = ev.prompt.replace(/\s*\[y\/N\]\s*$/, "");
+    draw();
+    if (ev.state === "running") polling = setTimeout(poll, 400); else setRunning(false);
+  }).catch(() => { polling = setTimeout(poll, 1500); });
+}
+
+/* ---------- parse and draw ---------- */
+const stepRe = /^\s+([\d.]+)s\s+(\S+)\s+(\S+)\s+(.*)$/;
+function parse(src = lines) {
+  const s = {steps: [], sbar: {}, causes: [], proposed: [], escalated: null, outcome: null, checker: null, replay: false,
+             started: false, injected: false, alert: false, agent: null, reasons: [], impact: null};
+  let inCheck = false;
+  for (const l of src) {
+    const t = l.text;
+    if (l.kind === "cmd") inCheck = /run\.py check/.test(t);
+    if (inCheck && l.kind === "out") {
+      if (/^(NOT )?RECOVERED\s*$/.test(t)) s.checker = t.trim();
+      const r = t.match(/^\s+- (.*)$/); if (r) s.reasons.push(r[1]);
+      if (/impact since the first fault/.test(t)) {
+        const num = k => { const m = t.match(new RegExp("'" + k + "': ([\\d.]+|None)")); return m ? m[1] : null; };
+        s.impact = {failed: num("failed_journeys"), ttm: num("time_to_mitigate_s"), censored: /'mitigation_censored': True/.test(t), doubles: num("double_postings"),
+                    unbalanced: num("unbalanced_payments"), late: num("late_clearings")};
+      }
+    }
+    if (/^REPLAY/.test(t)) s.replay = true;
+    if (/^starting/.test(t)) s.started = true;
+    if (/fault\(s\) injected|^injected /.test(t)) s.injected = true;
+    if (l.kind === "note" && /alert fires/.test(t)) s.injected = true;
+    if (/^incident commander \(/.test(t)) { s.alert = true; s.agent = t; }
+    const m = t.match(stepRe);
+    if (m && s.alert) s.steps.push({rel: +m[1], phase: m[2], name: m[3], text: m[4]});
+    let x;
+    if ((x = t.match(/^Outcome: (\S+)\s*\((.*)\)/))) s.outcome = {word: x[1], detail: x[2]};
+    if ((x = t.match(/^\s+root cause: (.*)$/))) s.causes.push(x[1]);
+    if ((x = t.match(/^\s+proposed: (.*)$/))) s.proposed.push(x[1]);
+    if ((x = t.match(/^\s+escalated (.*)$/))) s.escalated = x[1];
+    if ((x = t.match(/^(SITUATION|BACKGROUND|ASSESSMENT|RECOMMENDATION): (.*)$/))) s.sbar[x[1]] = x[2];
+    if ((x = t.match(/^CHECKER: (.*)$/))) { s.checker = x[1]; const r = x[1].replace(/^NOT RECOVERED:?\s*/, ""); if (r && r !== x[1]) s.reasons = r.split("; "); }
+  }
+  return s;
+}
+function draw() {
+  layout();
+  if (runKind === "selftest") { drawSelftest(); return; }
+  let src = lines, js = jobState;
+  if (runKind === "set") {
+    const segs = segments();
+    drawBoard(segs);
+    const i = st.view !== null && st.view < segs.length ? st.view : segs.length - 1;
+    if (i >= 0) { src = segs[i].lines; runCase = segs[i].id; if (i < segs.length - 1) js = "done"; }
+  }
+  const s = parse(src);
+  const el = ((performance.now() - tStart) / 1000);
+  let state = "Ready", col = "var(--muted)", cap = "Pick an incident and press Run. The bank starts fresh, the faults are injected, and the agent gets only an alert.";
+  if (runCase) {
+    if (s.checker) { const ok = /^RECOVERED/.test(s.checker); state = "Checker: " + (ok ? "recovered" : "not recovered"); col = ok ? "var(--ok)" : "var(--crit)";
+      cap = ok ? "The checker scored a clean window of every customer's journeys." : "The bank did not recover in the checker's window" + (s.reasons.length ? ": " + s.reasons.join("; ") + "." : "."); }
+    else if (s.outcome) { state = "Agent: " + s.outcome.word.toLowerCase(); col = s.outcome.word === "RECOVERED" || s.outcome.word === "NO_INCIDENT" ? "var(--ok)" : "var(--warn)";
+      cap = "The agent has handed over. The checker now waits for a clean 20 s window of customer journeys."; }
+    else if (s.steps.some(x => x.phase === "verify")) { state = "Verifying"; col = "var(--accent)"; cap = "Recovery needs two clean rechecks in a row."; }
+    else if (s.alert) { state = "Responding"; col = "var(--accent)"; cap = "The agent surveys every component before it fixes anything."; }
+    else if (s.injected) { state = "Incident"; col = "var(--crit)"; cap = "Faults injected. The alert fires in 5 s; nobody tells the agent what broke."; }
+    else { state = "Starting"; col = "var(--muted)"; cap = "Starting a fresh bank and its 20 simulated customers (about 10 s)."; }
+    if (js === "stopped") { state = "Stopped"; col = "var(--muted)"; cap = "You stopped the run. The test bank is shut down."; }
+    if (js === "error") { state = "Error"; col = "var(--crit)"; cap = "The console hit an error. See the terminal below."; }
+  }
+  if (runMode === "advise" && s.checker && !/^RECOVERED/.test(s.checker)) cap += " Expected in advise mode: the agent sends no action, so the bank stays broken until a person carries out its plan.";
+  if (runCase && runCase !== "demo") {
+    const c = INFO.cases.find(x => x.id === runCase);
+    if (c && c.escalate && s.checker && !/^RECOVERED/.test(s.checker)) cap += " For this case that is expected: no safe action fixes it, so the right answer is to escalate.";
+  }
+  $("#status").style.setProperty("--st", col);
+  $("#state").textContent = state;
+  $("#caption").innerHTML = esc(cap) + `<small>${runCase ? esc((runCase === "demo" ? "two-fault demo" : runCase) + " · " + (js === "running" ? el.toFixed(0) + " s" : js)) + (s.replay ? " · model answers replayed from a recorded run" : "") : ""}</small>`;
+  if (s.agent) {
+    const parts = s.agent.replace(/^incident commander \(/, "").replace(/\)$/, "").split(", ");
+    const model = (parts[1] || "").startsWith("replay:") ? "replayed answers" : (parts[1] || "").replace(/^\w+:/, "");
+    $("#armline").textContent = [parts[0] + " arm", model, parts[2]].filter(Boolean).join(" · ");
+  }
+
+  const cur = s.steps.length ? s.steps[s.steps.length - 1].phase : null;
+  const ci = PHASES.map(p => p[0]).indexOf(cur), done = !!s.outcome;
+  $("#phases").innerHTML = PHASES.map(([k, n, d], i) => `<div class="ph ${done || i < ci ? "done" : ""} ${!done && i === ci ? "now" : ""}">${n}<small>${d}</small></div>`).join("");
+  const ab = s.steps.find(x => x.name === "abcde");
+  $("#abcde").classList.toggle("lit", !!ab);
+  $("#abcde-t").textContent = ab ? ab.text : "Primary survey: access, bottlenecks, capacity, dependencies, events";
+  $("#steps").innerHTML = s.steps.map((x, i) => `<li class="${i === s.steps.length - 1 && !done ? "new" : ""}"><span class="t num">${x.rel.toFixed(1)}s</span><span class="ph-tag">${esc(x.phase.replace("_", " "))}</span><span class="what"><b>${esc(GLOSS[x.name] || x.name)}</b><code>${esc(x.text)}</code></span></li>`).join("")
+    || `<li class="empty" style="display:block">${runCase ? (s.injected ? "Waiting for the alert…" : "The bank is starting…") : "The agent's steps appear here as they happen."}</li>`;
+  const sl = $("#steps"); sl.scrollTop = sl.scrollHeight;
+
+  const acts = s.steps.filter(x => ACTIONS.includes(x.name));
+  $("#acts").innerHTML = acts.map(a => {
+    const prop = /^proposed/.test(a.text), dec = /declin|refus|not sent/.test(a.text);
+    const pill = prop ? `<span class="pill muted">proposed · not sent</span>` : dec ? `<span class="pill warn">declined · not sent</span>` : `<span class="pill ok">allowed · sent</span>`;
+    const am = a.text.match(/^(\w+) (\S+?):/) || a.text.match(/^proposed (\w+) on (\S+)/);
+    const nm = am ? am[1] + " " + am[2] : a.name;
+    return `<div class="act ${prop ? "proposed" : dec ? "declined" : ""}"><div class="row"><span class="name">${esc(nm)}</span>${pill}</div><div class="why">${esc(a.text)}</div><div class="why num">at ${a.rel.toFixed(1)} s, during ${esc(a.phase.replace("_", " "))}</div></div>`;
+  }).join("") + s.steps.filter(x => x.name === "escalate").map(e => `<div class="act declined"><div class="row"><span class="name">escalation</span><span class="pill warn">to a person · no action</span></div><div class="why">${esc(e.text)}</div><div class="why num">at ${e.rel.toFixed(1)} s</div></div>`).join("")
+    || `<p class="empty">No action yet. Every action the agent proposes is checked against the allowlist before it reaches the system.</p>`;
+  const checks = s.steps.filter(x => x.name === "check");
+  const n = Math.max(3, checks.length);
+  $("#looks").innerHTML = Array.from({length: n}, (_, i) => {
+    const c = checks[i];
+    if (!c) return `<div class="look"><b>Look ${i + 1}</b>${runCase && !done ? "waiting" : "—"}</div>`;
+    const clean = /: clean/.test(c.text);
+    return `<div class="look ${clean ? "good" : "bad"}"><b>${clean ? "Clean" : "Not clean"}</b>look ${i + 1} · ${c.rel.toFixed(1)} s</div>`;
+  }).join("");
+
+  if (s.outcome) {
+    const ok = ["RECOVERED", "NO_INCIDENT"].includes(s.outcome.word);
+    $("#outcome").innerHTML = `<div class="verdict ${ok ? "ok" : "warn"}">${esc(s.outcome.word.replace("_", " "))}</div>
+      <div class="help">${esc(s.outcome.detail)}</div>
+      ${s.causes.length ? `<div><span class="eyebrow">Root causes</span><div class="mono" style="font-size:13px">${s.causes.map(esc).join("<br>")}</div></div>` : ""}
+      ${s.escalated ? `<div><span class="eyebrow">Escalated</span><div style="font-size:14px">${esc(s.escalated)}</div></div>` : ""}
+      ${s.proposed.length ? `<div><span class="eyebrow">Proposed for a person</span><div class="mono" style="font-size:13px">${s.proposed.map(esc).join("<br>")}</div></div>` : ""}
+      ${Object.keys(s.sbar).length ? `<dl>${["SITUATION", "BACKGROUND", "ASSESSMENT", "RECOMMENDATION"].map(k => `<dt>${k[0]}</dt><dd><b>${k[0] + k.slice(1).toLowerCase()}.</b> ${esc(s.sbar[k] || "")}</dd>`).join("")}</dl>` : ""}
+      ${s.replay ? `<div class="note">The handover text is the recorded run's answer, so its times and figures are that run's, not this one's.</div>` : ""}`;
+  } else $("#outcome").innerHTML = `<p class="empty">The outcome, root causes and handover appear when the agent finishes.</p>`;
+
+  if (s.checker) {
+    const ok = /^RECOVERED/.test(s.checker);
+    const im = s.impact;
+    $("#check").innerHTML = `<div class="verdict ${ok ? "ok" : "bad"}">CHECKER: ${esc(ok ? "RECOVERED" : "NOT RECOVERED")}</div>
+      ${s.reasons.length ? `<div class="help">${s.reasons.map(esc).join("<br>")}</div>` : ""}
+      ${im ? `<div class="stats">
+        <div class="stat"><b>${esc(im.failed ?? "–")}</b><span>customer journeys failed since the first fault</span></div>
+        <div class="stat"><b>${im.censored ? "not yet" : im.ttm && im.ttm !== "None" ? esc((+im.ttm).toFixed(0)) + " s" : "–"}</b><span>${im.censored ? "mitigated within the window" : "time to mitigate"}</span></div>
+        <div class="stat"><b>${esc(im.doubles ?? "–")} · ${esc(im.unbalanced ?? "–")}</b><span>double postings · unbalanced payments</span></div>
+        <div class="stat"><b>${esc(im.late ?? "–")}</b><span>late clearings</span></div></div>` : ""}
+      <div class="help">The checker is separate code. It scores every simulated customer's own log and the ledger, not the agent's report.</div>`;
+  } else if (s.outcome) $("#check").innerHTML = `<p class="empty">Waiting for every customer retry to finish, then scoring a clean 20 s window (about 31 s).</p>`;
+  else $("#check").innerHTML = `<p class="empty">Separate code that decides whether the bank really recovered.</p>`;
+}
+
+function layout() {
+  const self = runKind === "selftest";
+  $("#selftest").hidden = !self;
+  $("#panes2").hidden = self; $("#lower").hidden = self;
+  $("#board").hidden = !(runKind === "set" && runCases.length);
+}
+function segments() {
+  const segs = [];
+  for (const l of lines) {
+    if (l.kind === "case") segs.push({id: l.text.split(" ")[0], lines: []});
+    else if (segs.length) segs[segs.length - 1].lines.push(l);
+  }
+  return segs;
+}
+function drawBoard(segs) {
+  let fin = 0, rec = 0, escd = 0;
+  const shown = st.view !== null && st.view < segs.length ? st.view : segs.length - 1;
+  $("#board-rows").innerHTML = runCases.map((id, i) => {
+    const seg = segs[i], c = INFO.cases.find(x => x.id === id);
+    let now = "waiting", agent = "–", acts = "–", chk = "–", cc = "";
+    if (seg) {
+      const s = parse(seg.lines), last = i === segs.length - 1;
+      if (s.alert) acts = String(s.steps.filter(x => ACTIONS.includes(x.name) && !/^proposed|declin|refus|not sent/.test(x.text)).length);
+      if (s.outcome) { agent = s.outcome.word.replace("_", " ").toLowerCase(); if (s.outcome.word === "ESCALATED") escd++; }
+      if (s.checker) {
+        const ok = /^RECOVERED/.test(s.checker); fin++; if (ok) rec++;
+        chk = ok ? "recovered" : "not recovered"; cc = ok ? "ok" : (c && c.escalate) || runMode === "advise" ? "warn" : "bad";
+      }
+      now = s.checker ? "done" : !last ? "stopped" : jobState !== "running" ? jobState
+        : s.outcome ? "checking" : s.alert ? "agent working" : s.injected ? "incident" : "starting";
+    }
+    return `<tr data-i="${i}" aria-selected="${i === shown}"><td class="num">${i + 1}</td><td class="mono">${esc(id)}</td><td>${esc(expectShort(c))}</td><td>${esc(now)}</td><td>${esc(agent)}</td><td class="num">${acts}</td><td class="${cc}">${chk}</td></tr>`;
+  }).join("");
+  document.querySelectorAll("#board-rows tr").forEach(r => r.addEventListener("click", () => {
+    const i = +r.dataset.i; if (i < segs.length) { st.view = i; draw(); }
+  }));
+  $("#board-sum").textContent = `${fin} of ${runCases.length} finished · checker recovered ${rec} · agent escalated ${escd} · mode ${runMode}`;
+  $("#follow").hidden = st.view === null || jobState !== "running";
+}
+$("#follow").addEventListener("click", () => { st.view = null; draw(); });
+function drawSelftest() {
+  let pct = 0, sum = "", code = null, missing = null;
+  const fails = [];
+  for (const l of lines) {
+    const t = l.text; let m;
+    if ((m = t.match(/\[\s*(\d+)%\]\s*$/))) pct = +m[1];
+    if (/\b\d+ (passed|failed|errors?|skipped)\b.* in [\d.]+s/.test(t)) sum = t.replace(/^=+\s*|\s*=+$/g, "");
+    if ((m = t.match(/^(FAILED|ERROR) (\S+)/))) fails.push(m[2]);
+    if ((m = t.match(/No module named '([^']+)'/))) missing = m[1];
+    if (l.kind === "exit") code = +t.replace("exit ", "");
+  }
+  const running = code === null && jobState === "running";
+  const ok = code === 0;
+  $("#st-verdict").className = "verdict " + (running ? "" : ok ? "ok" : "bad");
+  $("#st-verdict").textContent = running ? "Running the tests…" : code === null ? (jobState === "stopped" ? "Stopped" : "Did not finish") : ok ? "All tests passed" : "Some tests failed";
+  $("#st-bar").style.width = (running ? pct : 100) + "%";
+  $("#st-sum").textContent = (sum || (running ? pct + "% of the tests run" : "")) + (missing ? ` · a package is missing (${missing}): pip install -r requirements.txt -r requirements-eval.txt` : "");
+  $("#st-fail").hidden = !fails.length;
+  $("#st-fail").innerHTML = fails.map(f => `<li>${esc(f)}</li>`).join("");
+  const col = running ? "var(--accent)" : ok ? "var(--ok)" : "var(--crit)";
+  $("#status").style.setProperty("--st", col);
+  $("#state").textContent = running ? "Self-test" : ok ? "Tests passed" : "Tests failed";
+  $("#caption").innerHTML = esc(running ? "The repository's own tests are running, the same ones CI runs on every change." : ok ? "Every test in the repository passed on this machine." : "See the failing tests below and the terminal for details.")
+    + `<small>${esc(((performance.now() - tStart) / 1000).toFixed(0))} s</small>`;
+}
+
+fetch("/api/info").then(r => r.json()).then(info => {
+  INFO = info;
+  $("#keystate").textContent = info.key_in_env ? "model key found in the environment" : "no model key: the demo runs as a replay";
+  $("#keystate").className = "pill " + (info.key_in_env ? "ok" : "muted");
+  drawPicker(); draw();
+  fetch("/api/events?since=0").then(r => r.json()).then(ev => { if (ev.state === "running") { const m = ev.meta || {}; runKind = m.kind || "one"; runCases = m.cases || []; runMode = m.mode || "auto"; runCase = runKind === "set" ? runCases[0] : runKind === "selftest" ? "selftest" : (m.case || "demo"); tStart = performance.now(); setRunning(true); poll(); } });
+});
+setInterval(() => { if (jobState === "running") draw(); }, 1000);
+
+</script>
+</body></html>

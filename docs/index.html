@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ABCDE Incident Console</title>
+<meta name="description" content="ABCDE Incident Commander: watch a recorded run of the AI incident commander on a simulated bank, or pick a practice incident and run the agent yourself.">
+<meta property="og:title" content="ABCDE Incident Console">
+<meta property="og:description" content="ABCDE Incident Commander: watch a recorded run of the AI incident commander on a simulated bank, or pick a practice incident and run the agent yourself.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a6a86'/%3E%3Cpath d='M5 17h5l3-7 5 13 3-6h6' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an operations console. Sticky control bar, a status banner, then three working panes
+   (customer | incident commander | safety guard and rechecks), with the handover and checker below. */
+:root{
+  --bg:#eef2f5; --panel:#ffffff; --sunk:#f6f8fa; --ink:#14202b; --muted:#566673; --line:#d3dce3;
+  --accent:#0a6a86; --accent-soft:#e1f0f5;
+  --ok:#0f7a55; --ok-soft:#e2f4ec; --warn:#a85407; --warn-soft:#fbeedd; --crit:#b42318; --crit-soft:#fbe5e2;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1318; --panel:#131d24; --sunk:#0f181e; --ink:#e2e9ee; --muted:#8c9daa; --line:#25343e;
+  --accent:#53b9d6; --accent-soft:#12303b;
+  --ok:#41c795; --ok-soft:#10322a; --warn:#f0a24c; --warn-soft:#3a2810; --crit:#f2675c; --crit-soft:#3c1715; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1318; --panel:#131d24; --sunk:#0f181e; --ink:#e2e9ee; --muted:#8c9daa; --line:#25343e;
+  --accent:#53b9d6; --accent-soft:#12303b;
+  --ok:#41c795; --ok-soft:#10322a; --warn:#f0a24c; --warn-soft:#3a2810; --crit:#f2675c; --crit-soft:#3c1715; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0;letter-spacing:.01em}
+.eyebrow{font:500 11px/1.2 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+
+/* header */
+header.top{background:var(--panel);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding-block:14px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0}
+.brand h1{font-size:22px}
+.brand .sub{color:var(--muted);font-size:14px}
+nav.tabs{margin-left:auto;display:flex;gap:4px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:3px}
+nav.tabs a{padding:6px 14px;border-radius:6px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px}
+nav.tabs a[aria-current="page"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* control bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.bar .wrap{display:grid;grid-template-columns:auto 1fr auto;gap:10px 16px;align-items:center;padding-block:10px}
+.ctl{display:flex;gap:6px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:500;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.speed{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.speed button{border:0;background:transparent;padding:7px 9px;cursor:pointer;font:500 13px var(--f-mono);color:var(--muted)}
+.speed button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.track{position:relative;height:38px;min-width:0}
+.track input{position:absolute;inset:auto 0 0 0;width:100%;margin:0;accent-color:var(--accent)}
+.marks{position:absolute;inset:0 0 18px 0}
+.mark{position:absolute;top:0;transform:translateX(-50%);font:500 10px/1 var(--f-mono);color:var(--muted);cursor:pointer;background:none;border:0;padding:2px;white-space:nowrap}
+.mark::after{content:"";display:block;width:1px;height:8px;background:var(--line);margin:3px auto 0}
+.mark.on{color:var(--ink)}
+.clock{text-align:right;font:500 13px/1.3 var(--f-mono)}
+.clock b{font-size:17px;font-weight:500}
+.clock span{color:var(--muted);display:block}
+
+/* status banner */
+.status{margin-block:18px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 18px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--st,var(--muted));border-radius:8px;padding:14px 18px}
+.status .state{font:600 26px/1.1 var(--f-display);letter-spacing:.03em;color:var(--st,var(--ink));text-transform:uppercase}
+.status .caption{color:var(--ink);font-size:15px;min-width:0}
+.status .caption small{display:block;color:var(--muted);font-size:13px}
+
+/* panes */
+.panes{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr) minmax(0,1fr);gap:14px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px 16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.pane h2{font-size:17px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.pane h2 .eyebrow{font-size:10px}
+.empty{color:var(--muted);font-size:13px;font-style:italic}
+
+/* customer */
+.receipt{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--sunk)}
+.receipt .ttl{font-weight:600}
+.receipt .det{font:12px/1.4 var(--f-mono);color:var(--muted);word-break:break-word}
+.receipt[data-o="ok"]{border-color:var(--ok);background:var(--ok-soft)}
+.receipt[data-o="ok"] .ttl{color:var(--ok)}
+.receipt[data-o="rejected"]{border-color:var(--crit);background:var(--crit-soft)}
+.receipt[data-o="rejected"] .ttl{color:var(--crit)}
+ol.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+ol.feed li{display:grid;grid-template-columns:52px 1fr;gap:8px}
+ol.feed .t{font:12px/1.5 var(--f-mono);color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--muted)}
+.dot.ok{background:var(--ok)} .dot.rejected{background:var(--crit)}
+
+/* phases */
+.phases{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.ph{border:1px solid var(--line);border-radius:6px;padding:6px 6px 7px;text-align:center;font:600 12px/1.2 var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--sunk)}
+.ph small{display:block;font:400 10px/1.3 var(--f-mono);letter-spacing:0;text-transform:none;margin-top:2px}
+.ph.done{color:var(--ink);border-color:var(--accent)}
+.ph.now{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.abcde{display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.abcde b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:4px;border:1px solid var(--line);font:600 13px var(--f-mono);color:var(--muted)}
+.abcde.lit b{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:420px;overflow:auto}
+.steps li{display:grid;grid-template-columns:44px 84px 1fr;gap:8px;padding:5px 6px;border-radius:4px;font-size:13px;align-items:baseline}
+.steps li.new{background:var(--accent-soft)}
+.steps .t{font:12px var(--f-mono);color:var(--muted);text-align:right}
+.steps .ph-tag{font:500 11px var(--f-mono);color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.steps .what{min-width:0}
+.steps .what b{font-weight:600}
+.steps .what code{display:block;font:12px/1.4 var(--f-mono);color:var(--muted);word-break:break-word}
+
+/* guard */
+.act{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.act .row{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.act .name{font:600 14px var(--f-mono)}
+.pill{font:500 11px/1 var(--f-mono);padding:4px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.muted{color:var(--muted)}
+.act .why{font-size:13px;color:var(--muted)}
+.looks{display:flex;gap:8px}
+.look{flex:1;border:1px dashed var(--line);border-radius:8px;padding:8px;text-align:center;font-size:12px;color:var(--muted)}
+.look b{display:block;font:600 15px var(--f-display);letter-spacing:.03em;text-transform:uppercase}
+.look.bad{border:1px solid var(--warn);background:var(--warn-soft);color:var(--warn)}
+.look.good{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok)}
+.rules{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:3px}
+
+/* lower */
+.lower{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;margin-top:14px}
+.sbar dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:8px 14px}
+.sbar dt{font:600 13px var(--f-display);letter-spacing:.08em;color:var(--accent);padding-top:1px}
+.sbar dd{margin:0;font-size:14px;min-width:0}
+.note{font-size:12px;color:var(--muted);background:var(--sunk);border-radius:6px;padding:8px 10px}
+.verdict{font:600 22px/1.1 var(--f-display);letter-spacing:.03em}
+.verdict.ok{color:var(--ok)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.stat{background:var(--sunk);border-radius:6px;padding:8px 10px}
+.stat b{display:block;font:500 20px var(--f-mono)}
+.stat span{font-size:12px;color:var(--muted)}
+
+footer{margin-block:22px 40px;color:var(--muted);font-size:13px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+footer h3{font-size:14px;color:var(--ink);margin-bottom:4px}
+footer p{margin:0 0 6px}
+.hash{overflow-x:auto}
+.hash table{border-collapse:collapse;font:12px var(--f-mono)}
+.hash td{padding:2px 10px 2px 0;white-space:nowrap}
+
+/* test view */
+.test{display:grid;gap:14px;margin-block:18px 40px}
+.lead{max-width:70ch;font-size:16px}
+.lead p{margin:6px 0}
+.cards2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.card h2{font-size:19px}
+.card .tag{align-self:flex-start}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--sunk);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px}
+.seg button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+.help{font-size:13px;color:var(--muted)}
+pre.cmd{position:relative;margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:12px 12px;overflow-x:auto;font:13px/1.6 var(--f-mono);white-space:pre}
+pre.cmd .c{color:var(--muted)}
+.copy{position:absolute;top:6px;right:6px;font-size:12px;padding:4px 8px}
+.caselist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;max-height:300px;overflow:auto;padding:2px}
+.case{border:1px solid var(--line);border-radius:6px;padding:7px 8px;background:var(--sunk);text-align:left;cursor:pointer;font-size:12px;line-height:1.35;display:flex;flex-direction:column;gap:2px}
+.case b{font:600 13px var(--f-mono)}
+.case[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.kind{font:500 10px var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.chosen{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.chosen .faults{font:13px var(--f-mono);word-break:break-word}
+details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:500}
+details .key{font-size:13px;margin-top:6px}
+.cs{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.cs a.btn{text-decoration:none;color:var(--panel)}
+
+@media (max-width:980px){
+  .panes{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .panes .pane.agent{grid-column:1 / -1;order:-1}
+  .lower,.cards2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .panes{grid-template-columns:minmax(0,1fr)}
+  .bar .wrap{grid-template-columns:1fr auto}
+  .track{grid-column:1 / -1;order:3}
+  .mark{display:none}
+  .mark.key{display:block}
+  .status{grid-template-columns:1fr}
+  .status .state{font-size:22px}
+  .phases{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .ph{font-size:10px;padding:5px 2px}
+  .ph small{display:none}
+  .steps li{grid-template-columns:38px 1fr}
+  .steps .ph-tag{display:none}
+  nav.tabs{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand"><h1>ABCDE Incident Commander</h1><span class="sub">Incident console for a recorded run of the frozen agent</span></div>
+  <nav class="tabs" aria-label="Views">
+    <a href="#watch" id="tab-watch">Watch an incident</a>
+    <a href="#test" id="tab-test">Test it yourself</a>
+  </nav>
+</div></header>
+
+<section id="view-watch">
+  <div class="bar"><div class="wrap">
+    <div class="ctl">
+      <button class="btn primary" id="play" type="button">▶ Play from start</button>
+      <div class="speed" role="group" aria-label="Playback speed">
+        <button type="button" data-s="1" aria-pressed="false">1×</button>
+        <button type="button" data-s="2" aria-pressed="true">2×</button>
+        <button type="button" data-s="4" aria-pressed="false">4×</button>
+      </div>
+    </div>
+    <div class="track">
+      <div class="marks" id="marks"></div>
+      <input type="range" id="scrub" min="0" max="1000" value="1000" step="1" aria-label="Position in the recorded run">
+    </div>
+    <div class="clock num"><b id="clk">0:00.0</b><span id="clk2">into the run</span></div>
+  </div></div>
+
+  <div class="wrap">
+    <div class="status" id="status">
+      <div class="state" id="state">…</div>
+      <div class="caption" id="caption"></div>
+    </div>
+
+    <div class="panes">
+      <div class="pane cust">
+        <h2>Customer in a browser <span class="eyebrow">web-01</span></h2>
+        <div id="receipt"></div>
+        <ol class="feed" id="custfeed"></ol>
+      </div>
+
+      <div class="pane agent">
+        <h2>Incident commander <span class="eyebrow">abcde arm · mode auto</span></h2>
+        <div class="phases" id="phases"></div>
+        <div class="abcde" id="abcde"><b>A</b><b>B</b><b>C</b><b>D</b><b>E</b><span id="abcde-t">Primary survey: access, bottlenecks, capacity, dependencies, events</span></div>
+        <ol class="steps" id="steps"></ol>
+      </div>
+
+      <div class="pane guard">
+        <h2>Safety guard <span class="eyebrow">every action passes here</span></h2>
+        <div id="acts"></div>
+        <div>
+          <div class="eyebrow" style="margin-bottom:6px">Rechecks · 2 clean in a row to hand over</div>
+          <div class="looks" id="looks"></div>
+        </div>
+        <div class="rules">
+          <span>Allowlist: restart, rollback, revert_config, release_lock, failover, quarantine.</span>
+          <span>At most 8 actions per incident and 2 repeats of the same action on the same target.</span>
+          <span>Anything else is refused and written to the audit log.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="lower">
+      <div class="pane sbar">
+        <h2>SBAR handover <span class="eyebrow">written by the agent</span></h2>
+        <div id="sbar"></div>
+      </div>
+      <div class="pane check">
+        <h2>Independent checker <span class="eyebrow">scores the customers' own logs</span></h2>
+        <div id="check"></div>
+      </div>
+    </div>
+
+    <footer>
+      <div>
+        <h3>What this is</h3>
+        <p>A step-by-step replay of one real run, filmed Fri 30 Oct 2026, 22:08 Riyadh. The bank, its 20 simulated customers, the browser customer, the survey, both actions, every recheck and the checker's verdict all ran live.</p>
+        <p>The model's two answers (triage and the handover text) came from a recording of an earlier live run of the same frozen agent, so the run needed no key. The SBAR quotes that earlier run's figures.</p>
+      </div>
+      <div>
+        <h3>What it is not</h3>
+        <p>A demo, not evidence. This is one two-fault incident from the practice set the agent was tuned on. Accuracy comes from the held-out exam, reported in the repository.</p>
+        <p>The panels are drawn from the run's own terminal and browser logs. The model does not generate this page.</p>
+      </div>
+      <div>
+        <h3>Same code before and after</h3>
+        <p>freeze-1 tag (0e58fe9) plus the browser-demo folder. Content hashes matched before and after the run:</p>
+        <div class="hash"><table>
+          <tr><td>agent</td><td>9c27cb6849972bd8…</td></tr>
+          <tr><td>system</td><td>9917f1ab10182809…</td></tr>
+          <tr><td>scorer</td><td>e29e6c9bbd401bb8…</td></tr>
+          <tr><td>sealed exam</td><td>f2ed58bc0e98dae5…</td></tr>
+        </table></div>
+      </div>
+    </footer>
+  </div>
+</section>
+
+<section id="view-test" hidden>
+  <div class="wrap test">
+    <div class="lead">
+      <span class="eyebrow">Run the frozen agent yourself</span>
+      <h2 style="font-size:28px;margin-top:4px">Break the bank, then watch the agent recover it</h2>
+      <p>Everything runs on your own computer or in a browser terminal. You need Python 3.11 or later. The bank and its customers start locally, and nothing leaves your machine except the model calls.</p>
+    </div>
+
+    <div class="card">
+      <span class="pill ok tag">No install · pick a case, press Run</span>
+      <h2>Run the agent from a web console</h2>
+      <p class="help" style="margin:0">The repository ships a small web console. Pick any practice incident and a mode, press Run, and watch the frozen agent's survey, actions, rechecks and handover arrive live, followed by the checker's verdict. It drives the same run.py commands shown below.</p>
+      <div class="cs">
+        <a class="btn primary" href="https://codespaces.new/Oahsins/HUMAIN-Incident-Commander?quickstart=1" target="_blank" rel="noopener">Open in GitHub Codespaces</a>
+        <span class="help">Needs a free GitHub account. On GitHub's page, click <b>Create new codespace</b>. It builds for 2 to 3 minutes, then the console opens in a new tab. If the tab is blocked, open the <b>Ports</b> tab and click the globe next to “Incident console”.</span>
+      </div>
+      <pre class="cmd" id="cmd-console"></pre>
+    </div>
+
+    <div class="cards2">
+      <div class="card">
+        <span class="pill ok tag">No key needed · about 2 minutes</span>
+        <h2>1. The two-fault demo</h2>
+        <p class="help" style="margin:0">A pipeline change cuts the transfer limit and fraud screening slows down. Choose how much the agent may do:</p>
+        <div class="seg" role="group" aria-label="Mode for the demo" id="dmode">
+          <button type="button" data-m="auto" aria-pressed="true">auto</button>
+          <button type="button" data-m="confirm" aria-pressed="false">confirm</button>
+        </div>
+        <p class="help" id="dmode-help" style="margin:0"></p>
+        <pre class="cmd" id="cmd-demo"></pre>
+        <p class="help" style="margin:0">With no key, the model's answers are replayed from a recorded run and the terminal says so first. The bank, the faults, the actions, the rechecks and the checker run live. Advise mode (plan only, no actions) needs a key, because the recorded answers describe a run that acted. Set a key, as on the right, and the same command runs the model live.</p>
+      </div>
+
+      <div class="card">
+        <span class="pill warn tag">Your own model key</span>
+        <h2>2. Pick any practice incident</h2>
+        <div class="seg" role="group" aria-label="Filter incidents" id="filter">
+          <button type="button" data-f="all" aria-pressed="true">All 32</button>
+          <button type="button" data-f="single" aria-pressed="false">One fault</button>
+          <button type="button" data-f="multi" aria-pressed="false">Two or more</button>
+          <button type="button" data-f="escalate" aria-pressed="false">Must escalate</button>
+          <button type="button" data-f="healthy" aria-pressed="false">Healthy (no fault)</button>
+        </div>
+        <div class="caselist" id="cases"></div>
+        <div class="chosen" id="chosen"></div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div class="seg" role="group" aria-label="Mode" id="cmode">
+            <button type="button" data-m="auto" aria-pressed="true">auto</button>
+            <button type="button" data-m="confirm" aria-pressed="false">confirm</button>
+            <button type="button" data-m="advise" aria-pressed="false">advise</button>
+          </div>
+          <div class="seg" role="group" aria-label="Your shell" id="os">
+            <button type="button" data-o="sh" aria-pressed="true">macOS / Linux</button>
+            <button type="button" data-o="ps" aria-pressed="false">Windows PowerShell</button>
+          </div>
+        </div>
+        <pre class="cmd" id="cmd-case"></pre>
+        <p class="help" style="margin:0">These are the 32 practice cases the agent was tuned on, plus the decoys some of them carry. The exam faults stay sealed in the repository so the reported results stay honest. Each run makes 2 or 3 model calls.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+const DATA = {"term": [{"t": 1793386452.6522546, "line": "starting a fresh bank on 27800 ..."}, {"t": 1793386463.1203983, "line": "2 fault(s) injected; the alert fires in 5 s"}, {"t": 1793386468.1371257, "line": "incident commander (abcde, replay:replays/demo-frozen.jsonl, mode auto, budget 90 s)"}, {"t": 1793386468.1433246, "line": "   0.0s  survey     describe     bank: 8 components"}, {"t": 1793386468.159628, "line": "   0.0s  survey     observe      8 components"}, {"t": 1793386469.167775, "line": "   1.0s  survey     probe        payment journey failed at payments"}, {"t": 1793386469.168273, "line": "   1.0s  survey     abcde        8 fault findings, 11 findings in all, 8 components checked"}, {"t": 1793386469.1711774, "line": "   1.0s  survey     containment  failover screening: done (screening now served by its standby)"}, {"t": 1793386469.1728961, "line": "   1.0s  survey     logs         1 log records from gateway"}, {"t": 1793386469.1747055, "line": "   1.0s  survey     logs         6 log records from payments"}, {"t": 1793386469.1756818, "line": "   1.0s  triage     assess       anthropic:claude-opus-5-5 answered in 0.0 s"}, {"t": 1793386469.1783104, "line": "   1.0s  remediate  revert_config revert_config payments: done (payments max_transfer_minor restored from 5000 to 1000000 (changed earlier by pipeline))"}, {"t": 1793386472.1933534, "line": "   4.1s  verify     observe      8 components"}, {"t": 1793386472.975098, "line": "   4.8s  verify     probe        payment journey ok"}, {"t": 1793386472.9751408, "line": "   4.8s  verify     check        look 1: not clean (0 of 2 in a row); still abnormal: gateway: 12% of requests fail (baseline 0%); gateway: 12% of requests are refused (baseline 0%); payments: 13% of requests fail (baseline 0%) (+7 more)"}, {"t": 1793386476.9896922, "line": "   8.8s  verify     observe      8 components"}, {"t": 1793386477.9179585, "line": "   9.8s  verify     probe        payment journey ok"}, {"t": 1793386477.9184794, "line": "   9.8s  verify     check        look 2: clean (1 of 2 in a row)"}, {"t": 1793386481.939331, "line": "  13.8s  verify     observe      8 components"}, {"t": 1793386482.7237246, "line": "  14.6s  verify     probe        payment journey ok"}, {"t": 1793386482.724233, "line": "  14.6s  verify     check        look 3: clean (2 of 2 in a row)"}, {"t": 1793386482.7244768, "line": "  14.6s  hand_over  outcome      recovered"}, {"t": 1793386482.724894, "line": "  14.6s  hand_over  sbar         anthropic:claude-opus-5-5 answered in 0.0 s"}, {"t": 1793386482.7249289, "line": ""}, {"t": 1793386482.725042, "line": "Outcome: RECOVERED  (2 action(s) sent, 13 adapter calls, 14.6 s)"}, {"t": 1793386482.7252367, "line": "  root cause: dependency_slow on screening"}, {"t": 1793386482.7253273, "line": "  root cause: bad_config on payments"}, {"t": 1793386482.72549, "line": "  model calls: 2, estimated cost $0.0000"}, {"t": 1793386482.7255802, "line": ""}, {"t": 1793386482.725723, "line": "SITUATION: The bank payment journey has recovered. The last two of three recovery checks were clean, the final one at 24 s."}, {"t": 1793386482.7259002, "line": "BACKGROUND: The screening primary began timing out, and payments calls to it rose to p95 1003 ms against a 15 ms baseline, with 18% failing. Separately, a pipeline config change cut payments max_transfer_minor from 1000000 to 5000."}, {"t": 1793386482.726144, "line": "ASSESSMENT: Screening slowness caused 5% of payments to fail; the incident commander failed screening over to its standby, which now serves traffic. The limit change caused 45% of payments to be refused (for example 17415, 25904 and 39203); the incident commander reverted max_transfer_minor to 1000000, and checks are now clean."}, {"t": 1793386482.7263176, "line": "RECOMMENDATION: Investigate why the screening primary timed out before failing back from the standby, and find out why the pipeline set max_transfer_minor to 5000 so it is not reapplied. Operations should review payments that failed on screening timeouts or were refused by the 5000 limit and decide whether customers need to retry or be contacted."}, {"t": 1793386482.7269154, "line": ""}, {"t": 1793386482.726924, "line": "full result: runs/bank-27800/agent-1793386482.json"}, {"t": 1793386482.7269316, "line": ""}, {"t": 1793386482.7269363, "line": "waiting 31 s for a clean checker window (every customer retry finished), then asking the checker ..."}, {"t": 1793386513.7327302, "line": "CHECKER: RECOVERED"}], "jour": [{"t": 1793386450.437, "video_s": 0.555, "event": "caption", "step": "", "text": "Starting a fresh copy of the test bank, with its 20 simulated customers\u2026"}, {"t": 1793386453.087, "video_s": 3.205, "event": "bank_up"}, {"t": 1793386454.296, "video_s": 4.414, "event": "caption", "step": "1 \u00b7", "text": "Warm-up: everything is healthy. The customer pays SAR 400."}, {"t": 1793386454.412, "video_s": 4.53, "event": "click", "button": "pay", "label": "warm-up payment"}, {"t": 1793386454.736, "video_s": 4.854, "event": "result", "outcome": "ok", "title": "Payment accepted", "detail": "payment 68b924a80a11489a \u00b7 status posted", "http": "200"}, {"t": 1793386454.934, "video_s": 5.052, "event": "screenshot", "file": "shots/01-warmup-paid.png"}, {"t": 1793386454.964, "video_s": 5.082, "event": "cleared"}, {"t": 1793386463.232, "video_s": 13.35, "event": "faults_injected"}, {"t": 1793386463.281, "video_s": 13.399, "event": "caption", "step": "2 \u00b7", "text": "The incident: a pipeline change cuts the transfer limit, and fraud screening slows down."}, {"t": 1793386464.821, "video_s": 14.939, "event": "click", "button": "pay", "label": "new payment during the incident"}, {"t": 1793386464.989, "video_s": 15.107, "event": "result", "outcome": "rejected", "title": "Payment refused", "detail": "amount exceeds transfer limit", "http": "422"}, {"t": 1793386465.101, "video_s": 15.219, "event": "screenshot", "file": "shots/02-incident-refused.png"}, {"t": 1793386465.111, "video_s": 15.229, "event": "caption", "step": "3 \u00b7", "text": "The customer retries the same payment every 5 s while the incident commander works."}, {"t": 1793386470.136, "video_s": 20.254, "event": "click", "button": "retry", "label": "retry same payment"}, {"t": 1793386470.346, "video_s": 20.464, "event": "result", "outcome": "ok", "title": "Payment accepted", "detail": "payment 6bf857c2337c4aae \u00b7 status posted", "http": "200"}, {"t": 1793386470.356, "video_s": 20.475, "event": "caption", "step": "4 \u00b7", "text": "Paid. The payment posted once, under the same reference."}, {"t": 1793386470.469, "video_s": 20.587, "event": "screenshot", "file": "shots/03-retry-paid.png"}, {"t": 1793386472.98, "video_s": 23.098, "event": "caption", "step": "4 \u00b7", "text": "Retrying once more: the bank answers \u201calready paid\u201d with the same payment id. Paid exactly once."}, {"t": 1793386472.988, "video_s": 23.106, "event": "click", "button": "retry", "label": "retry after success (shows replayed)"}, {"t": 1793386473.23, "video_s": 23.348, "event": "result", "outcome": "ok", "title": "Already paid: this payment went through once and was not sent again", "detail": "payment 6bf857c2337c4aae \u00b7 status cleared", "http": "200"}, {"t": 1793386473.463, "video_s": 23.581, "event": "screenshot", "file": "shots/04-replayed.png"}, {"t": 1793386482.793, "video_s": 32.911, "event": "handover"}, {"t": 1793386482.809, "video_s": 32.927, "event": "caption", "step": "5 \u00b7", "text": "The incident commander hands over. The customer keeps banking normally."}, {"t": 1793386485.873, "video_s": 35.991, "event": "click", "button": "pay", "label": "fresh payment after recovery"}, {"t": 1793386486.073, "video_s": 36.191, "event": "result", "outcome": "ok", "title": "Payment accepted", "detail": "payment f5f9e9e7e02245f7 \u00b7 status posted", "http": "200"}, {"t": 1793386493.125, "video_s": 43.243, "event": "click", "button": "pay", "label": "second fresh payment after recovery"}, {"t": 1793386493.363, "video_s": 43.481, "event": "result", "outcome": "ok", "title": "Payment accepted", "detail": "payment fc9bbd1240774289 \u00b7 status posted", "http": "200"}, {"t": 1793386493.513, "video_s": 43.631, "event": "screenshot", "file": "shots/05-after-recovery.png"}, {"t": 1793386493.532, "video_s": 43.65, "event": "caption", "step": "6 \u00b7", "text": "The independent checker scores every customer's own log, this browser customer included."}, {"t": 1793386513.843, "video_s": 63.961, "event": "checker", "verdict": "CHECKER: RECOVERED"}, {"t": 1793386513.857, "video_s": 63.975, "event": "caption", "step": "6 \u00b7", "text": "CHECKER: RECOVERED, with the browser customer counted. Paid exactly once."}, {"t": 1793386515.495, "video_s": 65.613, "event": "screenshot", "file": "shots/06-checker.png"}, {"t": 1793386520.012, "video_s": 70.13, "event": "done"}], "cases": [{"id": "dev-01", "faults": [{"type": "crash", "params": {"target": "payments"}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "single: payments process killed", "fixes": [{"cls": "process_down", "target": "payments", "action": "restart"}]}, {"id": "dev-02", "faults": [{"type": "bad_update", "params": {}}], "distractors": 3, "escalate": false, "healthy": false, "notes": "single: payments 1.4 fails on larger payments", "fixes": [{"cls": "bad_release", "target": "payments", "action": "rollback"}]}, {"id": "dev-03", "faults": [{"type": "bad_setting", "params": {"variant": "transfer_limit"}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "single: rejects, not errors", "fixes": [{"cls": "bad_config", "target": "payments", "action": "revert_config"}]}, {"id": "dev-04", "faults": [{"type": "locked_ledger", "params": {}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "single: the job holding the lock is not the target", "fixes": [{"cls": "lock_held", "target": "ledger", "action": "release_lock"}]}, {"id": "dev-05", "faults": [{"type": "stopped_worker", "params": {}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "single: backlog grows, payments still accepted", "fixes": [{"cls": "process_down", "target": "clearing", "action": "restart"}]}, {"id": "dev-06", "faults": [{"type": "slow_screening", "params": {}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "single: slow dependency with a standby", "fixes": [{"cls": "dependency_slow", "target": "screening", "action": "failover"}]}, {"id": "dev-07", "faults": [{"type": "bad_setting", "params": {"target": "payments", "key": "max_transfer_minor", "value": 5000}}, {"type": "stopped_worker", "params": {"target": "clearing"}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "confusable: rejects vs backlog", "fixes": [{"cls": "bad_config", "target": "payments", "action": "revert_config"}, {"cls": "process_down", "target": "clearing", "action": "restart"}]}, {"id": "dev-08", "faults": [{"type": "crash", "params": {"target": "gateway"}}], "distractors": 3, "escalate": false, "healthy": false, "notes": "single: the entry point is down", "fixes": [{"cls": "process_down", "target": "gateway", "action": "restart"}]}, {"id": "dev-09", "faults": [{"type": "noise", "params": {"variant": "both"}}], "distractors": 1, "escalate": false, "healthy": true, "notes": "healthy: a harmless deploy and a busy job", "fixes": []}, {"id": "dev-10", "faults": [{"type": "network_outage", "params": {}}], "distractors": 3, "escalate": true, "healthy": false, "notes": "must escalate: the external network drops connections", "fixes": [{"cls": "external_outage", "target": "network", "action": "escalate"}]}, {"id": "dev-11", "faults": [{"type": "bad_setting", "params": {"variant": "screening_timeout"}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "confusable: looks like a screening outage, the setting is on payments", "fixes": [{"cls": "bad_config", "target": "payments", "action": "revert_config"}]}, {"id": "dev-12", "faults": [{"type": "crash", "params": {"target": "screening"}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "single: a dependency process killed", "fixes": [{"cls": "process_down", "target": "screening", "action": "restart"}]}, {"id": "dev-13", "faults": [{"type": "bad_setting", "params": {"variant": "transfer_limit"}}, {"type": "slow_screening", "params": {}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "double: failover first, then undo the limit; the failover must survive", "fixes": [{"cls": "dependency_slow", "target": "screening", "action": "failover"}, {"cls": "bad_config", "target": "payments", "action": "revert_config"}]}, {"id": "dev-14", "faults": [{"type": "locked_ledger", "params": {}}, {"type": "crash", "params": {"target": "payments"}}], "distractors": 3, "escalate": false, "healthy": false, "notes": "double: upstream lock first, then the crashed caller", "fixes": [{"cls": "lock_held", "target": "ledger", "action": "release_lock"}, {"cls": "process_down", "target": "payments", "action": "restart"}]}, {"id": "dev-15", "faults": [{"type": "bad_update", "params": {}}, {"type": "slow_screening", "params": {}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "double: errors from the release and slowness from the dependency", "fixes": [{"cls": "dependency_slow", "target": "screening", "action": "failover"}, {"cls": "bad_release", "target": "payments", "action": "rollback"}]}, {"id": "dev-16", "faults": [{"type": "noise", "params": {"variant": "deploy"}}, {"type": "bad_setting", "params": {"variant": "clearing_batch"}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "distractor: the gateway deploy is harmless; the batch size stops clearing", "fixes": [{"cls": "bad_config", "target": "clearing", "action": "revert_config"}]}, {"id": "dev-17", "faults": [{"type": "bad_setting", "params": {"variant": "screening_timeout"}}, {"type": "stopped_worker", "params": {}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "double: two unrelated components", "fixes": [{"cls": "bad_config", "target": "payments", "action": "revert_config"}, {"cls": "process_down", "target": "clearing", "action": "restart"}]}, {"id": "dev-18", "faults": [{"type": "noise", "params": {"variant": "cpu", "cpu_s": 150}}], "distractors": 2, "escalate": false, "healthy": true, "notes": "healthy: a busy job that is not a fault", "fixes": []}, {"id": "dev-19", "faults": [{"type": "slow_screening", "params": {"latency_ms": 900, "jitter_ms": 200}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "single: milder slowness", "fixes": [{"cls": "dependency_slow", "target": "screening", "action": "failover"}]}, {"id": "dev-20", "faults": [{"type": "crash", "params": {"target": "payments"}}, {"type": "bad_setting", "params": {"variant": "clearing_batch"}}, {"type": "slow_screening", "params": {}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "triple: upstream first, then the most impact per second", "fixes": [{"cls": "dependency_slow", "target": "screening", "action": "failover"}, {"cls": "bad_config", "target": "clearing", "action": "revert_config"}, {"cls": "process_down", "target": "payments", "action": "restart"}]}, {"id": "dev-21", "faults": [{"type": "bad_update", "params": {}}], "distractors": 3, "escalate": false, "healthy": false, "notes": "single: payments 1.4", "fixes": [{"cls": "bad_release", "target": "payments", "action": "rollback"}]}, {"id": "dev-22", "faults": [{"type": "locked_ledger", "params": {}}, {"type": "bad_setting", "params": {"variant": "transfer_limit"}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "double: upstream lock first, then the limit", "fixes": [{"cls": "lock_held", "target": "ledger", "action": "release_lock"}, {"cls": "bad_config", "target": "payments", "action": "revert_config"}]}, {"id": "dev-23", "faults": [{"type": "stopped_worker", "params": {}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "single: clearing stopped", "fixes": [{"cls": "process_down", "target": "clearing", "action": "restart"}]}, {"id": "dev-24", "faults": [{"type": "noise", "params": {"variant": "both"}}], "distractors": 1, "escalate": false, "healthy": true, "notes": "healthy", "fixes": []}, {"id": "dev-25", "faults": [{"type": "network_outage", "params": {"drop_pct": 1.0}}], "distractors": 1, "escalate": true, "healthy": false, "notes": "must escalate", "fixes": [{"cls": "external_outage", "target": "network", "action": "escalate"}]}, {"id": "dev-26", "faults": [{"type": "crash", "params": {"target": "gateway"}}, {"type": "slow_screening", "params": {}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "double: screening is upstream of the gateway through payments", "fixes": [{"cls": "dependency_slow", "target": "screening", "action": "failover"}, {"cls": "process_down", "target": "gateway", "action": "restart"}]}, {"id": "dev-27", "faults": [{"type": "bad_setting", "params": {"variant": "clearing_batch"}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "single: clearing takes nothing", "fixes": [{"cls": "bad_config", "target": "clearing", "action": "revert_config"}]}, {"id": "dev-28", "faults": [{"type": "crash", "params": {"target": "clearing"}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "single: clearing killed", "fixes": [{"cls": "process_down", "target": "clearing", "action": "restart"}]}, {"id": "dev-29", "faults": [{"type": "bad_setting", "params": {"variant": "screening_timeout"}}, {"type": "locked_ledger", "params": {}}], "distractors": 3, "escalate": false, "healthy": false, "notes": "double: the ledger is upstream of payments", "fixes": [{"cls": "lock_held", "target": "ledger", "action": "release_lock"}, {"cls": "bad_config", "target": "payments", "action": "revert_config"}]}, {"id": "dev-30", "faults": [{"type": "bad_update", "params": {}}, {"type": "noise", "params": {"variant": "deploy"}}, {"type": "stopped_worker", "params": {}}], "distractors": 1, "escalate": false, "healthy": false, "notes": "double with a distractor: rollback only payments", "fixes": [{"cls": "process_down", "target": "clearing", "action": "restart"}, {"cls": "bad_release", "target": "payments", "action": "rollback"}]}, {"id": "dev-31", "faults": [{"type": "unrecorded_payments", "params": {}}], "distractors": 3, "escalate": false, "healthy": false, "notes": "single: about half of payments are answered as posted but never reach the ledger; nothing errors", "fixes": [{"cls": "bad_release", "target": "payments", "action": "rollback"}]}, {"id": "dev-32", "faults": [{"type": "unrecorded_payments", "params": {}}, {"type": "stopped_worker", "params": {}}], "distractors": 2, "escalate": false, "healthy": false, "notes": "double: the stopped worker is loud, the unwritten payments are not; restart clearing, then roll back payments", "fixes": [{"cls": "process_down", "target": "clearing", "action": "restart"}, {"cls": "bad_release", "target": "payments", "action": "rollback"}]}], "t0": 1793386447.3044615, "t1": 1793386520.056586};
+const T0 = DATA.t0, TEND = DATA.t1 - T0;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- build the event list ---------- */
+const termRe = /^\s+([\d.]+)s\s+(\S+)\s+(\S+)\s+(.*)$/;
+const steps = [], term = [];
+let tAlert = null, tFaults = null, tBankUp = null, tHand = null, tCheck = null, tVerify = null, tAgentOutcome = null;
+const sbar = {};
+for (const x of DATA.term) {
+  const t = x.t - T0, line = x.line;
+  term.push({t, line});
+  if (line.startsWith("incident commander")) tAlert = t;
+  const m = line.match(termRe);
+  if (m) {
+    const s = {t, rel: parseFloat(m[1]), phase: m[2], name: m[3], text: m[4]};
+    steps.push(s);
+    if (s.phase === "verify" && tVerify === null) tVerify = t;
+    if (s.name === "outcome") tAgentOutcome = t;
+  }
+  const sb = line.match(/^(SITUATION|BACKGROUND|ASSESSMENT|RECOMMENDATION): (.*)$/);
+  if (sb) sbar[sb[1]] = sb[2];
+  if (line.startsWith("CHECKER:")) tCheck = t;
+}
+const jour = DATA.jour.map(x => ({...x, t: x.t - T0}));
+for (const j of jour) {
+  if (j.event === "bank_up") tBankUp = j.t;
+  if (j.event === "faults_injected") tFaults = j.t;
+  if (j.event === "handover") tHand = j.t;
+}
+
+const GLOSS = {
+  describe: "Map the system", observe: "Read every component's health", probe: "Test a real payment journey",
+  abcde: "ABCDE primary survey", containment: "Contain with a safe action", logs: "Read recent logs",
+  assess: "Triage: rank faults by impact", revert_config: "Undo the bad setting", check: "Recheck recovery",
+  outcome: "Declare the outcome", sbar: "Write the SBAR handover"
+};
+const PHASES = [["survey","Survey","look first"],["triage","Triage","rank"],["remediate","Remediate","safe fix"],["verify","Verify","recheck"],["hand_over","Hand over","SBAR"]];
+const MARKS = [
+  {t: tBankUp, l: "healthy"}, {t: tFaults, l: "faults", key: 1}, {t: tAlert, l: "alert"},
+  {t: tVerify, l: "verify"}, {t: tAgentOutcome, l: "handover", key: 1}, {t: tCheck, l: "checker", key: 1}
+];
+
+/* ---------- render at time T ---------- */
+const fmt = s => { s = Math.max(0, s); const m = Math.floor(s / 60); return m + ":" + (s - m * 60).toFixed(1).padStart(4, "0"); };
+const actions = steps.filter(s => s.name === "containment" || s.name === "revert_config");
+
+function stateAt(T) {
+  if (tCheck !== null && T >= tCheck) return ["Checker: recovered", "var(--ok)"];
+  if (tAgentOutcome !== null && T >= tAgentOutcome) return ["Handed over · recovered", "var(--ok)"];
+  if (tVerify !== null && T >= tVerify) return ["Verifying", "var(--accent)"];
+  if (tAlert !== null && T >= tAlert) return ["Responding", "var(--accent)"];
+  if (tFaults !== null && T >= tFaults) return ["Incident", "var(--crit)"];
+  if (tBankUp !== null && T >= tBankUp) return ["Healthy", "var(--ok)"];
+  return ["Starting", "var(--muted)"];
+}
+
+let lastKey = "";
+function render(T) {
+  $("#clk").textContent = fmt(T);
+  $("#clk2").textContent = tAlert !== null && T >= tAlert ? "alert +" + (T - tAlert).toFixed(1) + " s" : "into the run";
+  $("#scrub").value = Math.round(T / TEND * 1000);
+  document.querySelectorAll(".mark").forEach(m => m.classList.toggle("on", T >= +m.dataset.t));
+
+  const nTerm = term.filter(x => x.t <= T).length, nJour = jour.filter(x => x.t <= T).length;
+  const key = nTerm + "/" + nJour;
+  if (key === lastKey) return;
+  lastKey = key;
+
+  const [st, col] = stateAt(T);
+  $("#status").style.setProperty("--st", col);
+  $("#state").textContent = st;
+  const caps = jour.filter(x => x.t <= T && x.event === "caption");
+  const cap = caps.length ? caps[caps.length - 1].text : "Press play to watch the incident from the start.";
+  let sub = "";
+  if (st === "Incident") sub = "The alert fires 5 s after the faults land. Nobody tells the agent what broke.";
+  else if (st === "Responding") sub = "The agent surveys every component before it fixes anything.";
+  else if (st === "Verifying") sub = "Recovery needs two clean rechecks in a row.";
+  else if (st.startsWith("Handed")) sub = "The agent's job ends here. The checker now waits for a clean 20 s window of customer journeys.";
+  else if (st.startsWith("Checker")) sub = "The checker is separate code. It scores every customer's own log and the ledger, the browser customer included.";
+  $("#caption").innerHTML = esc(cap) + (sub ? "<small>" + esc(sub) + "</small>" : "");
+
+  /* customer */
+  const res = jour.filter(x => x.t <= T && x.event === "result");
+  const clicks = jour.filter(x => x.t <= T && x.event === "click");
+  if (res.length) {
+    const r = res[res.length - 1];
+    $("#receipt").innerHTML = `<div class="receipt" data-o="${esc(r.outcome)}"><div class="ttl">${esc(r.title)}</div><div class="det">${esc(r.detail)} · HTTP ${esc(r.http)}</div></div>`;
+  } else $("#receipt").innerHTML = `<div class="receipt"><div class="ttl">No payment yet</div><div class="det">the bank is warming up</div></div>`;
+  $("#custfeed").innerHTML = clicks.map(c => {
+    const r = jour.find(x => x.event === "result" && x.t >= c.t && x.t <= T);
+    return `<li><span class="t num">${fmt(c.t)}</span><span><span class="dot ${r ? esc(r.outcome) : ""}"></span>${esc(c.label)}${r ? ": <b>" + esc(r.http) + "</b>" : " …"}</span></li>`;
+  }).reverse().join("") || `<li class="empty">The customer's payments appear here.</li>`;
+
+  /* agent */
+  const seen = steps.filter(s => s.t <= T);
+  const cur = seen.length ? seen[seen.length - 1].phase : null;
+  const order = PHASES.map(p => p[0]);
+  const ci = cur ? order.indexOf(cur) : -1;
+  const done = tAgentOutcome !== null && T >= tAgentOutcome + 0.001 && seen.some(s => s.name === "sbar");
+  $("#phases").innerHTML = PHASES.map(([k, n, d], i) =>
+    `<div class="ph ${done || i < ci ? "done" : ""} ${!done && i === ci ? "now" : ""}">${n}<small>${d}</small></div>`).join("");
+  const surveyed = seen.some(s => s.name === "abcde");
+  $("#abcde").classList.toggle("lit", surveyed);
+  const ab = steps.find(s => s.name === "abcde");
+  $("#abcde-t").textContent = surveyed ? ab.text : "Primary survey: access, bottlenecks, capacity, dependencies, events";
+  const newest = seen.length ? seen[seen.length - 1].t : -1;
+  $("#steps").innerHTML = seen.map(s => `<li class="${s.t === newest && !done ? "new" : ""}"><span class="t num">${s.rel.toFixed(1)}s</span><span class="ph-tag">${esc(s.phase.replace("_", " "))}</span><span class="what"><b>${esc(GLOSS[s.name] || s.name)}</b><code>${esc(s.text)}</code></span></li>`).join("")
+    || `<li class="empty" style="display:block">${tFaults !== null && T >= tFaults ? "Waiting for the alert…" : "The system is healthy. The agent is not running."}</li>`;
+  const sl = $("#steps"); sl.scrollTop = sl.scrollHeight;
+
+  /* guard */
+  const acts = actions.filter(a => a.t <= T);
+  $("#acts").innerHTML = acts.map(a => {
+    const m = a.text.match(/^(\S+) (\S+): (\w+) \((.*)\)$/);
+    const [act, tgt, ok, why] = m ? m.slice(1) : [a.name, "", "done", a.text];
+    return `<div class="act"><div class="row"><span class="name">${esc(act)} ${esc(tgt)}</span><span class="pill ok">allowed · ${esc(ok)}</span></div><div class="why">${esc(why)}</div><div class="why num">at ${a.rel.toFixed(1)} s, during ${esc(a.phase)}</div></div>`;
+  }).join("") || `<p class="empty">No action yet. Every action the agent proposes is checked against the allowlist before it reaches the system.</p>`;
+  const checks = steps.filter(s => s.name === "check");
+  $("#looks").innerHTML = [0, 1, 2].map(i => {
+    const c = checks[i];
+    if (!c || c.t > T) return `<div class="look"><b>Look ${i + 1}</b>waiting</div>`;
+    const clean = /: clean/.test(c.text);
+    return `<div class="look ${clean ? "good" : "bad"}"><b>${clean ? "Clean" : "Not clean"}</b>look ${i + 1} · ${c.rel.toFixed(1)} s</div>`;
+  }).join("");
+
+  /* sbar */
+  const sbarOn = seen.some(s => s.name === "sbar");
+  $("#sbar").innerHTML = sbarOn
+    ? `<dl>${["SITUATION", "BACKGROUND", "ASSESSMENT", "RECOMMENDATION"].map(k => `<dt>${k[0]}</dt><dd><b>${k[0] + k.slice(1).toLowerCase()}.</b> ${esc(sbar[k] || "")}</dd>`).join("")}</dl>
+       <div class="note">This text is the recorded run's answer, so its times and figures are that run's (its final check at 24 s). This run handed over at ${steps.find(s => s.name === "sbar").rel.toFixed(1)} s. Root causes found: dependency_slow on screening, bad_config on payments.</div>`
+    : `<p class="empty">The handover appears when the agent declares recovery: situation, background, assessment, recommendation.</p>`;
+
+  /* checker */
+  if (tCheck !== null && T >= tCheck) {
+    $("#check").innerHTML = `<div class="verdict ok">CHECKER: RECOVERED</div>
+      <div class="stats">
+        <div class="stat"><b>224/224</b><span>customer journeys succeeded in the 20 s window</span></div>
+        <div class="stat"><b>0 · 0 · 0</b><span>ghost, lost and double payments</span></div>
+        <div class="stat"><b>4 → 4</b><span>browser references → ledger rows: paid exactly once</span></div>
+        <div class="stat"><b>2</b><span>actions sent, both allowlisted</span></div>
+      </div>`;
+  } else if (tAgentOutcome !== null && T >= tAgentOutcome) {
+    $("#check").innerHTML = `<p class="empty">Waiting for every customer retry to finish, then scoring a clean 20 s window of journeys (about 31 s).</p>`;
+  } else {
+    $("#check").innerHTML = `<p class="empty">The checker is separate from the agent. It decides at the end whether the bank really recovered.</p>`;
+  }
+}
+
+/* ---------- playback ---------- */
+let T = TEND, playing = false, speed = 2, lastFrame = 0;
+function frame(now) {
+  if (!playing) return;
+  const dt = (now - lastFrame) / 1000; lastFrame = now;
+  T = Math.min(TEND, T + dt * speed);
+  render(T);
+  if (T >= TEND) { playing = false; setPlay(); return; }
+  requestAnimationFrame(frame);
+}
+function setPlay() { $("#play").textContent = playing ? "❚❚ Pause" : (T >= TEND - 0.05 ? "▶ Play from start" : "▶ Play"); }
+$("#play").addEventListener("click", () => {
+  if (playing) { playing = false; setPlay(); return; }
+  if (T >= TEND - 0.05) { T = 0; lastKey = ""; }
+  playing = true; lastFrame = performance.now(); setPlay(); requestAnimationFrame(frame);
+});
+document.querySelectorAll(".speed button").forEach(b => b.addEventListener("click", () => {
+  speed = +b.dataset.s;
+  document.querySelectorAll(".speed button").forEach(x => x.setAttribute("aria-pressed", x === b));
+}));
+$("#scrub").addEventListener("input", e => { T = e.target.value / 1000 * TEND; lastKey = ""; render(T); setPlay(); });
+$("#marks").innerHTML = MARKS.filter(m => m.t !== null).map(m =>
+  `<button type="button" class="mark ${m.key ? "key" : ""}" data-t="${m.t}" style="left:${(m.t / TEND * 100).toFixed(2)}%">${m.l}</button>`).join("");
+document.querySelectorAll(".mark").forEach(m => m.addEventListener("click", () => { T = +m.dataset.t + 0.05; lastKey = ""; render(T); setPlay(); }));
+render(T); setPlay();
+
+/* ---------- test view ---------- */
+const REPO = "https://github.com/Oahsins/HUMAIN-Incident-Commander";
+const MODE_HELP = {
+  auto: "auto: the agent acts on its own, inside the guard's limits.",
+  confirm: "confirm: the agent asks you before each action. Type y or n in the terminal. A declined action is never sent.",
+  advise: "advise: the agent never acts. It surveys, triages and hands over a plan for a person to carry out."
+};
+const st = {dmode: "auto", cmode: "auto", os: "sh", filter: "all", id: "dev-13"};
+function seg(id, k) {
+  document.querySelectorAll(`#${id} button`).forEach(b => b.addEventListener("click", () => {
+    st[k] = b.dataset[Object.keys(b.dataset)[0]];
+    document.querySelectorAll(`#${id} button`).forEach(x => x.setAttribute("aria-pressed", x === b));
+    drawTest();
+  }));
+}
+seg("dmode", "dmode"); seg("cmode", "cmode"); seg("os", "os"); seg("filter", "filter");
+const kindOf = c => c.healthy ? "healthy" : c.escalate ? "escalate" : c.faults.length > 1 ? "multi" : "single";
+const KIND = {healthy: "healthy", escalate: "must escalate", multi: "two or more", single: "one fault"};
+const faultStr = f => f.type + (Object.keys(f.params).length ? "(" + Object.entries(f.params).map(([k, v]) => k + "=" + v).join(", ") + ")" : "");
+const install = () => `<span class="c"># once: get the code</span>
+git clone ${REPO}.git
+cd HUMAIN-Incident-Commander
+pip install -r requirements.txt
+`;
+function copyBtn(pre) {
+  const b = document.createElement("button"); b.type = "button"; b.className = "btn copy"; b.textContent = "Copy";
+  b.addEventListener("click", () => {
+    const text = pre.innerText.replace(/\nCopy$/, "").replace(/^Copy\n?/, "");
+    const done = () => { b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1500); };
+    try { navigator.clipboard.writeText(text).then(done, () => sel(pre)); } catch (e) { sel(pre); }
+  });
+  pre.appendChild(b);
+}
+function sel(el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+function drawTest() {
+  $("#cmd-console").innerHTML = install() + `
+<span class="c"># or on your own computer: the console, then open http://127.0.0.1:8088</span>
+python console/app.py`;
+  copyBtn($("#cmd-console"));
+  $("#dmode-help").textContent = MODE_HELP[st.dmode];
+  const dm = st.dmode === "auto" ? "" : " --mode " + st.dmode;
+  $("#cmd-demo").innerHTML = install() + `
+<span class="c"># the demo: a fresh bank, two faults, the agent, then the checker</span>
+python run.py demo${dm}`;
+  copyBtn($("#cmd-demo"));
+
+  const list = DATA.cases.filter(c => st.filter === "all" || kindOf(c) === st.filter);
+  if (!list.some(c => c.id === st.id)) st.id = list[0].id;
+  $("#cases").innerHTML = list.map(c => `<button type="button" class="case" aria-pressed="${c.id === st.id}" data-id="${c.id}"><b>${c.id}</b><span class="kind">${KIND[kindOf(c)]}</span><span>${esc(c.notes.replace(/^[a-z ]+: /, ""))}</span></button>`).join("");
+  document.querySelectorAll(".case").forEach(b => b.addEventListener("click", () => { st.id = b.dataset.id; drawTest(); }));
+  const c = DATA.cases.find(x => x.id === st.id);
+  const expect = c.healthy ? "No incident: the agent should change nothing." : c.escalate ? "Escalate to a person: no safe action fixes this." : "Recover: " + c.fixes.map(f => `${f.action} ${f.target} (${f.cls.replace(/_/g, " ")})`).join(", then ");
+  $("#chosen").innerHTML = `<div class="row" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="mono">${c.id}</b><span class="kind">${KIND[kindOf(c)]}${c.distractors ? " · " + c.distractors + " harmless decoy" + (c.distractors > 1 ? "s" : "") : ""}</span></div>
+    <div>${esc(c.notes)}</div>
+    <div class="faults">faults: ${c.faults.length ? esc(c.faults.map(faultStr).join(" + ")) : "none (busy but healthy)"}</div>
+    <details><summary>Show the answer key</summary><div class="key">${esc(expect)}</div></details>`;
+  const keyLine = st.os === "ps" ? `$env:ANTHROPIC_API_KEY = "sk-ant-..."` : `export ANTHROPIC_API_KEY=sk-ant-...`;
+  const cm = st.cmode === "auto" ? "" : " --mode " + st.cmode;
+  $("#cmd-case").innerHTML = install() + `${keyLine}
+
+<span class="c"># start the bank and its 20 customers, then break it</span>
+python run.py up
+python run.py inject --scenario scenarios/dev/dev.jsonl --id ${c.id}
+
+<span class="c"># the agent responds; then the independent checker scores it</span>
+python run.py agent${cm}
+python run.py check
+python run.py down`;
+  copyBtn($("#cmd-case"));
+}
+drawTest();
+
+/* ---------- views ---------- */
+function route() {
+  const v = location.hash === "#test" ? "test" : "watch";
+  $("#view-watch").hidden = v !== "watch"; $("#view-test").hidden = v !== "test";
+  $("#tab-watch").setAttribute("aria-current", v === "watch" ? "page" : "false");
+  $("#tab-test").setAttribute("aria-current", v === "test" ? "page" : "false");
+  if (v !== "watch" && playing) { playing = false; setPlay(); }
+}
+addEventListener("hashchange", route); route();
+</script>
+</body>
+</html>

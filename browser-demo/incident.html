@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Incident card</title>
+<style>
+  /* An incident card drawn live from the demo's own terminal lines (one step per line), plus the
+     agent's saved result once it exists. Nothing here is invented: every element maps to a line. */
+  :root { --bg:#0b1015; --panel:#111a21; --line:#22303a; --ink:#e6edf3; --muted:#8fa1b1; --dim:#5d6f7e;
+          --ok:#5ccf84; --okbg:#143524; --bad:#f0685c; --badbg:#3a1c1a; --warn:#e6a740;
+          --survey:#45c3d8; --triage:#d77ad1; --remediate:#e2b33c; --verify:#5ccf84; --hand_over:#7ea3ff;
+          --sans:system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"DejaVu Sans Mono",ui-monospace,Menlo,Consolas,monospace; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 var(--sans); }
+  .card { height:100%; display:grid; grid-template-rows:auto auto 1fr auto; gap:12px; padding:14px 16px; }
+  .top { display:flex; align-items:center; gap:12px; }
+  .title { font-size:18px; font-weight:650; }
+  .status { margin-left:auto; font:600 13px var(--sans); padding:6px 12px; border-radius:99px; background:var(--panel);
+            border:1px solid var(--line); color:var(--muted); transition:background .3s, color .3s; }
+  .status.bad { background:var(--badbg); color:var(--bad); border-color:var(--bad); }
+  .status.work { background:#2b2410; color:var(--warn); border-color:var(--warn); }
+  .status.ok { background:var(--okbg); color:var(--ok); border-color:var(--ok); }
+  .clock { font:500 13px var(--mono); color:var(--muted); min-width:92px; text-align:right; }
+  .steps { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
+  .step { border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--panel); opacity:.45;
+          transition:opacity .3s, border-color .3s; }
+  .step b { display:block; font-size:14px; } .step span { font:12px var(--mono); color:var(--muted); }
+  .step.on { opacity:1; } .step.now { box-shadow:0 0 0 2px currentColor inset; }
+  .step.survey { color:var(--survey); } .step.triage { color:var(--triage); } .step.remediate { color:var(--remediate); }
+  .step.verify { color:var(--verify); } .step.hand_over { color:var(--hand_over); }
+  .mid { display:grid; grid-template-columns:1.1fr 1fr; gap:12px; min-height:0; }
+  .box { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:12px; min-height:0; overflow:hidden;
+         display:flex; flex-direction:column; gap:8px; }
+  .h { font:600 11.5px var(--mono); letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .feed { display:flex; flex-direction:column; gap:5px; overflow:hidden; }
+  .feed div { display:grid; grid-template-columns:44px 74px 1fr; gap:8px; font-size:13px; animation:in .35s ease-out; }
+  .feed .t { font:12px var(--mono); color:var(--dim); text-align:right; } .feed .n { font:12px var(--mono); }
+  .letters { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
+  .letter { border:1px solid var(--line); border-radius:8px; padding:6px 8px; display:grid; gap:2px; animation:in .4s ease-out; }
+  .letter b { font-size:20px; line-height:1; } .letter i { font-style:normal; font-size:11px; color:var(--muted); }
+  .letter span { font:600 12px var(--mono); } .letter.hit { border-color:var(--bad); } .letter.hit b { color:var(--bad); }
+  .letter.clear b { color:var(--ok); }
+  .act { border:1px solid var(--ok); background:var(--okbg); border-radius:8px; padding:9px 11px; display:grid; gap:3px; animation:in .4s ease-out; }
+  .act.no { border-color:var(--bad); background:var(--badbg); }
+  .act .a { font:600 15px var(--mono); }
+  .act .d { font-size:12.5px; color:var(--ink); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .act { padding:7px 11px; }
+  .verifyrow { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .act .g { font:11.5px var(--mono); color:var(--ok); } .act.no .g { color:var(--bad); }
+  .cause { font-size:13px; display:flex; gap:8px; align-items:baseline; animation:in .4s ease-out; }
+  .cause code { font:600 12.5px var(--mono); color:var(--bad); }
+  .looks { display:flex; gap:8px; align-items:center; }
+  .look { width:30px; height:30px; border-radius:50%; border:2px solid var(--line); display:grid; place-items:center;
+          font:600 12px var(--mono); color:var(--dim); transition:all .3s; }
+  .look.clean { background:var(--ok); border-color:var(--ok); color:var(--bg); }
+  .look.dirty { border-color:var(--warn); color:var(--warn); }
+  .lookt { font-size:12.5px; color:var(--muted); }
+  .bottom { display:grid; grid-template-columns:1fr 250px; gap:12px; }
+  .sbar { display:grid; gap:4px; font-size:12.5px; line-height:1.35; }
+  .sbar div { display:grid; grid-template-columns:22px 1fr; gap:6px; animation:in .4s ease-out; }
+  .sbar b { font:700 13px var(--mono); color:var(--hand_over); }
+  .sbar span { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+  .verdict { border:2px dashed var(--line); border-radius:10px; display:grid; place-items:center; text-align:center; padding:10px;
+             font:600 15px var(--sans); color:var(--muted); }
+  .verdict.ok { border-style:solid; border-color:var(--ok); background:var(--okbg); color:var(--ok); font-size:19px; }
+  .verdict.no { border-style:solid; border-color:var(--bad); background:var(--badbg); color:var(--bad); }
+  .verdict small { display:block; font:500 12px var(--sans); color:var(--muted); margin-top:4px; }
+  .term { font:11.5px/1.45 var(--mono); color:var(--muted); background:#070b0e; border:1px solid var(--line); border-radius:8px;
+          padding:7px 10px; height:92px; overflow:hidden; white-space:pre; display:flex; flex-direction:column; justify-content:flex-end; }
+  .empty { color:var(--dim); font-size:13px; }
+  @keyframes in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top"><span class="title">Incident commander</span><span class="status" id="status">Waiting for the bank</span>
+    <span class="clock" id="clock"></span></div>
+  <div class="steps" id="steps"></div>
+  <div class="mid">
+    <div class="box"><div class="h">What it found</div><div class="letters" id="letters" hidden></div>
+      <div id="causes"></div><div class="feed" id="feed"><span class="empty">Nothing yet. The agent starts when the alert fires.</span></div></div>
+    <div class="box"><div class="h">Actions, through the guard</div><div id="acts"><span class="empty">No action yet.</span></div>
+      <div class="verifyrow"><div class="h">Verifying</div><div class="looks" id="looks"></div>
+      <div class="lookt" id="lookt">Needs 2 clean checks in a row.</div></div></div>
+  </div>
+  <div class="bottom">
+    <div class="box"><div class="h">Handover (SBAR)</div><div class="sbar" id="sbar"><span class="empty">Written when the agent hands over.</span></div></div>
+    <div class="verdict" id="verdict">Independent checker<small>scores the customers' own logs after the handover</small></div>
+  </div>
+</div>
+<script>
+const PHASES = [["survey", "Survey"], ["triage", "Triage"], ["remediate", "Remediate"], ["verify", "Verify"], ["hand_over", "Hand over"]];
+const LETTERS = { A: "Access", B: "Bottlenecks", C: "Capacity", D: "Dependencies", E: "Events" };
+const TRACE = /^\s*(\d+\.\d+)s\s+(survey|triage|remediate|verify|hand_over)\s+(\S+)\s+(.*)$/;
+const ACTION = /^([a-z_]+) ([a-z][a-z-]*)[^:]*: (done|refused|declined|failed|not sent)(?: \((.*)\))?$/;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+let faultSeen = null, resultAsked = false, shownLines = 0;
+
+$("steps").innerHTML = PHASES.map(([k, v]) => `<div class="step ${k}" id="st-${k}"><b>${v}</b><span>—</span></div>`).join("");
+setInterval(() => { if (faultSeen) $("clock").textContent = "T+" + ((Date.now() - faultSeen) / 1000).toFixed(1) + " s"; }, 100);
+
+function status(text, cls) { const s = $("status"); s.textContent = text; s.className = "status " + (cls || ""); }
+
+function render(lines) {
+  const steps = [], acts = [], looks = [], causes = [], sbar = {};
+  let outcome = null, checker = null, waiting = null, started = false, faults = false, agent = false, last = null;
+  for (const line of lines) {
+    if (/^starting a fresh/.test(line)) started = true;
+    if (/fault\(s\) injected/.test(line)) faults = true;
+    if (/^incident commander \(/.test(line)) agent = true;
+    const m = line.match(TRACE);
+    if (m) {
+      const [, t, phase, name, summary] = m;
+      last = { t: +t, phase, name, summary };
+      const a = summary.match(ACTION);
+      if (a && name !== "check") acts.push({ t: +t, action: a[1], target: a[2], status: a[3], detail: a[4] || "" });
+      else if (name === "check") looks.push(summary);
+      else steps.push(last);
+      steps.phaseStart = steps.phaseStart || {};
+      if (!(phase in steps.phaseStart)) steps.phaseStart[phase] = +t;
+      continue;
+    }
+    let x;
+    if ((x = line.match(/^Outcome: (\S+)\s+\((.*)\)/))) outcome = { word: x[1], detail: x[2] };
+    if ((x = line.match(/^\s+root cause: (\S+) on (\S+)/))) causes.push({ cls: x[1], target: x[2] });
+    if ((x = line.match(/^(SITUATION|BACKGROUND|ASSESSMENT|RECOMMENDATION): (.*)/))) sbar[x[1]] = x[2];
+    if ((x = line.match(/^waiting (\d+) s for a clean checker window/))) waiting = +x[1];
+    if (/^CHECKER:/.test(line)) checker = line;
+    if (/^full result:/.test(line) && !resultAsked) { resultAsked = true; loadResult(); }
+  }
+  if (faults && !faultSeen) faultSeen = Date.now();
+  // status
+  if (checker) status(checker.startsWith("CHECKER: RECOVERED") ? "Recovered · verified by the checker" : "Checker: not recovered", checker.startsWith("CHECKER: RECOVERED") ? "ok" : "bad");
+  else if (outcome) status(`Agent says ${outcome.word.toLowerCase()} · checker pending`, "work");
+  else if (agent) status("Responding", "work");
+  else if (faults) status("Incident · 2 faults · alert in 5 s", "bad");
+  else if (started) status("Healthy · warm-up");
+  // stepper
+  const ps = steps.phaseStart || {};
+  const lastPhase = last ? last.phase : null;
+  for (const [k] of PHASES) {
+    const el = $("st-" + k), on = k in ps;
+    el.classList.toggle("on", on);
+    el.classList.toggle("now", on && k === lastPhase && !checker);
+    el.querySelector("span").textContent = on ? `from ${ps[k].toFixed(1)} s` : "—";
+  }
+  // feed: the latest steps that are not actions or checks
+  if (steps.length) $("feed").innerHTML = steps.slice(-5).map((s) =>
+    `<div><span class="t">${s.t.toFixed(1)}s</span><span class="n" style="color:var(--${s.phase})">${esc(s.name)}</span><span>${esc(s.summary)}</span></div>`).join("");
+  if (causes.length) $("causes").innerHTML = causes.map((c) => `<div class="cause">root cause <code>${esc(c.cls)}</code> on <b>${esc(c.target)}</b></div>`).join("");
+  if (acts.length) $("acts").innerHTML = acts.map((a) => `<div class="act ${a.status === "done" ? "" : "no"}"><span class="a">${esc(a.action)} → ${esc(a.target)}</span>` +
+    `<span class="d">${esc(a.detail)}</span><span class="g">${a.t.toFixed(1)} s · guard ${a.status === "refused" ? "refused" : "allowed"} · ${esc(a.status)}</span></div>`).join("");
+  $("looks").innerHTML = [0, 1, 2].map((i) => { const l = looks[i]; const cls = !l ? "" : /: clean/.test(l) ? "clean" : "dirty";
+    return `<span class="look ${cls}">${i + 1}</span>`; }).join("");
+  if (looks.length) $("lookt").textContent = looks[looks.length - 1].replace(/; still abnormal:.*/, ": still abnormal");
+  const keys = Object.keys(sbar);
+  if (keys.length) $("sbar").innerHTML = keys.map((k) => `<div><b>${k[0]}</b><span>${esc(sbar[k])}</span></div>`).join("");
+  const v = $("verdict");
+  if (checker) { const ok = checker.startsWith("CHECKER: RECOVERED");
+    v.className = "verdict " + (ok ? "ok" : "no"); v.innerHTML = `${esc(checker)}<small>${ok ? "every customer's own log, this browser included" : ""}</small>`; }
+  else if (waiting !== null) v.innerHTML = `Independent checker<small>waiting ${waiting} s for a clean 20 s window</small>`;
+}
+
+async function loadResult() {
+  for (let i = 0; i < 20; i++) {
+    try {
+      const r = await fetch("/api/result");
+      if (r.ok) {
+        const { findings } = await r.json();
+        const by = {};
+        for (const f of findings || []) (by[f.letter] = by[f.letter] || []).push(f);
+        $("letters").innerHTML = Object.entries(LETTERS).map(([k, name]) => {
+          const faults = (by[k] || []).filter((f) => f.severity === "fault").length, all = (by[k] || []).length;
+          return `<div class="letter ${faults ? "hit" : "clear"}"><b>${k}</b><i>${name}</i><span>${faults ? faults + " fault" + (faults > 1 ? "s" : "") : all ? all + " note" : "clear"}</span></div>`;
+        }).join("");
+        $("letters").hidden = false;
+        return;
+      }
+    } catch (e) {}
+    await new Promise((res) => setTimeout(res, 500));
+  }
+}
+
+async function poll() {
+  try {
+    const r = await fetch("/api/terminal");
+    const { text } = await r.json();
+    const lines = text.split("\n");
+    if (lines.length !== shownLines) {
+      shownLines = lines.length;
+      render(lines);
+    }
+  } catch (e) {}
+  setTimeout(poll, 300);
+}
+poll();
+</script>
+</body>
+</html>
