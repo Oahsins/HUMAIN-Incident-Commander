@@ -728,8 +728,8 @@ const kindOf = c => c.healthy ? "healthy" : c.escalate ? "escalate" : c.faults.l
 const KIND = {healthy: "healthy", escalate: "must escalate", multi: "two or more", single: "one fault"};
 const faultStr = f => f.type + (Object.keys(f.params).length ? "(" + Object.entries(f.params).map(([k, v]) => k + "=" + v).join(", ") + ")" : "");
 const OS_HELP = {
-  sh: "On a Mac, open Terminal (press Cmd+Space, type Terminal, press Return); on Linux, any terminal. Copy one line at a time, paste it, press Return, and let it finish before the next.",
-  ps: "Open PowerShell from the Start menu. Copy one line at a time, paste it, press Enter, and let it finish before the next."
+  sh: "These are the Mac and Linux commands. On a Mac, open Terminal (press Cmd+Space, type Terminal, press Return); on Linux, any terminal. Copy one line at a time, paste it, press Return, and let it finish before the next.",
+  ps: "These are the Windows PowerShell commands. Open PowerShell from the Start menu. Copy one line at a time, paste it, press Enter, and let it finish before the next."
 };
 const cmdRow = cmd => `<div class="cmdrow"><code>${esc(cmd)}</code><button type="button" class="btn copy" data-cmd="${esc(cmd)}" aria-label="Copy ${esc(cmd)}">Copy</button></div>`;
 const howto = list => list.map((s, i) => `<li><span class="n">${i + 1}</span><div class="sb"><b class="st">${s.t}</b>${cmdRow(s.cmd)}${s.help ? `<p class="help">${s.help}</p>` : ""}${s.alt ? `<p class="help">${s.alt.label}</p>${cmdRow(s.alt.cmd)}` : ""}</div></li>`).join("");
@@ -744,17 +744,20 @@ document.addEventListener("click", e => {
 function setupSteps() {
   const W = st.os === "ps", win = W ? "PowerShell window" : "terminal window";
   return [
+    {t: "Go to your home folder first", cmd: "cd ~",
+     help: W ? "PowerShell often opens in C:\\Windows\\system32, where nothing can be saved. This moves you to your own folder under C:\\Users." : "This moves you to your own folder, so the code lands somewhere you can find it."},
     {t: "Check your Python", cmd: W ? "py --version" : "python3 --version",
      help: `It should print Python 3.11 or later. If not, install Python from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a>${W ? " (tick “Add python.exe to PATH”)" : ""}, then open a new ${win}.`},
     {t: "Get the code", cmd: `git clone ${REPO}.git`,
-     help: W ? `No git? Install it from <a href="https://git-scm.com/downloads/win" target="_blank" rel="noopener">git-scm.com</a>, then open a new PowerShell window.`
-             : "If your Mac offers to install the command line developer tools, accept, then run this line again."},
-    {t: "Go into the folder", cmd: "cd HUMAIN-Incident-Commander"},
+     help: (W ? `No git? Install it from <a href="https://git-scm.com/downloads/win" target="_blank" rel="noopener">git-scm.com</a>, then open a new PowerShell window.`
+             : "If your Mac offers to install the command line developer tools, accept, then run this line again.") + " If it says the folder already exists, you have it already: go on to the next step."},
+    {t: "Go into the folder", cmd: "cd HUMAIN-Incident-Commander",
+     help: "The prompt should now end in HUMAIN-Incident-Commander. Every step after this runs from here."},
     {t: "Make a separate Python for it", cmd: W ? "py -m venv .venv" : "python3 -m venv .venv",
      help: "A virtual environment, so nothing goes into your system Python."},
     {t: "Switch it on", cmd: W ? ".venv\\Scripts\\Activate.ps1" : "source .venv/bin/activate",
-     help: `The prompt now starts with (.venv). In a new ${win}, run steps 3 and 5 again first.`,
-     alt: W ? {label: "If PowerShell says running scripts is disabled, run this, then step 5 again:", cmd: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force"} : null},
+     help: `The prompt now starts with (.venv). In a new ${win}, run steps 1, 4 and 6 again first.`,
+     alt: W ? {label: "If PowerShell says running scripts is disabled, run this, then step 6 again:", cmd: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force"} : null},
     {t: "Install the packages", cmd: "python -m pip install -r requirements.txt -r requirements-eval.txt",
      help: "psutil, rich, pytest and matplotlib. About a minute."},
     {t: "Check that it works (optional)", cmd: "python -m pytest -q",
