@@ -49,6 +49,7 @@ HEALTHY_S = 50.0                      # after warm-up: about a minute of traffic
 RED_LIMIT_S = 40.0                    # a break shows in the verdict about 10-20 s after it
 GREEN_AFTER_S = WINDOW_S + LAG_S + 2  # the first verdict whose window starts after the fix
 GREEN_LIMIT_S = 80.0                  # a backlog can take a few seconds more to drain (unit-sync: about 41 s)
+LONG_GREEN_LIMIT_S = 150.0            # after 125 s with no action: the backlog grows with the outage (DISPATCH.md 6)
 TABLE_RED_AT_S = 35.0                 # spec 17.3: red about 35 s after the break, green about 35 s after the fix
 FIX_AT_S = 5.0                        # the real timing: the alert comes 5 s after the break ...
 VERDICT_AT_S = 125.0                  # ... and the verdict 125 s after it, on the window [95 s, 115 s)
@@ -634,7 +635,7 @@ def at_real_timing(platform, family):
     fixed_t = time.time()   # heal before the second run
     fix(platform, state)
     sleep_until(fixed_t + GREEN_AFTER_S)
-    held, v = poll_verdict(platform, fixed_t + GREEN_LIMIT_S, is_green)
+    held, v = poll_verdict(platform, fixed_t + LONG_GREEN_LIMIT_S, is_green)
     if not held:
         return problems + [f"{name}: still red after the fix: {explain(v)}"]
 

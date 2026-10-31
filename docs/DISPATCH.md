@@ -431,6 +431,25 @@ the start.
   green sooner than 30 s after the last failing call (window 20 s plus lag 10 s).
 - The drain with a surge was not measured.
 
+**Drain after a unit-sync outage.** An unreadable report stopped unit-sync for F seconds, then `quarantine` and
+`restart`, with no surge, on one copy alone on the machine (one run each, sampled every 5 s). Times are from the
+fix.
+
+| F | Backlog (pending at the fix) | Backlog cleared | First green verdict | Verdict 125 s after the break |
+|---|---|---|---|---|
+| 30 s | 51 | by 15 s | 40.3 s | green |
+| 60 s | 120 | by 25 s | 50.6 s | green |
+| 90 s | 185 | by 41 s | 66.1 s | red: "31 of 47 calls failed: 31 with no crew en route within 3 s of being told" |
+
+- While unit-sync is down, crews still take alerts and serve incidents, but CAD never hears of it: each
+  assignment becomes `no_ack`, and its incident returns to `pending` and is sent to another unit. Once unit-sync
+  is back, the reports from the outage are too old (`max_message_age_s`, 10 s) or superseded by each unit's
+  newest report, so every incident that no crew is serving at that moment is dispatched again, by
+  priority then id. The backlog grows with the outage, and fresh calls wait behind it: they were reached again
+  by about 10, 21 and 36 s after fixes at 30, 60 and 90 s (the first green verdict less 30 s).
+- At the harness's timing (11.6) a unit-sync outage is therefore judged recovered only when its fix comes within
+  about 70 s of the break. A dispatcher outage drains faster (the table above).
+
 **One call in N.** A scored window holds about 49 calls. A mechanism that touches one call in N misses a whole
 window with probability about (1 − 1/N)^49. Every failed call counts (section 10, zero failed calls).
 
@@ -914,6 +933,11 @@ The harness takes its verdict about 125 s after the last change it makes, on cal
 it (`window_s` 20, `lag_s` 10), with `since_t` the first change. **A fault must still act 95-115 s after it.**
 One that ends by itself before then (a short lock, a short surge, a one-time record write) is green with no
 action, and the case is excluded.
+
+A fix must also come early enough. After an outage the backlog drains in proportion to the outage's length,
+and fresh calls keep failing until it has drained (section 6). Measured on unit-sync: the right fix applied 60 s
+after the break was green at the verdict, and applied 90 s after it, red. An arm that fixes a unit-sync outage
+later than about 70 s after the break is judged red even with the right fix.
 
 ### 11.7 The far-future report
 
