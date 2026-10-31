@@ -73,6 +73,8 @@ The incidents were written by a separate Codex session and sealed 39 minutes bef
 | `abcde` vs `naive_verify` | False all-clear | [FILL] | [FILL] | [FILL] | [FILL] |
 | `abcde` vs `runbook` | User-impact seconds (Wilcoxon) | - | - | [FILL] | [FILL] |
 
+In the primary and secondary comparisons, b counts the cases only `abcde` succeeded on and c the cases only the other arm succeeded on, and each difference is `abcde` minus the other arm. False all-clear is the exception, because lower is better: there b counts the cases where only `abcde` gave a false all-clear, so a larger b or a positive difference counts against `abcde`. The Wilcoxon test gives no b, c or difference.
+
 **Where the runbook ties or wins:** [FILL, from the report's headline section].
 
 **By fault type** (descriptive, case success, from the report's registered strata). The runbook's six rules were written for the practice fault types only.
@@ -92,6 +94,8 @@ Two more pre-registered conditions, a changed log format and an extra service, w
 | Four faults at once | `abcde` | [FILL] / [FILL] | [FILL] |
 | Four faults at once | `runbook` | [FILL] / [FILL] | [FILL] |
 | Model swap (Claude Haiku 5.5, not tuned on) | `abcde` | [FILL] / [FILL] | [FILL] |
+
+Each change is in points, paired case by case with the main run: a negative change is a drop under the condition.
 
 ### Transfer: dispatch, a system built after the freeze, descriptive
 
