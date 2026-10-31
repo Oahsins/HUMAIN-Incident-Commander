@@ -5,8 +5,10 @@ bank, behind the same adapter. This document gives the facts about it that an in
 the users do, what the checker counts, and what each channel offers a fault. You can write incidents from it
 without reading the code in `targets/dispatch/`.
 
-The facts follow the code. A line that starts with `MEASURED:` marks a number the measurement step still owes.
-Do not use a guess in its place.
+The facts follow the code. The measured numbers come from live runs on a 4-CPU Linux machine with seed 0, and
+each table says how it was measured. Nothing was measured on Windows. Every measured number here was taken before
+the dispatcher's 30 s re-offer rule (11.1, Pending incidents), except the alerting outage given there. The rule
+changes nothing on a healthy copy.
 
 ## 1. What dispatch is
 
@@ -116,8 +118,10 @@ through the `dispatcher->alerting` relay and records the call under `alerting`. 
 ## 3. Settings
 
 Every setting is a number or a named choice. A bool is never usable. The defaults are safe. A component reads
-its settings at most 0.2 s old. The workers sleep in 0.25 s slices and wake early when a setting changes, so
-`revert_config` takes effect within about 0.25 s.
+its settings at most 0.2 s old. The workers sleep in 0.25 s slices and wake early when a setting changes. The
+sleep compares with the settings the cycle started with, so a change made during a cycle also cuts short the
+sleep its old `poll_interval_s` set. So `revert_config` takes effect within about 0.25 s, or about 0.25 s after
+the cycle in progress ends.
 
 | Component | Setting | Default | Usable values | When unusable |
 |---|---|---|---|---|
@@ -142,11 +146,31 @@ its settings at most 0.2 s old. The workers sleep in 0.25 s slices and wake earl
 - **Harmful.** A usable but harmful value is used as given. A dispatcher `poll_interval_s` of 30 makes every
   dispatch late.
 
-**Harmless ranges**, for background changes:
+**Harmless ranges**, for background changes. Measured on one copy while three other copies shared the
+machine, with healthy links. Each value was held 35 s, then judged on three 20 s windows (lag 10 s) 20 s apart.
+Every value tried was green in all three windows.
 
-MEASURED: the harmless range of every setting above, on three copies with a surge at the cap and without one
-(`positions` both ways, dispatcher `poll_interval_s`, `ack_timeout_s`, unit-sync `batch_size`,
-`max_message_age_s`, and the rest), from the step-7 soak.
+| Component | Setting | Values tried | Harmless range |
+|---|---|---|---|
+| call-handling | `positions` | 6, 4 | 4-14 |
+| call-handling | `positions`, during a surge at the cap (3.0 per second, medical mix) | 14, 12, 10 | 10-14 (answer p95 at most 103 ms) |
+| call-handling | `rollover_s` * | 1.0, 5.0 | 1.0-5.0 |
+| call-handling | `ali_timeout_s` * | 0.3, 2.0 | 0.3-2.0 |
+| call-handling | `cad_timeout_s` * | 0.5, 3.0 | 0.5-3.0 |
+| cad | `write_timeout_ms` * | 200, 5000 | 200-5000 |
+| dispatcher | `poll_interval_s` | 0.5, 1.0 | 0.2-1.0 |
+| dispatcher | `ack_timeout_s` | 1.5, 1.0, 10 | 1.0-10 |
+| dispatcher | `alert_timeout_s` * | 0.5, 3 | 0.5-3 |
+| unit-sync | `poll_interval_s` | 0.5, 1.0 | 0.2-1.0 |
+| unit-sync | `batch_size` | 50, 10 | 10-200 |
+| unit-sync | `max_message_age_s` | 2, 1 | 1-10 |
+
+- \* These five were changed together: all five low values in one test, all five high values in another.
+- The ranges assume healthy links. No value tried was red, so where harm starts is not known.
+- `positions` 4 leaves answer p95 unchanged without a surge, because everyday callers arrive every 0.35-0.55 s,
+  not at random.
+- Not measured: dispatcher `batch_size` and `recommend_by`, `positions` below 4, and any setting other than
+  `positions` during a surge. cad `repeat_match` "off" is a break (section 12).
 
 ## 4. Data
 
@@ -205,6 +229,10 @@ move to a closed assignment state, and every incident close, sets `closed_t`.
 - `units` holds only what the field reported, plus the seed and the probe's TEST-1 cleanup.
 - incident-archive `--export` inserts `rms_export` rows only.
 
+**Growth.** Nothing prunes `field_queue`. It grows by about 28 rows a second, every heartbeat and status report.
+In the 30-minute soak (section 7) it reached about 53,000 rows and 11 MB with its indexes, 70% of cad.db, which
+reached about 16 MB per copy, plus a 4.4 MB write-ahead log.
+
 **Seed.**
 
 - **Stations** on a 20 × 20 km grid: S1 (4, 4), S2 (16, 4), S3 (10, 10), S4 (4, 16), S5 (16, 16).
@@ -243,6 +271,7 @@ never logged or raised.
 | `checker_baseline.json` | the warm-up baseline (section 10) |
 | `logs/<component>.jsonl`, `logs/*.out` | component logs and process output |
 | `logs/call-surge-<pid>.jsonl` | each surge helper's caller lines |
+| `releases/<component>/v<x_y>.py` | a copy of each release deployed with `module_path` (11.1, Releases) |
 | `actions.jsonl`, `changes.jsonl` | the agent's actions, and every recorded change |
 
 ## 5. Users and the users' log
@@ -265,16 +294,20 @@ sentence, and its true location. Each call writes exactly one caller line when i
 
 | Outcome | When |
 |---|---|
-| `told` | the report answered 200 |
+| `told` | the report answered 2xx with a JSON object holding `"told": true` and a whole incident id, 0 < id < 2^63 (the releases here answer 200) |
 | `rolled_over` | the dial got 503 `{"error": "rolled over"}` |
-| `not_answered` | the dial got another 5xx, or an answer without a call id |
+| `not_answered` | the dial got another 5xx; or a malformed HTTP answer, or a 2xx answer that is not a JSON object holding a call id, a string of 1-64 characters (both `status` `bad_response`) |
 | `rejected` | the dial got a 4xx, or the report a 4xx other than 404 |
 | `refused` | the dial's connection was refused |
 | `cut_off` | the dial's connection was reset, as a restart of call-handling does |
 | `dropped` | after the answer, the report got 404, or a refused or reset connection |
-| `not_entered` | the report got a 5xx |
+| `not_entered` | the report got a 5xx; or a malformed HTTP answer, or a 2xx answer that is not a JSON object holding `"told": true` and a whole incident id (both `status` `bad_response`). So a release whose report answer lacks the incident id fails its callers as "answered but not told help is on the way" (`not_told`), not under `told_without_incident` |
 | `timeout` | a client timeout at either step |
 
+- **Windows.** There a connection to a closed local port is refused only after about 2 s. So a report sent while
+  call-handling is down usually ends as `timeout` (its client timeout is 2.0 s), not `dropped`, and does not
+  count in `calls_dropped`; a dial then takes about 2 s before `refused`. The verdict is red either way. Not
+  measured: it follows from the code and that platform behaviour.
 - **Redial.** After `refused`, `cut_off`, `not_answered`, `dropped`, `not_entered` or `timeout`, the caller
   dials again 0.3-0.6 s later: kind `redial`, the same number, a new call. Only while the emergency's first dial
   is under 7.0 s old, and at most 3 calls in all. Never after `rolled_over` (the backup centre has the call),
@@ -343,27 +376,60 @@ Numbers are fictional: `0PP-555-01NN`. No area code starts with 0, and 555-01NN 
 | Who | PP | Numbers | Reuse |
 |---|---|---|---|
 | Everyday callers | 10-39 | 3,000, in turn | each number after about 23 minutes |
-| Surge callers | 40-89, five blocks of ten PP (1,000 numbers each) | one block per helper, so at most five helpers at once; a helper continues its block where the last one stopped | after 1,000 emergencies, at least 333 s at the cap |
+| Surge callers | 40-89, five blocks of ten PP (1,000 numbers each) | one block per helper, so at most five helpers at once; a helper continues its block where the last one stopped | after its block has placed 1,000 more emergencies, at least 333 s at the cap |
 | The probe | 99 (`099-555-0100` to `099-555-0199`) | NN = seq % 100 | |
+
+- **Surge blocks.** A helper takes the first block no running helper holds. Its numbers go in turn:
+  `area.surge_number(block, index)` takes the index modulo 1,000. The slot file `surge-slots/<k>` holds
+  `{"pid", "next"}`. While a helper runs, the file's `next` stays up to ten numbers ahead of the ones it has used;
+  when it ends, it saves its exact place. The next helper on that block goes on from `next`, so a helper killed
+  mid-run makes its successor skip at most about ten numbers and never repeat one. One surge starts at most 1,000
+  emergencies (11.3), so one run never uses a number twice.
+- **A number comes round.** An everyday number returns after about 23 minutes. If that number's incident is
+  still open then, cad links the new emergency's call to it, and the checker counts that caller under
+  `told_without_incident` (`other_emergency`). This matters only on a copy that has run for more than about 22
+  minutes.
 
 ## 6. Load, capacity and drain
 
 **Everyday load on one copy.**
 
 - About 2.2 emergencies per second plus 10% callbacks: about 2.4 calls per second, about 49 calls per 20 s
-  window. The checker needs at least 20.
-- About 20% of positions busy, and about 20% of units committed.
+  window. The checker needs at least 20. In the soak (section 7) a 20 s window outside surges held 43-54 calls
+  (median 48-49), and up to 122 during a surge at the cap.
+- About 20% of positions busy, and about 20% of units committed. In the soak: 2.2 of 14 positions busy on
+  average outside surges (at most 5), and 3-4 of 20 units committed at the median (at most 16).
 - About 27 field reports per second: 20 heartbeats plus about 7 status changes.
 
-**Capacity.**
+**Capacity.** Measured on one copy while three other copies shared the machine. Each surge ran 150 s with the
+normal mix, judged on 20 s windows (lag 10 s). The medical row is one 240 s surge, with `positions` set to 14,
+then 12, then 10.
 
-MEASURED: the capacity table, live on three copies: extra calls/s | calls per window | windows breaching |
-medical incidents sent an engine | incidents waiting.
+| Extra calls/s (surge) | Calls per window | Windows breaching | Medical incidents sent an engine | Incidents waiting: pending max, oldest |
+|---|---|---|---|---|
+| 0 (none) | 47-50 | 0 of 3 | 0 of 76 | 1-2, 0.16 s |
+| 1.1 (surge 1.0) | 66-77 | 0 of 7 | 0 of 283 | 2, 0.19 s |
+| 2.1 (surge 2.0) | 79-98 | 0 of 7 | 1 of 360 | 2, 0.19 s |
+| 3.5 (surge 3.0, the cap) | 107-128 | 0 of 7 | 21 of 463 | 3, 0.19 s |
+| 3.3 (surge 3.0, medical) | 97-131 | 0 of 9 | 164 of 1,037 | 4, 0.20 s |
 
-**Drain.**
+- The checker's `incidents_waiting` was 0 in every window. A rate above the cap cannot be run: the helper refuses
+  it.
+- In the soak, all three copies ran a medical surge at the cap at once and none breached. Call-taker positions
+  are the tightest resource: 13 of 14 busy at the peak.
 
-MEASURED: the drain table: after the dispatcher has been out for D = 10, 30 and 60 s, with no surge and with a
-surge at the cap, how long until fresh calls meet the reach target again.
+**Drain.** The dispatcher stopped for D seconds, then started, with no surge, on the same copy. Times are from
+the start.
+
+| D | Backlog (pending max) | Backlog cleared | Fresh calls reached again | First green verdict |
+|---|---|---|---|---|
+| 10 s | 22 | 4.0 s | at once | 28.6 s |
+| 30 s | 68 | 10.1 s | after 4.7 s (7 calls failed) | 35.0 s |
+| 60 s | 133 | 19.1 s | after 14.7 s (18 calls failed) | 46.1 s |
+
+- The first green window was also the first in which every call reached a crew within 3 s. A verdict cannot be
+  green sooner than 30 s after the last failing call (window 20 s plus lag 10 s).
+- The drain with a surge was not measured.
 
 **One call in N.** A scored window holds about 49 calls. A mechanism that touches one call in N misses a whole
 window with probability about (1 − 1/N)^49. Every failed call counts (section 10, zero failed calls).
@@ -401,11 +467,34 @@ warm-up p95 (section 10).
 | Crew report to CAD record | terminal, cad, unit-sync | 0.05-0.5 s | lag allowance 3.0 s |
 | En route to on scene, then available | crew | drive 0.3-1.8 s, then 0.6-1.2 s on scene | the 4.0 s status timer (a monitor) |
 
-MEASURED: healthy times on three copies with a surge at the cap: answer time p50, p90, p95, p99 and max;
-told after answer; en route after told; record lag.
+**Healthy times, measured.** A 30-minute soak of three copies (port bases 9600, 9700 and 9800), with a fourth
+copy sharing the machine throughout. Each copy ran two 150 s surges at the cap (five medical, one normal), one of
+them at minute 20 on all three copies at once, and one copy ran an `--export`. All 16,047 calls succeeded: 0
+failed calls in all 270 back-to-back 20 s windows and in 5,343 sliding ones, and all 183 live verdicts were
+green. Seed 0 makes the three copies replay the same callers, so they are not independent samples.
 
-MEASURED: the p95 band chosen (the bank's band `min(1000, max(2b, b + 250))` with b the warm-up answer p95, or
-a flat 1000 ms if the three-copy soak breached it), with the measured b.
+| Measure (three copies pooled) | p50 | p90 | p95 | p99 | max |
+|---|---|---|---|---|---|
+| Answer time, all 16,047 calls (ms) | 5.8 | 7.1 | 7.5 | 8.8 | 54.0 |
+| Answer time, the 5,096 calls during surges (ms) | 5.8 | 7.1 | 7.4 | 8.7 | 11.9 |
+| Told after answer (s) | 1.17 | 1.52 | 1.56 | 1.59 | 1.64 |
+| First crew en route after told, first calls (s) | 0.45 | 0.56 | 0.59 | 0.62 | 0.69 |
+
+**Record lag**, from a crew's status line to the matching `unit_history` row, over 43,802 status changes: p50
+0.104 s, p90 0.183 s, p99 0.202 s, p99.9 0.209 s, max 0.356 s (p99.9 0.216 s during surges). No status change
+was skipped, and no row showed a state its crew had already left.
+
+**The p95 band is kept**: the bank's `min(1000, max(2b, b + 250))`, with b the copy's warm-up answer p95
+(DECISIONS, dispatch row 2). No healthy window came near it.
+
+| Copy | Warm-up p95 b | Band | Worst 20 s window p95 |
+|---|---|---|---|
+| 9600 | 7.9 ms | 257.9 ms | 10.8 ms |
+| 9700 | 7.5 ms | 257.5 ms | 9.4 ms |
+| 9800 | 8.5 ms | 258.5 ms | 9.3 ms |
+
+Answer p90 never went above 8.7 ms in a window. The band is never below 250 ms, though the warm-up baseline
+holds only about 21 calls.
 
 ## 8. Monitors
 
@@ -417,7 +506,7 @@ cause is fixed. Integrity counts leave out test rows and TEST-1; queue keys coun
 | On | Key | Definition | Reason (real practice) | Healthy |
 |---|---|---|---|---|
 | call-handling | `queue_depth`, `oldest_pending_s`, `processed_per_s` | calls ringing now; the longest current ring; calls answered per second | the call queue wallboard | 0-1; under 0.1 s; about 2.4 |
-| dispatcher | `queue_depth`, `oldest_pending_s`, `processed_per_s` | real `pending` incidents; seconds since the oldest was created; units the dispatcher committed per second. Read from cad-db, so they show while the dispatcher is down. No `head_item`: these are live calls | CAD's pending-incident list | 0-2; under 0.3 s |
+| dispatcher | `queue_depth`, `oldest_pending_s`, `processed_per_s` | real `pending` incidents; seconds since the oldest was created; units the dispatcher committed per second. Read from cad-db, so they show while the dispatcher is down. No `head_item`: these are live calls | CAD's pending-incident list | 0-2, up to 5 during a surge at the cap; under 0.3 s |
 | dispatcher | `integrity.units_not_acknowledging` | real units with an assignment `assigned` or `alerted` for more than 3.0 s | the "dispatched, not acknowledged" timer | 0 |
 | cad | `integrity.unit_status_timers_expired` | real units whose record has been `enroute` or `onscene` for more than 4.0 s | the en-route and on-scene status (welfare) timers | 0 |
 | cad | `integrity.possible_duplicate_incidents` | open real incidents that share a number with another open real incident | duplicate-call detection by number | 0 |
@@ -426,7 +515,25 @@ cause is fixed. Integrity counts leave out test rows and TEST-1; queue keys coun
 | cad-db | `lock_holders [{session, mode, held_s, statement}]` | the live registered lock holders | the database lock view | `[]` |
 | cad-db | `write_errors` | failed writes of cad, the dispatcher and unit-sync together; null when none of them answers | the failed-write counter | 0 |
 | cad-db | `up` false with `extra.error` "cad-db cannot be read (<ExceptionType>)" | cad.db cannot be opened or read | | up true |
-| incident-archive | `runs`, `cpu_pct`, `mem_mb` | running jobs named `incident-archive`, and their CPU and memory | the job monitor | 0, null |
+| incident-archive | `runs`, `cpu_pct`, `mem_mb` | running jobs named `incident-archive`, and their CPU and memory, summed over each run and the processes it started (on Windows a venv's `python.exe` is a launcher that runs Python as its child). `cpu_pct` is the CPU since the previous observe(), so the first observe() of a run reads 0 | the job monitor | 0, null |
+
+In the 30-minute soak (section 7) every monitor stayed at its healthy value, `write_errors` stayed 0 and no lock
+holder showed, even during an `--export`. The dispatcher's `queue_depth` reached 3-5 only during surges at the
+cap, and no component wrote a WARN or ERROR line. Two breaks barely show in observe():
+
+- **A short `ack_timeout_s`** shows in no integrity key, and in the measured run observe() showed nothing. The
+  changes feed shows it, and so does the dispatcher's log: a WARN `no_acknowledgement` line, "<unit> did not
+  acknowledge incident N in time", for every assignment that expires, with no rate limit. At 0.05 s nearly every
+  assignment expires before its crew's en route report is applied, so these lines come several a second. From
+  the code, not measured: most incidents are then committed to two units or more, so the dispatcher's
+  `processed_per_s` runs at about twice the rate of new incidents or more.
+- **`repeat_match` "off"** shows in the changes feed, and in cad's `possible_duplicate_incidents` again and again
+  while it lasts, though any one observe() more often reads 0. Each callback opens a second incident, and the
+  count includes both incidents of that number from then until the first one closes, about 1-2 s. Callbacks come
+  about every 4.5 s, so roughly one observe() in three or four reads 2 (estimated from the code; measured: 2 at
+  15 s into the break).
+
+Section 12 gives what observe() showed for each break.
 
 The checker's counts (section 10) never appear in observe(). Staff learn of them through callbacks, crews on the
 radio, or later review.
@@ -447,28 +554,34 @@ false with one step `journey`, "no journey named that". The probe never raises.
 
 | # | Step | Passes when | Detail on failure |
 |---|---|---|---|
-| 1 | call-handling | POST `/dial` (3.5 s timeout) answers with a `call_id` | the error, e.g. "rolled over" |
-| 2 | cad | the report (nature `test`, a spoken location only if ALI gave none) answers told with an `incident_id`; a 502 or 504 whose `at` is `cad` names cad | the status and error |
+| 1 | call-handling | POST `/dial` (3.5 s timeout) answers with a `call_id` | the status and error, e.g. "503 rolled over", or the error kind (`refused`, `timeout`, `bad_response`); "answered without a call id" when the answer holds no string `call_id` |
+| 2 | cad | the report (nature `test`, with a location only if ALI gave none or one more than 0.05 km from (0, 0)) answers told with an `incident_id`; a 502 or 504 whose `at` is `cad` names cad, any other error names call-handling | the status and error, or the error kind; "the caller was not told help is on the way" (step cad) when the answer's `told` is missing or false, or its `incident_id` is not a whole number |
 | 3 | cad-db | the incident exists with `test` 1, is open, holds this call, and has the test location and priority | "incident not recorded" or "incident differs from the call" |
 | 4 | call-network | the dial carried a location within 0.05 km of (0, 0) | "location not verified (unavailable)" or "location not verified (differs)" |
 | 5 | dispatcher | an assignment of the incident to TEST-1 appears within 2.5 s | "no unit committed within 2.5 s" |
 | 6 | alerting, or alerting-backup after a failover | the active side's inbox holds that assignment within 1.0 s | "alert not delivered on <side> within 1.0 s" |
-| 7 | unit-sync | the probe, as TEST-1's terminal, posts `enroute` to cad `/mdt`, and TEST-1's record shows it within 1.5 s; then it posts `available` without waiting. A failed post is reported as step `cad` | "unit record not updated within 1.5 s" |
+| 7 | unit-sync | the probe, as TEST-1's terminal, posts `enroute` to cad `/mdt`, and TEST-1's record shows it within 1.5 s; then it posts `available` without waiting. A failed post is reported as step `cad` | "unit record not updated within 1.5 s"; for a failed post, "unit report not taken in: " and the status and error, or the error kind |
 
-A healthy probe takes well under 1 s. The worst case is about 11 s, inside the adapter's 15 s. No crew is ever
-alerted: TEST-1 has no crew, and `test_alerts_to_crews` proves it. Test rows are left out of every monitor and
-checker count, and the probe never writes the users' log.
+A healthy probe takes about 0.3 s. The worst case, every step slow but passing, is about 13.5 s (0.5 s cleanup,
+3.5 + 2.5 s for the call, 2.5 + 1.0 s of polls, then 1.0 + 1.5 + 1.0 s for TEST-1's two reports), inside the
+adapter's 15 s. No crew is ever alerted: TEST-1 has no crew, and `test_alerts_to_crews` proves it. Test rows
+are left out of every monitor and checker count, and the probe never writes the users' log.
 
 ## 10. The checker
 
 `targets/dispatch/checker.py`:
 
 - `verify(control, *, window_s=20.0, lag_s=10.0, since_t=None)` gives the verdict;
-- `record_baseline(control, window_s)` runs once at the end of warm-up;
+- `record_baseline(control, window_s=10.0)` runs once at the end of warm-up;
 - `p95_allowed(baseline)` gives the band.
 
 It reads the users' log, every surge log, cad-db (read-only, 5000 ms busy timeout) and `checker_baseline.json`.
 It never reads observe(), monitors, `changes.jsonl`, `actions.jsonl` or labels.
+
+**Cost.** Every call reads the whole users' log and `incident_events`, so `verify` slows as a copy runs, even
+without `since_t`. In the soak (section 7, four copies sharing the machine) it took 14-19 ms at minute 1. At
+minute 30 it took about 190 ms without `since_t` (291 ms at most) and about 400 ms with `since_t` at the start
+(482 ms at most).
 
 ### 10.1 Constants
 
@@ -491,7 +604,15 @@ It never reads observe(), monitors, `changes.jsonl`, `actions.jsonl` or labels.
 | `FOR_OPERATIONS_CAP` | 50 | |
 | `FIELD_WAIT_S` | 3.0 | a pending report older than this is waiting (information only) |
 
-MEASURED: the lag allowance, only if the measurement step changes `LAG_ALLOW_S` from 3.0 (never below 1.5 s).
+**`LAG_ALLOW_S` stays 3.0 s** (DECISIONS, dispatch row 2). Over 43,802 status changes the healthy apply lag
+was 0.209 s at p99.9 and 0.356 s at most (section 7), so amendment D5 allowed 1.5 s. It stays 3.0 s because
+every table and break-and-heal result here was measured at 3.0 s, and the transfer run puts three copies on one
+laptop. The cost: a record that lags its crew by less than 3.0 s, still showing a state the crew held in the
+last 3.0 s, is never counted. A record that is simply wrong is counted however briefly it lasts: a row showing a
+state the crew did not hold from 3.0 s before it to 0.05 s after it counts under rule W (10.4), for example
+`onscene` written while the crew is still en route. A crew is away from `available` for at most about 2.9 s per
+job, so a unit record stuck at `available` is never counted: a unit frozen there shows as incidents with two
+crews en route, not as wrong unit records (10.4, 11.7).
 
 ### 10.2 Notation
 
@@ -540,7 +661,7 @@ verdict shows.
 | `told_without_incident` | calls in W told help is on the way that do not belong. `told_without_incident_by` splits them `{missing, test, other_emergency, closed_before_link}` | "N callers were told help is on the way but CAD holds no incident of theirs" |
 | `incidents_dropped` | distinct incidents I told to a call in W that belongs, told at least 3.0 s ago, where no real crew ever went en route to I and CAD is no longer working I (not `pending`, and no `assigned` or `alerted` assignment newer than 3.0 s). An incident deleted after the caller was told counts here | "N incidents callers were told about were dropped: no crew ever went en route and CAD is no longer working them" |
 | `unit_records_wrong` | real units wrong by rule W or rule S (below). `unit_records_wrong_by` gives `{wrong_writes, units_behind}` | "N units' CAD records differed from their crews for longer than the 3 s status lag" |
-| `duplicate_incidents` | for each emergency with a call in W, its real incidents (deleted ones included) created while another of them was still open | "N incidents duplicate an open incident of the same emergency" |
+| `duplicate_incidents` | for each emergency with a call in W, its real incidents (deleted ones included) created while another of them was still open. Two created in the same millisecond (one transaction) are ordered by id, so the second counts | "N incidents duplicate an open incident of the same emergency" |
 | `incidents_double_sent` | distinct incidents told to a call in W that belongs, with two or more real crews en route | "N incidents had more than one crew en route" |
 | `units_double_committed` | real units with two assignments whose times overlap, the overlap meeting [lo, hi) | "N units were committed to two incidents at once" |
 | `incident_details_wrong` | calls in W told, belonging, without details_ok | "N calls were entered in CAD with details other than their callers'" |
@@ -552,6 +673,12 @@ verdict shows.
 - **Rule S (left behind).** At some sample x = lo + k × 0.1 before hi, CAD's record R_u(x) is a state u's crew
   did not hold at any time in [x − 3.0, x + 0.05].
 - So CAD's record may show any state the crew held in the last 3.0 s, and may never lead it by more than 0.05 s.
+- **Blind spot.** A record stuck at `available` is never counted. Rule W sees only rows written in the window,
+  and a stuck record writes none. Rule S allows any state the crew held in [x − 3.0, x + 0.05], and a crew is
+  away from `available` for at most about 2.9 s per job: turnout keeps its logged status `available`, the drive
+  is at most about 1.6 s inside the grid (1.8 s cap), and the scene at most 1.2 s. A record stuck at `enroute` or
+  `onscene` is counted about 3 s after its crew leaves that state, because CAD then never sends the unit again
+  and the crew stays free.
 
 **Counted, not blocking:** `calls_dropped` (calls in W with outcome `dropped` or `cut_off`), `incidents_waiting`,
 `unreadable_set_aside` (unreadable reports set aside) and `field_messages_waiting` (pending reports older than
@@ -613,11 +740,11 @@ values and channel.
 
 | Channel | Dispatch detail |
 |---|---|
-| Processes | `control.kill(component) -> bool` crashes a process with no change recorded. `control.stop(component, actor="operator", log_change=True) -> bool` and `control.start(...)` work for call-handling, cad, dispatcher, alerting, alerting-backup, unit-sync and call-network. Nothing restarts by itself. A restart of call-handling loses every call between dial and report: a dial in progress is cut off (`cut_off`), a report gets 404 or a refused connection (`dropped`), and the caller redials. The checker counts these calls in `calls_dropped` and as failed journeys |
-| Releases | `control.deploy(component, release, module_path=None, actor="pipeline") -> bool` copies the file to `<data>/releases/<component>/v<release>.py` and restarts the component. The module defines `class Release`, usually subclassing the current one (`from targets.dispatch.releases.cad.v3_4 import Release as Base`). Releases in the repository: call-handling 5.2 and 5.2.1; cad 3.4 and 3.4.1; dispatcher 2.1 and 2.1.1; unit-sync 4.0 and 4.0.1; alerting and alerting-backup 1.6 and 1.6.1; call-network 1.0. Each x.y.1 is a harmless build label. `rollback` returns to the previous release on call-handling, cad, dispatcher and unit-sync. alerting has no rollback: its fix is `failover`. alerting-backup's releases matter only after a failover. A release on call-network is an external outage |
+| Processes | `control.kill(component) -> bool` crashes a process with no change recorded. `control.stop(component, actor="operator", log_change=True) -> bool` and `control.start(...)` work for call-handling, cad, dispatcher, alerting, alerting-backup, unit-sync and call-network. Nothing restarts by itself. A restart of call-handling loses every call between dial and report: a dial in progress is cut off (`cut_off`), a report gets 404 or a refused connection (`dropped`; on Windows a refused connection usually ends as `timeout`, 5.1), and the caller redials. The checker counts these calls in `calls_dropped` and as failed journeys. Any restart of call-handling, a deploy included, loses about 3 calls and turns the verdict red for about 20 s (measured: from 10.7 s to 29 s after a build-label deploy: "3 answered but not told"), and the lost calls count in impact. So judge that a change "stays green" at least 30 s after it. A restart of cad likewise fails the reports that reach it meanwhile (call-handling answers 502, `not_entered`); this was not measured |
+| Releases | `control.deploy(component, release, module_path=None, actor="pipeline") -> bool` restarts the component on that release. With `module_path` it first copies the file to `<data>/releases/<component>/v<release, dots as underscores>.py` (release 3.5 is `v3_5.py`), so nothing the agent reads names the source file. The module defines `class Release`, usually subclassing the current one (`from targets.dispatch.releases.cad.v3_4 import Release as Base`). A deployed release must not import anything from `faults/`, or that path shows in its tracebacks: component logs strip only the repository root and the data folder from traceback paths. Keep what it needs in that one file, and import only from `targets.dispatch.releases`, the shared modules (`worker`, `cadstore`, `fieldmsg`, `area`) and `ic.kit`. Release labels look like normal versions (3.5, 2.1.2). Releases in the repository: call-handling 5.2 and 5.2.1; cad 3.4 and 3.4.1; dispatcher 2.1 and 2.1.1; unit-sync 4.0 and 4.0.1; alerting and alerting-backup 1.6 and 1.6.1; call-network 1.0. Each x.y.1 is a harmless build label. `rollback` returns to the previous release on call-handling, cad, dispatcher and unit-sync. alerting has no rollback: its fix is `failover`. alerting-backup's releases matter only after a failover. A release on call-network is an external outage |
 | Release API | Frozen at the merge (below) |
 | Settings | Section 3. `control.set_config(component, key, value, actor="operator") -> bool` is versioned and shown in `changes`. Which alerting side the dispatcher uses is routing state that only `failover` changes |
-| Pending incidents | `incidents.status = 'pending'`, dispatched by priority then id, up to `batch_size` per cycle every `poll_interval_s`. Test incidents are taken in their own query, and an incident with no free unit does not use up the batch. With no free unit an incident waits; nothing closes it. An unacknowledged assignment becomes `no_ack` after `ack_timeout_s`, and its incident returns to `pending` (that unit is never sent to it again). An `enroute` or `onscene` incident whose last open assignment expires this way closes `completed`. These are live calls: they cannot be set aside, and the dispatcher skips an unreadable incident rather than crash |
+| Pending incidents | `incidents.status = 'pending'`, dispatched by priority then id, up to `batch_size` per cycle every `poll_interval_s`. Test incidents are taken in their own query, and an incident with no free unit does not use up the batch. With no free unit an incident waits; nothing closes it. An unacknowledged assignment becomes `no_ack` after `ack_timeout_s`, and its incident returns to `pending`. That unit is not offered that incident again for 30 s (`REOFFER_S`, counted from the `no_ack`), so the next free unit goes; after that it may be. So during an alerting outage incidents keep cycling through the units, one `ack_timeout_s` per try. (Before this rule, an outage longer than about 40 s, 20 units × 2.0 s, left incidents that every unit had missed waiting for good.) Once alerts get through again, the backlog is dispatched, each incident within 30 s of its last miss when a unit is free. Measured once with this rule, on one copy: during a 75 s alerting outage the dispatcher's `queue_depth` rose to 148, and some incidents went back to pending more than 20 times (up to 29). After the outage ended the backlog read 136, 99, 64, 35, 3 and 0 at 5 s steps. The verdicts, taken every 20 s, were red 20 s after the outage ended ("43 of 46 calls failed: 43 with no crew en route within 3 s of being told" and "7 units were committed to two incidents at once") and 40 s after ("9 of 47 calls failed: 9 with no crew en route within 3 s of being told"), and green from 60 s on. An `enroute` or `onscene` incident whose last open assignment expires this way closes `completed`. These are live calls: they cannot be set aside, and the dispatcher skips an unreadable incident rather than crash |
 | Field-report queue | Table `field_queue` (pending, applied, skipped, quarantined). unit-sync takes the oldest pending rows in id order, up to `batch_size`, and parses them all before writing. An unreadable report (11.2) crashes unit-sync by design, after the readable reports before it are committed and its own `attempts` raised. unit-sync stays down until restarted, and `head_item` names that report with `attempts` at least 1. A report is skipped when it is too old (`max_message_age_s`), superseded by a newer pending report of the same unit (judged from the reports themselves, not the `unit_id` column), or out of order. cad stores any JSON object of at most 4 KB at intake, without checking fields. Rows can be added through `control.db("cad-db")`, or by a helper posting to cad `/mdt` a bounded, one-off set of reports. Fix: `quarantine` with `params.item` = the row id = `head_item.id`, then `restart`. Each unreadable report needs its own quarantine |
 | Ordering memory | unit-sync remembers, in memory only, the newest report time it has applied for each unit, and skips anything not newer. A restart forgets it. Report times are the terminal's clock. This is the system's one in-memory state that only a restart clears |
 | Repeat calls (idempotency) | `calls.call_id` is the primary key, and entry is idempotent by `call_id` inside cad's write transaction. Under `repeat_match` "ani_open", cad links a call to this number's open incident (same number and test flag, status pending, dispatched, enroute or onscene) |
@@ -625,22 +752,51 @@ values and channel.
 | Crew behaviour | Section 5.2. Crews read both station inboxes, and a busy crew ignores alerts. A full-state heartbeat goes every 1.0 s. A failed post is not retried, and a report older than 2.0 s is dropped at the terminal. Unit records heal within about 1 s once the path works |
 | Unit records | Only unit-sync writes `units`, apart from the seed and the probe's TEST-1 cleanup. Keep the `unit_history` and `incident_events` triggers: they are the checker's evidence. A one-time direct write to `units.status` or `units.incident_id` is overwritten by the next heartbeat within about 1 s, so it never lasts into a verdict |
 | Locks | `control.spawn("incident-archive", ["{python}", "-m", "targets.dispatch.jobs.incident_archive", "--data", "{data}", "--hold-lock", "<S>"])` holds `BEGIN IMMEDIATE` on cad-db for S seconds. It registers `{"session": "incident-archive-<pid>", "pid", "since_t", "mode": "write", "statement": "INSERT INTO rms_export ... (export batch)"}` in `cad_locks.json`. observe() shows it under cad-db's `lock_holders`, and `release_lock` on cad-db ends it. Readers keep working (WAL). Every writer waits for its busy timeout and fails. A lock must be held at least about 130 s to still act in the scored window |
-| Helper processes | incident-archive modes: `--export` (normal, about 1 s, batches of at most 50 rows, never registers as a lock holder), `--hold-lock S`, and `--cpu S` (a harmless busy run at low priority: a background change). `runs` counts only running jobs spawned under exactly the name `incident-archive`. Anything else spawned is invisible to the agent, and no action reaches it, except `release_lock` for registered lock holders |
+| Helper processes | incident-archive modes: `--export` (normal, about 1 s, batches of at most 50 rows, never registers as a lock holder; measured: 2,008 incidents in 0.4 s and 3,679 in 0.8 s, with no lock holder shown and the copy green), `--hold-lock S`, and `--cpu S` (a harmless busy run at low priority: a background change). `runs` counts only running jobs spawned under exactly the name `incident-archive`; `cpu_pct` and `mem_mb` sum each run and the processes it started, and the first observe() of a run reads `cpu_pct` 0. Anything else spawned is invisible to the agent, and no action reaches it, except `release_lock` for registered lock holders |
 | Datastore writes | `control.db(name=None) -> sqlite3.Connection`: `db("cad-db")` or `db()` gives autocommit, a 5000 ms busy timeout and `sqlite3.Row`. Any other name raises KeyError. Schema in section 4 |
-| Links | `control.link(route, latency_ms=0, jitter_ms=0, drop_pct=0.0) -> bool`. `drop_pct` is a fraction of connections, 0.0-1.0. `"dispatcher->alerting"` is alerting as the dispatcher sees it; fix: `failover` on alerting, because the backup path bypasses the relay. `"call-handling->call-network"` is ALI as call-handling sees it; this is an external outage: escalate |
+| Links | `control.link(route, latency_ms=0, jitter_ms=0, drop_pct=0.0) -> bool`. The relay delays each request by `latency_ms` plus a uniform 0-`jitter_ms`; answers are not delayed. `drop_pct` is a fraction of connections, 0.0-1.0; a dropped connection is closed before it reaches the far side. The measured thresholds are below the table. `"dispatcher->alerting"` is alerting as the dispatcher sees it; fix: `failover` on alerting, because the backup path bypasses the relay. `"call-handling->call-network"` is ALI as call-handling sees it; this is an external outage: escalate |
 | Standby | alerting-backup runs the same image and writes its own inbox, and crews read both. It carries alerts only after `failover`. A change there alone shows nothing to users |
-| External | call-network is the provider's. Stopping, killing or hanging it, deploying a release to it, or slowing or dropping its link is `external_outage`, and must be escalated. It has no actions, and the agent sees only call-handling's view of it. Calls then go spoken: answers are slower and callers are told later |
+| External | call-network is the provider's. Stopping, killing or hanging it, deploying a release to it, or slowing or dropping its link is `external_outage`, and must be escalated. It has no actions, and the agent sees only call-handling's view of it, with no logs. observe() shows it `up` false whenever every lookup in the window failed, so a link that drops every connection, or slows lookups past `ali_timeout_s`, also shows call-network down. Calls then go spoken: answers are slower and callers are told later |
 | Admin hooks | `control.admin(component, op, payload=None) -> dict`, with `op="hang"`, on any process. Its HTTP server stops answering (`not_answering`), and every background loop stops at its gate |
-| Call surge | `control.surge(rate_per_s, seconds, seed=0, mix="normal") -> int` (11.3). It is the only source of extra calls |
+| Call surge | `control.surge(rate_per_s, seconds, seed=0, mix="normal") -> int`, the helper's own pid (11.3). It is the only source of extra calls |
 | Other Control calls | `control.snapshot() -> dict`, `control.baseline(window_s=10.0) -> dict`, `control.paths() -> dict`, `control.shutdown()` |
 | Capacity and drain | The tables of section 6. A scored window holds about 49 calls, so a mechanism that touches one call in N misses a window with probability about (1 − 1/N)^49 |
 | Checker rules a fault must respect | Section 10 exactly. Unreadable is 11.2. A readable report set aside keeps the checker red for good, so label `quarantine` only for unreadable rows. A call counts as reached only when a crew's own log says en route. Records may lag by 3.0 s and never lead by more than 0.05 s. Test data is excluded everywhere. The timing rule (11.6) |
-| Actors and words | Actors are drawn from `pipeline`, `operator`, `ops-maintenance` and `scheduler`, and passed on every deploy, setting change, stop and start. No release label, session name, statement, log line, change detail or payload contains a fault type or class name, or the words fault, inject, poison, stale or chaos. Use only made-up callers from the fictional number pools. Never log a caller's number, words or location |
+| Actors and words | Actors are drawn from `pipeline`, `operator`, `ops-maintenance` and `scheduler`, and passed on every deploy, setting change, stop and start. No release label, session name, statement, log line, change detail or payload contains a fault type or class name, or the words fault, faults, inject, sealed, heldout, exam, poison, stale or chaos. These match as whole words, case ignored, with `_` counting as a word break, as `RESERVED` in `tests/dispatch/test_static.py` matches them (so `poison_message` counts and "example" does not). A lock holder's session name and statement show in observe(), and `release_lock` repeats the session names in its answer and in the changes feed. Use only made-up callers from the fictional number pools. Never log a caller's number, words or location |
 
-**Link thresholds.**
+**Link thresholds**, with no action. Measured on one copy while three other copies shared the machine, in the
+same way as the harmless ranges (section 3): held 35 s, then three 20 s windows (lag 10 s) 20 s apart. Green
+and red mean all three windows; flaky means a mix. The copy's band was 257.9 ms.
 
-MEASURED: for each link route (`dispatcher->alerting`, `call-handling->call-network`), the latency, jitter and
-drop values that are reliably green, flaky, or reliably red with no action.
+| Route | Change | Result | Reasons when red |
+|---|---|---|---|
+| `dispatcher->alerting` | latency 100 or 300 ms | green | |
+| `dispatcher->alerting` | latency 600 or 900 ms | red | nearly every call not reached within 3 s; at 600 ms once also 7 incidents dropped |
+| `dispatcher->alerting` | latency 1200 or 1500 ms | red | every call not reached; 7-11 units double committed; 2-5 incidents double sent |
+| `dispatcher->alerting` | latency 300 ms, jitter 300 ms | red | 23-45 calls per window (of 48-53) not reached |
+| `dispatcher->alerting` | latency 300 ms, jitter 800 ms | red | every call or all but one not reached; 5-7 incidents dropped; 2-3 units double committed; 1 incident double sent |
+| `dispatcher->alerting` | drop 0.05 or 0.2 | green | |
+| `dispatcher->alerting` | drop 0.5 | red | 32-41 of about 48 calls not reached; 4-7 incidents double sent; 12-17 units double committed |
+| `dispatcher->alerting` | drop 1.0 | red | every call not reached |
+| `call-handling->call-network` | latency 100 or 200 ms | green | (answer p95 108 and 209 ms) |
+| `call-handling->call-network` | latency 300 ms | red | only answer p95, 308 ms |
+| `call-handling->call-network` | latency 500 or 1000 ms | red | 9-17 calls per window told more than 3 s after answer; answer p95 503 ms |
+| `call-handling->call-network` | latency 200 ms, jitter 200 ms | red | only answer p95, 385-401 ms |
+| `call-handling->call-network` | drop 0.05 | flaky | 2 of 46, 0 of 49 and 1 of 49 calls told late |
+| `call-handling->call-network` | drop 0.2 or 0.5 | red | 2-5 calls per window told late |
+| `call-handling->call-network` | drop 1.0 | red | 10-19 of 45-52 calls told late |
+
+- **`dispatcher->alerting` is limited by throughput**, not by `alert_timeout_s`. Alerts go out one at a time
+  inside the dispatcher's cycle, so it alerts about 1/latency incidents per second (600 ms gives about 1.7,
+  against about 2.2 arriving). The edge lies between 300 ms and a mean of about 450 ms (latency 300 ms with
+  jitter 300 ms), far below `alert_timeout_s` (1.0 s). Red points went green 30-49 s after the undo.
+- **Above `alert_timeout_s`** each alert times out, but the relay still delivers it, so a crew turns out just as
+  the 2.0 s timer gives the incident to another unit: hence the double counts.
+- **`call-handling->call-network`:** the latency edge is the p95 band, b + 250 ms, so it moves with the copy's
+  warm-up p95 (about 258 ms on the measured copies). From 500 ms (`ali_timeout_s`) every lookup fails and calls
+  go spoken. A call-network drop of 0.05 is flaky.
+- Measured before the 30 s re-offer rule. With it, incidents no longer stay pending for good after a drop of 1.0
+  (11.1, Pending incidents); the rest of this table should not change, but it was not measured again.
 
 **Release API**, frozen at the merge; a rename needs a new row here:
 
@@ -657,7 +813,9 @@ drop values that are reliably green, flaky, or reliably red with no action.
 **Behaviour the methods carry.**
 
 - The dispatcher's `send_alert` posts to the active side with `alert_timeout_s`. A failed alert is retried every
-  0.3 s.
+  0.3 s. When the path fails (no answer, or a server error), the other due alerts wait those 0.3 s too, so a
+  silent alerting path costs a cycle at most one `alert_timeout_s` and the timer and new commits keep their pace.
+- `free_units` leaves out a unit that failed to acknowledge this incident in the last 30 s (`REOFFER_S`).
 - No release holds a cad-db transaction across a network call.
 - unit-sync's `apply_unit` sets `status`, `incident_id`, `status_t` (the report's `t`) and `applied_t`.
   `apply_assignment` keeps assignments in step with the state a report carries: `enroute` or `onscene` for X acks
@@ -694,17 +852,23 @@ control.spawn("call-surge", ["{python}", "-m", "targets.dispatch.surge", "--data
 
 - `rate_per_s` is **emergencies per second**; each makes about 1.1 calls. All surges together are capped at
   **3.0 emergencies per second**, and a healthy copy stays green at the cap.
-- `seconds` is 1-900. One surge places at most 1,000 emergencies (`rate_per_s × seconds` ≤ 1000).
+- `seconds` is 1-900. A surge whose `rate_per_s × seconds` is above 1,000 is refused. Arrivals are random, so a
+  surge starts about `rate_per_s × seconds` emergencies, and it never starts more than 1,000: at the 1,000th it
+  stops starting new ones but still runs its full `seconds`.
 - `mix` is `normal` (everyday weights), `medical` (cardiac, breathing, fall, collision) or `fire`
   (structure_fire, vehicle_fire, alarm).
-- `control.surge` returns the helper's pid once it is registered in `surge.json`. It waits up to 5 s.
+- `control.surge` returns the helper's own pid once it is registered in `surge.json`: the pid in its log file's
+  name, its `emergency_id`s and its printed lines. It waits up to 5 s. On Windows a venv's `python.exe` is a
+  launcher and the helper is its child, so this pid can differ from the one `control.spawn` returns.
+- Numbers: the helper takes the first free number block and goes on from where that block got to (5.4).
 - **Refused, never clamped.** A surge over the cap, with no free number block or with a bad argument, exits
   with code 2, prints one line `call-surge <pid>: refused: <reason>` to `logs/call-surge.out`, and places no
   call. `control.surge` then raises `RuntimeError("call surge refused: <reason>")`. If the helper neither
   registers nor exits within 5 s, it raises `RuntimeError("call surge <pid> neither registered nor refused
   within 5 s")`. Reasons include "the surges together would start 3.50 emergencies per second, above the cap of
   3", "all 5 number blocks are held by running surges", "rate x seconds is ... emergencies, more than the 1000
-  numbers ...", "seconds must be a number from 1 to 900" and "mix must be normal, medical or fire".
+  numbers ...", "rate must be a number above 0 and at most 3 (emergencies per second)", "seconds must be a
+  number from 1 to 900" and "mix must be normal, medical or fire".
 - Emergencies start at random (exponential) gaps, each in its own thread, at most 64 at once. They follow the
   callers' redial, callback and timeout rules. The helper runs its full `seconds` whatever call-handling does,
   then up to 10 s more for calls in flight, and then exits.
@@ -712,6 +876,8 @@ control.spawn("call-surge", ["{python}", "-m", "targets.dispatch.surge", "--data
   line.
 - It is not a component. The agent sees a surge only as more calls (rps, the call queue keys, the pending
   board).
+- Measured: a surge of 3.0 per second for 150 s registered within 0.07-0.18 s, ran 151 s and placed 445
+  emergencies (482 calls, all told). A second surge that would pass the cap was refused within 0.1 s.
 - A fault that acts only during a surge needs the surge to cover the scored window: start it with at least
   130 s.
 
@@ -754,7 +920,28 @@ action, and the case is excluded.
 A report dated far ahead freezes its unit's CAD record until unit-sync restarts: the ordering memory skips every
 later report as out of order. It freezes the unit **only if no newer report of that unit is pending at
 unit-sync's next cycle**; otherwise it is skipped as superseded. Confirm the freeze took effect: the unit's
-`units.status_t` equals the `t` you inserted. If it does not, insert it again.
+`units.status_t` equals the `t` you inserted. If it does not, insert it again (in the measured run the first
+insert was superseded and the second froze the unit).
+
+What the verdict shows depends on the state the report carries, which is the state the record freezes in:
+
+- **Frozen at `available`** (the crew is free or in turnout, the usual case). CAD keeps offering the unit. Its
+  crew takes alerts, but its acknowledgements never reach CAD, so the 2.0 s timer sends each such incident to a
+  second unit: "N incidents had more than one crew en route", and some calls may also miss the 3 s reach. The
+  unit-records sentence never appears: the checker cannot count a record stuck at `available` (10.4, Blind
+  spot). Measured: red after 16 s with "4 incidents had more than one crew en route" and nothing else; green 26 s
+  after the restart.
+- **Frozen while busy** (`enroute` or `onscene`, with the crew's incident). CAD shows the unit busy for good, so
+  it is never sent again, and its crew clears and stays free. Rule S counts the record from about 3 s after the
+  crew leaves that state, so the verdict (lag 10 s) shows "1 units' CAD records differed from their crews for
+  longer than the 3 s status lag" from about 13 s after it. It goes on showing it until about 30 s after the
+  restart (window 20 s plus lag 10 s), since the record heals within about 1 s of the restart. The unit's last
+  incident keeps its open assignment and stays open. Not measured live.
+- **observe().** Frozen at `available`, observe() showed only unit-sync's `unit_reports_overdue` 1. Frozen while
+  busy, cad's `unit_status_timers_expired` also reads 1 once the record has shown that state for 4.0 s (from the
+  code). Either way, unit-sync's log shows WARN `skipped` lines, "report N from <unit> skipped (out of order)",
+  at most one every 2 s; the healthy soak wrote no WARN line.
+- A report carrying a state its crew did not hold in the last 3 s is also a wrong write (Rule W).
 
 ## 12. Break and heal by hand
 
@@ -763,24 +950,59 @@ labelled fix. `control` is the copy's Control and `adapter` its adapter. A fix g
 the agent's would. The reason column gives the sentences the verdict should show; N, K, X and Y are counts and
 times.
 
+**Timing, measured on one copy** with the checker's 20 s window and 10 s lag: red about 10 s after the break
+(12-18 s for `positions` 1, `repeat_match` "off", the far-future report and the call-network drop), and green,
+two verdicts in a row, 26-41 s after the fix. The checker judges calls and records 10 s late (the lag), so a row
+turns red about 10 s after its break, and green no sooner than 30 s after the last failing call. A break that
+fails calls already under way (for example a kill, stop or hang of call-handling, cad, the dispatcher or
+alerting) can turn it red up to about 2 s sooner, about 4 s if callers give the location by voice: such a call
+started before the break, and one failed call makes an everyday window (about 49 calls) red. Any restart of
+call-handling, a build label on it included, loses about 3 calls and is red for about 20 s, so judge that a
+change "stays green" at least 30 s after it.
+
 | Break (Control) | Reasons with no action | Labelled fix (adapter) |
 |---|---|---|
 | `control.kill("call-handling")`, or `stop`, or `admin("call-handling", "hang")` | "K of N calls failed: K not answered"; "no call in the window was answered" | `act("restart", "call-handling")` |
 | `control.kill("cad")`, or `stop`, or `admin("cad", "hang")` | "K of N calls failed: K answered but not told help is on the way"; also "N units' CAD records differed from their crews for longer than the 3 s status lag" (reports to `/mdt` are lost) | `act("restart", "cad")` |
 | `control.kill("dispatcher")`, or `stop`, or `admin("dispatcher", "hang")` | "K of N calls failed: K with no crew en route within 3 s of being told" | `act("restart", "dispatcher")` |
-| `control.stop("unit-sync")`, or `kill`, or `admin("unit-sync", "hang")` | "N units' CAD records differed from their crews ..."; "N incidents had more than one crew en route" (acknowledgements never arrive, so the timer re-sends); "... with no crew en route within 3 s of being told" | `act("restart", "unit-sync")` |
-| `control.admin("alerting", "hang")`, or `kill` or `stop` | "... with no crew en route within 3 s of being told"; may add "N incidents callers were told about were dropped: ..." | `act("restart", "alerting")`; `act("failover", "alerting", {"to": "standby"})` also works |
+| `control.stop("unit-sync")`, or `kill`, or `admin("unit-sync", "hang")` | "K of N calls failed: K with no crew en route within 3 s of being told"; "N incidents had more than one crew en route" (acknowledgements never reach CAD, so the timer re-sends); "N units' CAD records differed from their crews ..." for the units whose record showed `enroute` or `onscene` when unit-sync stopped (a record stuck at `available` is never counted, 10.4) | `act("restart", "unit-sync")` |
+| `control.admin("alerting", "hang")`, or `kill` or `stop` | "K of N calls failed: K with no crew en route within 3 s of being told". Nothing is dropped: when an alert fails, the dispatcher holds the other alerts 0.3 s and keeps committing, and incidents cycle through the units (11.1, Pending incidents) | `act("restart", "alerting")`; `act("failover", "alerting", {"to": "standby"})` also works |
 | `control.set_config("call-handling", "positions", 1)` | "K of N calls failed: K rolled over to the backup centre"; "answer time p95 X ms is above Y ms"; "answer time p90 X ms is above 750 ms" | `act("revert_config", "call-handling", {"key": "positions"})` |
-| `control.set_config("dispatcher", "ack_timeout_s", 0.05)` | "N incidents had more than one crew en route"; also "N units were committed to two incidents at once" | `act("revert_config", "dispatcher", {"key": "ack_timeout_s"})` |
-| `control.set_config("cad", "repeat_match", "off")` | "N incidents duplicate an open incident of the same emergency" | `act("revert_config", "cad", {"key": "repeat_match"})` |
+| `control.set_config("dispatcher", "ack_timeout_s", 0.05)` | "N incidents had more than one crew en route"; also "N units were committed to two incidents at once". No integrity key shows it; the changes feed does, and the dispatcher's log has a WARN `no_acknowledgement` line for nearly every assignment (section 8) | `act("revert_config", "dispatcher", {"key": "ack_timeout_s"})` |
+| `control.set_config("cad", "repeat_match", "off")` | "N incidents duplicate an open incident of the same emergency". The changes feed shows it, and cad's `possible_duplicate_incidents` reads 2 for about 1-2 s after each callback, again and again while it lasts (section 8) | `act("revert_config", "cad", {"key": "repeat_match"})` |
 | an unusable setting, e.g. `control.set_config("dispatcher", "batch_size", 0)` | a worker stops: "... with no crew en route within 3 s of being told" (dispatcher) or "N units' CAD records differed ..." (unit-sync). call-handling answers 503: "... not answered". cad answers 503: "... answered but not told help is on the way" | `act("revert_config", <component>, {"key": <key>})` |
-| `control.link("dispatcher->alerting", latency_ms=1500)` (above `alert_timeout_s` 1.0), or `drop_pct=1.0` | "K of N calls failed: K with no crew en route within 3 s of being told" | `act("failover", "alerting", {"to": "standby"})` |
-| `control.spawn("incident-archive", ["{python}", "-m", "targets.dispatch.jobs.incident_archive", "--data", "{data}", "--hold-lock", "600"])` (at least 130 s) | "K of N calls failed: K answered but not told help is on the way"; often "answer time p95 ..." and "N units' CAD records differed ..." | `act("release_lock", "cad-db")` |
-| an unreadable report, inserted through `control.db()` (below) | unit-sync crashes: "N units' CAD records differed from their crews ..."; then "... more than one crew en route" and "... no crew en route within 3 s ..." as the board ages | `act("quarantine", "unit-sync", {"item": <head_item.id>})`, then `act("restart", "unit-sync")`; `for_operations` then lists `{"kind": "set_aside", "item": <id>, ...}` |
-| a far-future report for one unit (below) | that unit's record is frozen: "N units' CAD records differed from their crews ..." (N ≥ 1) once its crew moves | `act("restart", "unit-sync")` |
+| `control.link("dispatcher->alerting", latency_ms=1500)` (above `alert_timeout_s` 1.0), or `drop_pct=1.0` | "K of N calls failed: K with no crew en route within 3 s of being told". With the latency, also "N incidents had more than one crew en route" and "N units were committed to two incidents at once": each alert times out at 1.0 s but the relay still delivers it, so a crew turns out just as the 2.0 s timer gives the incident to another unit. With `drop_pct=1.0`, only the first sentence | `act("failover", "alerting", {"to": "standby"})` |
+| `control.spawn("incident-archive", ["{python}", "-m", "targets.dispatch.jobs.incident_archive", "--data", "{data}", "--hold-lock", "600"])` (at least 130 s) | "K of N calls failed: K answered but not told help is on the way"; often "answer time p95 ...", "answer time p90 ..." and "N units' CAD records differed ..." | `act("release_lock", "cad-db")` |
+| an unreadable report, inserted through `control.db()` (below) | unit-sync crashes: "N units' CAD records differed from their crews ..." for the units whose record showed `enroute` or `onscene` at the crash; then "... more than one crew en route" and "... no crew en route within 3 s ..." as the board ages | `act("quarantine", "unit-sync", {"item": <head_item.id>})`, then `act("restart", "unit-sync")`; `for_operations` then lists `{"kind": "set_aside", "item": <id>, ...}` |
+| a far-future report for one unit (below) | depends on the state it freezes (11.7). Frozen at `available`, the usual case: "N incidents had more than one crew en route", perhaps also "... no crew en route within 3 s ...", and never the unit-records sentence. Frozen at `enroute` or `onscene`: "1 units' CAD records differed from their crews ...", counted from about 3 s after its crew moves on, so shown from about 13 s after | `act("restart", "unit-sync")` |
 | a bad release: `control.deploy(component, "<version>", module_path=<file>)` | depends on the mechanism; each shape is counted exactly | `act("rollback", component)` |
-| call-network: `control.stop("call-network")`, or `control.link("call-handling->call-network", drop_pct=1.0)` or a latency | calls go spoken: "K of N calls failed: K told more than 3 s after answer"; with a slow link also "answer time p95 X ms is above Y ms" | escalate (no action); red with no action by design |
-| a surge at or below the cap; `control.stop("alerting-backup")` alone; `--cpu`; a build label (`control.deploy("call-handling", "5.2.1")`); a harmless setting move | green | none: healthy or a background change |
+| call-network: `control.stop("call-network")`, or `control.link("call-handling->call-network", drop_pct=1.0)` or a latency | calls go spoken: "K of N calls failed: K told more than 3 s after answer"; with a slow link also "answer time p95 X ms is above Y ms". observe() shows call-network `up` false even when only the link drops every connection | escalate (no action); red with no action by design |
+| a surge at or below the cap; `control.stop("alerting-backup")` alone; `--cpu`; a build label (`control.deploy("call-handling", "5.2.1")`); a harmless setting move | green; a build label on call-handling only from about 30 s after the deploy (its restart loses about 3 calls) | none: healthy or a background change |
+
+**Measured** on one copy, before the 30 s re-offer rule. Red and green are seconds from the break to the first
+red verdict, and from the fix to the second green verdict in a row.
+
+| Break | Red reasons seen | What observe() showed | Red | Green |
+|---|---|---|---|---|
+| kill cad | 137 of 137 not told; 4 unit records | cad `up` false; call-handling `dependencies.cad` error rate 1.0; unit-sync `processed_per_s` 0 | 10.1 | 32.9 |
+| stop unit-sync | 33 of 46 not reached; 14 double sent; 4 unit records | unit-sync `up` false, `queue_depth` 1212, `unit_reports_overdue` 20 | 10.1 | 40.7 |
+| hang dispatcher | 47 of 47 not reached | dispatcher `not_answering`, `processed_per_s` 0, `queue_depth` 83 | 10.1 | 35.6 |
+| hang alerting | 49 of 49 not reached; 45 of 45 in the failover run; nothing dropped | alerting `not_answering`; the dispatcher still committing 7.3 units/s; the probe fails at alerting | 10.4 | 40.5 (restart), 37.8 (failover) |
+| kill call-handling | 135 of 135 not answered | call-handling `up` false | 10.1 | 30.8 |
+| `positions` 1 | 29 of 46 rolled over; answer p95 2488 ms, p90 2481 ms | call-handling p95 2501 ms, error rate 0.44; the probe fails at call-handling, "503 rolled over" | 12.7 | 30.7 |
+| `ack_timeout_s` 0.05 | 44 double sent; 15 units double committed | nothing; the changes feed shows it | 10.1 | 30.8 |
+| `repeat_match` "off" | 6 duplicates | cad `possible_duplicate_incidents` 2 at 15 s, 0 by 35 s; the changes feed | 17.9 | 28.3 |
+| link latency 1500 ms | 49 of 49 not reached; 3 double sent; 12 units double committed | dispatcher `dependencies.alerting` error rate 1.0; the probe fails at alerting, and after the failover names alerting-backup | 10.4 | 37.9 |
+| hold-lock 600 | 129 of 129 not told; answer p95 863 ms, p90 770 ms; 4 unit records | cad-db `lock_holders` names the incident-archive session from 0.1 s after the spawn; `write_errors` 122 | 10.3 | 31.0 |
+| unreadable report | 35 of 47 not reached; 11 double sent; 2 unit records | unit-sync `up` false, `last_exit_code` 1, `head_item.id` the inserted row with `attempts` 1 | 10.2 | 39.1 |
+| far-future report, frozen at `available` | 4 double sent | unit-sync `unit_reports_overdue` 1, nothing else | 16.0 | 26.0 |
+| call-network link drop 1.0 | 12 of 52 told more than 3 s after answer | call-handling `dependencies.call-network` error rate 1.0; call-network `up` false; the probe fails at call-network | 12.9 | no fix; still red 25 s later |
+| build labels 5.2.1 and 2.1.1 | "3 answered but not told" from 10.7 s to 29 s after the call-handling deploy, then none | the changes feed | | |
+| a surge at the cap, 150 s, medical | none | | | |
+| alerting-backup stopped, with an `--export` | none for 60 s | alerting-backup `up` false; no lock holder | | |
+
+- The kit's `exits_15m` and `last_exit_code` stay set for 15 minutes after an exit, so a copy that ran an
+  earlier break still shows them.
 
 **Inserting a report** (both report rows):
 
@@ -800,7 +1022,10 @@ finally:
   shows unit-sync down with `head_item` `{"id": item, "attempts": 1, ...}`.
 - For a far-future report, put the unit's current crew state and a `t` an hour ahead, for example `{"unit":
   "M3", "kind": "heartbeat", "status": "available", "incident_id": null, "t": now + 3600}`. Then check that
-  `SELECT status_t FROM units WHERE id = 'M3'` equals that `t` (11.7).
+  `SELECT status_t FROM units WHERE id = 'M3'` equals that `t` (11.7). That example freezes M3 at `available`,
+  which shows as incidents with two crews en route. To freeze it busy, send the `enroute` or `onscene` state
+  with its incident while its crew holds it. CAD's own record, `units.status` and `units.incident_id`, follows
+  the crew within about 0.2 s (the record lag in section 7).
 
 **At the real timing.** The live tests run three families this way: kill dispatcher; hold-lock 600; an
 unreadable report. With no action the verdict 125 s after the break (with `since_t` the break) is red. With the
@@ -845,5 +1070,6 @@ finally:
 - `control.paths()` names every file the checker and harness read: `data_dir`, `logs`, `actions`, `changes`,
   `traffic_log`, `users_log`, `surge_logs`, `datastores`, `cad_db`, `locks`, `surge_registry`, `alert_inboxes`
   and `checker_baseline`.
-- `tests/dispatch/test_live.py` brings copies up and down, and breaks and heals them, under `IC_SLOW=1` (one
-  copy on port base 9700, about three minutes) and `IC_DISPATCH_LONG=1` (three copies, the whole table).
+- `tests/dispatch/test_live.py` brings copies up and down, and breaks and heals them. `IC_SLOW=1` runs the CI
+  tier: one copy on port base 9700, about three minutes. `IC_SLOW=1` with `IC_DISPATCH_LONG=1` also runs the
+  long tier: three copies on 9600, 9700 and 9800, the whole table and the real timing, about 25 minutes.

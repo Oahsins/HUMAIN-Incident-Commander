@@ -487,6 +487,17 @@ def test_a_second_incident_while_the_first_is_open_is_a_duplicate(world, after_s
     assert result["journeys"]["failures"] == {}
 
 
+def test_two_incidents_created_for_one_call_in_the_same_millisecond_are_one_duplicate(world):
+    """A release that opens two incidents for one call in one transaction: both carry the same insert time, and
+    the second (by id) is the duplicate."""
+    world.healthy()
+    line, first = world.entered(world.now - 25.0)
+    second = world.incident(world.now - 25.0 + 1.15, line["call_id"], line["ani"], line["nature"])
+    world.respond(first, "M9", line["t_start"] + 1.3)
+    world.respond(second, "M10", line["t_start"] + 1.3)
+    assert_counts(world.verdict(), duplicate_incidents=1, incidents_double_sent=0)
+
+
 def test_an_incident_reached_by_two_crews_is_double_sent(world):
     world.healthy()
     first = world.emergency(world.now - 25.0, "M9")

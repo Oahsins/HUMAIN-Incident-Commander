@@ -385,13 +385,15 @@ class Evidence:
 
     def duplicates(self, calls):
         """Incidents created while an earlier incident of the same emergency was still open, for the emergencies
-        with a call among these."""
+        with a call among these. Two created in the same millisecond (one transaction) are ordered by id, so the
+        second still counts."""
         count = 0
         for key in {emergency(c) for c in calls}:
             incidents = self.created(key)
             for j in incidents:
                 t = self.inserted[j][0]
-                if any(self.inserted[i][0] < t < self.gone.get(i, math.inf) for i in incidents if i != j):
+                if any((self.inserted[i][0], i) < (t, j) and t < self.gone.get(i, math.inf)
+                       for i in incidents if i != j):
                     count += 1
         return count
 
