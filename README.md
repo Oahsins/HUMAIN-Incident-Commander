@@ -5,7 +5,7 @@ An AI incident commander for HUMAIN's Future AI Builders hackathon (Challenge 1:
 **In 60 seconds**
 - **What it is:** an agent that surveys every component of a failing system in a fixed order before fixing anything. It fixes upstream faults first, then the most harmful, using six bounded actions. It hands over with an SBAR, or escalates to a person.
 - **Result:** On 40 sealed incidents it had never seen, the agent succeeded on 39 of 40 and a scripted runbook on 19 of 40 (paired test, p < 0.001). On the blind fault type, which neither had practised: 5 of 5 against 2 of 5.
-- **See it:** run `python run.py demo`, which needs no API key. The 3-minute video and the slides are linked here at submission.
+- **See it:** the [incident console](https://claude.ai/artifact/EJWMAk7KRGrQ7jJGhbMpE5) replays a recorded run of the agent in your browser. [GitHub Codespaces](https://codespaces.new/Oahsins/HUMAIN-Incident-Commander?quickstart=1) opens a ready copy of this repository with a Run-button console. Or run `python run.py demo` on your own machine; it needs no API key. The 3-minute video and the slides are linked here at submission.
 
 It keeps a failing multi-service system running using the method emergency medicine uses for several injuries at once. It surveys every component in a fixed ABCDE order (Access, Bottlenecks, Capacity, Dependencies, Events) before fixing anything, triages the faults by customer impact against time to fix, remediates with six bounded actions only (four can be undone, two lose no committed data), verifies recovery over a sustained window, and hands over with an SBAR, or escalates to a person when no safe action fixes the fault. A safety wrapper refuses any action outside the allowlist, and an independent checker decides whether the system really recovered, mainly from the customers' own log, which the agent never sees, and a full read of the ledger.
 
@@ -21,6 +21,14 @@ Omar AlHejji designed the agent and made the calls recorded in the [decision log
 - **Codex, Session B** wrote the scripted runbook and the evaluation harness, ran the pilot and produces the reports. It never saw the sealed files.
 
 Codex commits carry Codex's name, so the history shows who wrote what. Every change reached `main` through a pull request that Omar merged.
+
+## Built with
+
+- **Python 3.11 or later**, mostly the standard library. The shared kit (`ic/kit/`) builds every service of the bank and of dispatch on `http.server`, and they call each other with `urllib`. `sqlite3` holds the bank's double-entry ledger, and `multiprocessing` runs each arm on each incident in its own process, stopped at its time limit. Other packages: `psutil`, `rich`, `pytest` and `matplotlib` (`requirements.txt`, `requirements-eval.txt`).
+- **Claude, through the Anthropic Messages API**, called over HTTPS with no SDK (`ic/llm.py`). The models are set in `configs/models.json` and their prices in `configs/prices.json`.
+- **Playwright with Chromium, on Node 18 or later,** for the browser demo (`browser-demo/`).
+- **GitHub Actions** runs both test tiers on Ubuntu and Windows for every pull request, and **GitHub Codespaces** opens a ready-to-run copy (`.devcontainer/`).
+- **Claude Code and Codex** as the coding agents (see [How it was built](#how-it-was-built)).
 
 ## Quick start
 
