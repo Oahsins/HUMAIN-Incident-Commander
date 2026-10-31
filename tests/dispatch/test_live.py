@@ -11,6 +11,11 @@ The long tier (IC_SLOW=1 and IC_DISPATCH_LONG=1, run by hand, about 25 minutes) 
 break-and-heal table, the two breaks that have no fix, a call surge at the cap, privacy, and three families at
 the real timing (the verdict about 125 s after the break, with since_t the break).
 
+The soak (IC_SLOW=1 and IC_DISPATCH_SOAK=1, run by hand, about 12 minutes) is amendment F6, run on the laptop
+before the transfer run: the same three copies for ten minutes, with a surge at the cap on all three at once, and
+a verdict on each copy every 10 s. The surge cap is lowered if a window goes red. It writes its record to
+runs/dispatch-soak.json.
+
 Every copy gets its port base and data folder from this file, never from runs/current.json, and is brought down
 in a finally block or a fixture's teardown, also when a test fails. A port base already in use is left alone.
 """
@@ -38,6 +43,8 @@ SLOW = os.environ.get("IC_SLOW") == "1"
 LONG = SLOW and os.environ.get("IC_DISPATCH_LONG") == "1"
 ci_tier = pytest.mark.skipif(not SLOW, reason="starts a live copy of the dispatch centre; set IC_SLOW=1")
 long_tier = pytest.mark.skipif(not LONG, reason="the long dispatch live tests; set IC_SLOW=1 and IC_DISPATCH_LONG=1")
+SOAK = SLOW and os.environ.get("IC_DISPATCH_SOAK") == "1"
+soak_tier = pytest.mark.skipif(not SOAK, reason="the ten-minute soak of three copies; set IC_SLOW=1 and IC_DISPATCH_SOAK=1")
 
 CI_PORT_BASE = 9700
 LONG_PORT_BASES = (9600, 9700, 9800)
@@ -50,6 +57,9 @@ RED_LIMIT_S = 40.0                    # a break shows in the verdict about 10-20
 GREEN_AFTER_S = WINDOW_S + LAG_S + 2  # the first verdict whose window starts after the fix
 GREEN_LIMIT_S = 80.0                  # a backlog can take a few seconds more to drain (unit-sync: about 41 s)
 LONG_GREEN_LIMIT_S = 150.0            # after 125 s with no action: the backlog grows with the outage (DISPATCH.md 6)
+SOAK_S = float(os.environ.get("IC_DISPATCH_SOAK_S", 600))   # amendment F6: ten minutes on three copies ...
+SOAK_SURGE_AT_S = 120.0               # ... with a surge at the cap on all three at once, 150 s long
+SOAK_EVERY_S = 10.0                   # a verdict on each copy every 10 s, so every call falls in a scored window
 TABLE_RED_AT_S = 35.0                 # spec 17.3: red about 35 s after the break, green about 35 s after the fix
 FIX_AT_S = 5.0                        # the real timing: the alert comes 5 s after the break ...
 VERDICT_AT_S = 125.0                  # ... and the verdict 125 s after it, on the window [95 s, 115 s)
@@ -754,3 +764,40 @@ class TestThreeCopies:
 
     def test_three_families_at_the_real_timing(self, copies):
         assert on_each(copies, at_real_timing, FAMILIES) == []
+
+
+@soak_tier
+class TestTheSoak:
+    def test_three_copies_stay_green_for_ten_minutes_with_a_surge_at_the_cap_on_each(self, copies):
+        """Amendment F6: lower the surge cap if any window goes red."""
+        for platform in copies:
+            assert poll_verdict(platform, time.time() + 60.0, is_green)[0], explain(verdict(platform))
+        started = time.time()
+        rounds = {platform.port_base: [] for platform in copies}
+        pids = []
+        for k in range(1, int(SOAK_S // SOAK_EVERY_S) + 1):
+            if not pids and SOAK_EVERY_S * k > SOAK_SURGE_AT_S:
+                sleep_until(started + SOAK_SURGE_AT_S)
+                pids = [platform.control().surge(3.0, 150, mix="medical") for platform in copies]
+            sleep_until(started + SOAK_EVERY_S * k)
+            for platform in copies:
+                v = verdict(platform)
+                journeys = v["journeys"]
+                rounds[platform.port_base].append({
+                    "at_s": round(time.time() - started, 1), "green": v["recovered"], "calls": journeys.get("n"),
+                    "surge_calls": journeys["by_source"]["surge"]["n"], "p95_ms": journeys.get("p95_ms"),
+                    "p95_allowed_ms": journeys.get("p95_allowed_ms"),
+                    "reasons": None if v["recovered"] else explain(v)})
+        record = {"soak_s": SOAK_S, "surge_at_s": SOAK_SURGE_AT_S, "surge": [3.0, 150, "medical"], "copies": {
+            base: {"verdicts": len(taken), "red": [r for r in taken if not r["green"]],
+                   "most_calls_from_the_surge": max(r["surge_calls"] for r in taken),
+                   "worst_p95_ms": max((r["p95_ms"] for r in taken if r["p95_ms"] is not None), default=None),
+                   "p95_allowed_ms": min((r["p95_allowed_ms"] for r in taken if r["p95_allowed_ms"]), default=None)}
+            for base, taken in rounds.items()}}
+        with open(os.path.join(ROOT, "runs", "dispatch-soak.json"), "w", encoding="utf-8") as out:
+            json.dump(record, out, indent=1)
+        assert [base for base, summary in record["copies"].items() if not summary["most_calls_from_the_surge"]] == []
+        red = {base: summary["red"] for base, summary in record["copies"].items() if summary["red"]}
+        assert red == {}, json.dumps(red)[:4000]
+        sleep_until(started + SOAK_SURGE_AT_S + 150 + 15)
+        assert [pid for pid in pids if proc.alive(pid)] == [], "a surge helper should end within 10 s of its --seconds"
