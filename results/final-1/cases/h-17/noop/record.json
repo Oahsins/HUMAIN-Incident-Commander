@@ -1,0 +1,220 @@
+{
+  "case": {
+    "id": "h-17",
+    "input": {
+      "system": "bank",
+      "seed": 260017,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "bad_setting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "stale_balances",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "noop",
+  "result": {
+    "arm": "noop",
+    "mode": "auto",
+    "outcome": "no_incident",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "No intervention control.",
+      "background": "No observations or actions.",
+      "assessment": "Recovery is decided by the independent checker.",
+      "recommendation": "Retain the checker verdict."
+    },
+    "t_start": 1793427028.5794218,
+    "t_first_action": null,
+    "t_declared": 1793427028.5794218,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793427148.2955754,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793427118.296,
+      1793427138.296
+    ],
+    "journeys": {
+      "n": 230,
+      "ok": 34,
+      "success_rate": 0.1478,
+      "p95_ms": null,
+      "payments": {
+        "n": 175,
+        "ok": 0
+      },
+      "balances": {
+        "n": 55,
+        "fresh": 34
+      },
+      "p95_allowed_ms": 313.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 21,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [
+      "196 of 230 customer journeys failed (175 payments, 21 balance reads)"
+    ],
+    "impact": {
+      "since_t": 1793427015.2580812,
+      "until_t": 1793427138.2955754,
+      "breach_seconds": 125.0,
+      "failed_journeys": 1188,
+      "time_to_mitigate_s": 123.0,
+      "mitigation_censored": true,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793427015.2580812,
+      "at_s": 0
+    },
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793427017.251136,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793427021.2955,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793427022.3051722,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793427023.2953815,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793427015.2580812,
+    "t_alert": 1793427028.2953815,
+    "horizon": 1793427138.2953815,
+    "verdict_t": 1793427148.3401058
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

@@ -1,0 +1,406 @@
+{
+  "case": {
+    "id": "h-05",
+    "input": {
+      "system": "bank",
+      "seed": 260005,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "sealed_3",
+          "at_s": 0,
+          "params": {
+            "target": "network",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "network",
+          "class": "external_outage",
+          "fix": {
+            "action": "escalate",
+            "target": "network",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": true,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": ""
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "network",
+        "class": "external_outage",
+        "confidence": 0.93,
+        "evidence": "[D3] network: down (not answering), [D4] 100% of requests fail (run by another organisation); clearing log: 'payment network timeout; item stays pending item_id=98'."
+      }
+    ],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "network"
+      ],
+      "class": "external_outage",
+      "reason": "[D3] network: down (not answering), [D4] 100% of requests fail (run by another organisation); clearing log: 'payment network timeout; item stays pending item_id=98'.",
+      "urgency": "now",
+      "to": "the organisation that runs network",
+      "ask": "Contact the national payment network operator to restore service. Clearing will drain its 125-item backlog once the network answers. Do not quarantine item 98, because it is not malformed."
+    },
+    "sbar": {
+      "situation": "Recovery is not confirmed: the national payment network is down and every call from clearing fails or times out. Payments stay pending and the clearing backlog stands at 125 items.",
+      "background": "The national payment network, run by another organisation, stopped answering and 100% of requests to it fail. The clearing log shows 'payment network timeout; item stays pending item_id=98'.",
+      "assessment": "The root cause is an external outage of the payment network (confidence 0.93). Item 98 is not poison; it waits only because the network refuses or times out, and the screening-standby restarts were operator and maintenance actions with no symptom. No allowed action fixes this, so the incident commander escalated it to the network operator itself.",
+      "recommendation": "Follow up with the national payment network operator to restore service, and do not quarantine item 98 because it is not malformed. Once the network answers, confirm clearing drains its 125-item backlog. Operations should review the pending payments for delays."
+    },
+    "t_start": 1793448783.5141177,
+    "t_first_action": null,
+    "t_declared": 1793448794.4696314,
+    "trace": [
+      {
+        "t": 0.03,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 31.7
+        }
+      },
+      {
+        "t": 1.11,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: network",
+        "data": {
+          "ms": 1080.2
+        }
+      },
+      {
+        "t": 4.96,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3846.8
+        }
+      },
+      {
+        "t": 4.96,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "7 fault findings, 14 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "payment journey fails at step 'clearing': not cleared within 3 s (still pending)"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "backlog: 125 items waiting, oldest 15 s, 0.0 processed/s; first item 98 waiting 15 s after 6 attempt(s)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "calls to network fail: 100%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "calls to network are slow: p95 2021 ms (network itself answered in 28 ms at baseline)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "network",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "D4",
+              "letter": "D",
+              "component": "network",
+              "severity": "fault",
+              "text": "100% of requests fail (baseline 0%) (run by another organisation)"
+            },
+            {
+              "id": "D5",
+              "letter": "D",
+              "component": "network",
+              "severity": "info",
+              "text": "traffic 0.5/s (baseline 9.6/s), less work from its callers (run by another organisation)"
+            },
+            {
+              "id": "D6",
+              "letter": "D",
+              "component": "network",
+              "severity": "fault",
+              "text": "p95 2021 ms (baseline 28 ms) (run by another organisation)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "9 s ago: stop by operator"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "9 s ago: start by operator (release=4.1)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 4.98,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "9 log records from clearing",
+        "data": {
+          "ms": 22.0
+        }
+      },
+      {
+        "t": 10.96,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 5.974 s"
+      },
+      {
+        "t": 10.96,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate network (now) to the organisation that runs network"
+      },
+      {
+        "t": 10.96,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "escalated"
+      },
+      {
+        "t": 14.3,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 3.342 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 3749,
+        "output_tokens": 477,
+        "latency_s": 5.974,
+        "estimated_cost_usd": 0.024536,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 800,
+        "output_tokens": 313,
+        "latency_s": 3.342,
+        "estimated_cost_usd": 0.00946,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 4,
+    "audit": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793448903.1416094,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793448873.142,
+      1793448893.142
+    ],
+    "journeys": {
+      "n": 230,
+      "ok": 230,
+      "success_rate": 1.0,
+      "p95_ms": 62.99996376037598,
+      "payments": {
+        "n": 175,
+        "ok": 175
+      },
+      "balances": {
+        "n": 55,
+        "fresh": 55
+      },
+      "p95_allowed_ms": 328.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 1113,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "1113 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793448770.0720086,
+      "until_t": 1793448893.1416094,
+      "breach_seconds": 0.0,
+      "failed_journeys": 0,
+      "time_to_mitigate_s": 0.0,
+      "mitigation_censored": false,
+      "late_clearings": 1029,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "sealed_3",
+      "target": "network",
+      "class": "external_outage",
+      "detail": {},
+      "t": 1793448770.0720086,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793448776.0976112,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793448777.113562,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793448778.1411207,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793448770.0720086,
+    "t_alert": 1793448783.1411207,
+    "horizon": 1793448893.1411207,
+    "verdict_t": 1793448903.1898694
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

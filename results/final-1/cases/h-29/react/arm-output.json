@@ -1,0 +1,442 @@
+{
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "Gateway was up=false and not_answering with no release or config change; a restart restored it to baseline p95 and rps."
+      },
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.95,
+        "evidence": "The scheduler changed max_transfer_minor from 1000000 to 1, an unworkable limit, just before payments rejects rose to 10-41%; reverting it brought rejects back to 0."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793455691.0941944,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is not answering (process down) and payments had max_transfer_minor set to 1, an unworkable limit; restart gateway first.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "t": 1793455694.3574739,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "Now revert the payments transfer limit change to 1 minor unit, which blocks nearly all payments.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The bank system has recovered and is running normally. A probe passes end to end and all metrics are at baseline, confirmed clean on two checks in a row, the last at 39 seconds.",
+      "background": "The gateway process went down with no release or config change. Separately, the scheduler changed the payments setting max_transfer_minor from 1000000 to 1, and payments rejects then rose to 10-41%.",
+      "assessment": "Two root causes were found: the gateway process was down (confidence 0.9), and the payments max_transfer_minor setting was bad (confidence 0.95). The incident commander restarted the gateway itself, which restored baseline p95 and rps. It also reverted max_transfer_minor to 1000000 itself, which brought payments rejects back to 0.",
+      "recommendation": "Find out why the scheduler set max_transfer_minor to 1 and stop it happening again. Ask the owning team why ops-maintenance and the pipeline restarted screening-standby three times, though it is healthy on release 4.1. Operations should review the payments rejected while rejects ran at 10-41%."
+    },
+    "t_start": 1793455682.6824794,
+    "t_first_action": 1793455691.0941944,
+    "t_declared": 1793455722.1097157,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 40.9
+        }
+      },
+      {
+        "t": 2.52,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.479 s"
+      },
+      {
+        "t": 2.52,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all component metrics to see where the symptoms are."
+      },
+      {
+        "t": 3.59,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway",
+        "data": {
+          "ms": 1072.9
+        }
+      },
+      {
+        "t": 8.41,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.818 s"
+      },
+      {
+        "t": 8.41,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Gateway is not answering (process down) and payments had max_transfer_minor set to 1, an unworkable limit; restart gateway first."
+      },
+      {
+        "t": 9.1,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 11.67,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.571 s"
+      },
+      {
+        "t": 11.67,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Now revert the payments transfer limit change to 1 minor unit, which blocks nearly all payments."
+      },
+      {
+        "t": 11.68,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler))",
+        "data": {
+          "target": "payments",
+          "params": {
+            "key": "max_transfer_minor"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.11,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.425 s"
+      },
+      {
+        "t": 14.11,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Observe again to verify recovery and check for hidden faults."
+      },
+      {
+        "t": 14.24,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 131.8
+        }
+      },
+      {
+        "t": 17.4,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.16 s"
+      },
+      {
+        "t": 17.4,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: The payments reject rate is still elevated, but this window includes time before the revert, so I'll run a probe to check the journey end to end."
+      },
+      {
+        "t": 18.3,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 903.7
+        }
+      },
+      {
+        "t": 23.19,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.89 s"
+      },
+      {
+        "t": 23.19,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The probe passes. I'll observe a short window after the revert to confirm the payments reject rate has returned to baseline before declaring done."
+      },
+      {
+        "t": 23.26,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 64.1
+        }
+      },
+      {
+        "t": 29.45,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.192 s"
+      },
+      {
+        "t": 29.45,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: All components are at baseline with zero rejects and errors, and the probe passes. The screening-standby stop/start cycles were maintenance restarts that left it up on the same release, so it is not a fault; declare done."
+      },
+      {
+        "t": 33.55,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 95.4
+        }
+      },
+      {
+        "t": 34.43,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 883.1
+        }
+      },
+      {
+        "t": 34.43,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 38.52,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 92.3
+        }
+      },
+      {
+        "t": 39.43,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 905.4
+        }
+      },
+      {
+        "t": 39.43,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 39.43,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 44.75,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 5.323 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 89,
+        "latency_s": 2.479,
+        "estimated_cost_usd": 0.01268,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4716,
+        "output_tokens": 234,
+        "latency_s": 4.818,
+        "estimated_cost_usd": 0.023544,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4874,
+        "output_tokens": 114,
+        "latency_s": 2.571,
+        "estimated_cost_usd": 0.021776,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5059,
+        "output_tokens": 88,
+        "latency_s": 2.425,
+        "estimated_cost_usd": 0.021996,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7273,
+        "output_tokens": 155,
+        "latency_s": 3.16,
+        "estimated_cost_usd": 0.032192,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7624,
+        "output_tokens": 230,
+        "latency_s": 4.89,
+        "estimated_cost_usd": 0.035096,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 9859,
+        "output_tokens": 411,
+        "latency_s": 6.192,
+        "estimated_cost_usd": 0.047656,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 929,
+        "output_tokens": 359,
+        "latency_s": 5.323,
+        "estimated_cost_usd": 0.010896,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 11,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793455691.0941944,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is not answering (process down) and payments had max_transfer_minor set to 1, an unworkable limit; restart gateway first.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793455694.3574739,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "Now revert the payments transfer limit change to 1 minor unit, which blocks nearly all payments.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      }
+    ]
+  },
+  "error": null
+}

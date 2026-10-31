@@ -1,0 +1,421 @@
+{
+  "case": {
+    "id": "h-01",
+    "input": {
+      "system": "bank",
+      "seed": 260001,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "sealed_2",
+          "at_s": 0,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [],
+      "healthy": true,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": ""
+    }
+  },
+  "arm": "react",
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The bank payment system has recovered and is running normally. Two recovery checks in a row were clean, the last at 34 seconds.",
+      "background": "The only change was a maintenance deploy of screening-standby to version 4.1.2, with scheduler restarts. Screening-standby carries no traffic.",
+      "assessment": "No fault was found. All components match their baselines, the payment probe succeeded end to end, and the screening-standby logs are clean. The alert looks transient, most likely caused by the brief traffic dip in the first window.",
+      "recommendation": "Watch for the alert recurring, and check whether the screening-standby 4.1.2 deploy and scheduler restarts line up with the traffic dip. Nothing was escalated, and there are no money or data effects for the operations team to review."
+    },
+    "t_start": 1793452850.3758154,
+    "t_first_action": null,
+    "t_declared": 1793452884.8580754,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 42.3
+        }
+      },
+      {
+        "t": 2.5,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.457 s"
+      },
+      {
+        "t": 2.5,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all components to see symptoms and recent changes."
+      },
+      {
+        "t": 2.6,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 102.3
+        }
+      },
+      {
+        "t": 6.31,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.709 s"
+      },
+      {
+        "t": 6.31,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Metrics look healthy apart from lower traffic; screening-standby got a new release and restarted twice, so probe the journey to confirm end-to-end health."
+      },
+      {
+        "t": 7.22,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 912.1
+        }
+      },
+      {
+        "t": 16.03,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 8.803 s"
+      },
+      {
+        "t": 16.03,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: The journey works, but screening-standby got a new release and was restarted twice right after, which hints at a latent crash loop; check its logs."
+      },
+      {
+        "t": 16.06,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "4 log records from screening-standby",
+        "data": {
+          "ms": 31.6
+        }
+      },
+      {
+        "t": 21.15,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.092 s"
+      },
+      {
+        "t": 21.15,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Standby logs are clean and the restarts look like routine scheduler starts after a maintenance deploy, but the probe took 910 ms, close to the 1000 ms limit. Observe again over a short window to check for any developing symptom."
+      },
+      {
+        "t": 21.24,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 92.3
+        }
+      },
+      {
+        "t": 27.37,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.126 s"
+      },
+      {
+        "t": 27.37,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: Every component is at baseline, traffic has recovered, ledger integrity is clean and the probe succeeded. The only change is a maintenance deploy to the idle standby, which has clean logs, so I find no fault to fix."
+      },
+      {
+        "t": 28.47,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 98.7
+        }
+      },
+      {
+        "t": 29.41,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 944.6
+        }
+      },
+      {
+        "t": 29.41,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 33.55,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 133.5
+        }
+      },
+      {
+        "t": 34.48,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 934.4
+        }
+      },
+      {
+        "t": 34.48,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 34.48,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 38.59,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.108 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 88,
+        "latency_s": 2.457,
+        "estimated_cost_usd": 0.01266,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4663,
+        "output_tokens": 220,
+        "latency_s": 3.709,
+        "estimated_cost_usd": 0.023052,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5023,
+        "output_tokens": 189,
+        "latency_s": 8.803,
+        "estimated_cost_usd": 0.023872,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5154,
+        "output_tokens": 282,
+        "latency_s": 5.092,
+        "estimated_cost_usd": 0.026256,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7168,
+        "output_tokens": 428,
+        "latency_s": 6.126,
+        "estimated_cost_usd": 0.037232,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 681,
+        "output_tokens": 257,
+        "latency_s": 4.108,
+        "estimated_cost_usd": 0.007864,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 9,
+    "audit": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793452970.024599,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793452940.025,
+      1793452960.025
+    ],
+    "journeys": {
+      "n": 216,
+      "ok": 216,
+      "success_rate": 1.0,
+      "p95_ms": 75.00004768371582,
+      "payments": {
+        "n": 169,
+        "ok": 169
+      },
+      "balances": {
+        "n": 47,
+        "fresh": 47
+      },
+      "p95_allowed_ms": 315.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793452837.6035566,
+      "until_t": 1793452960.024599,
+      "breach_seconds": 0.0,
+      "failed_journeys": 0,
+      "time_to_mitigate_s": 0.0,
+      "mitigation_censored": false,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "sealed_2",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793452837.6035566,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793452844.0234363,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793452845.0240693,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793452837.6035566,
+    "t_alert": 1793452850.0240693,
+    "horizon": 1793452960.0240693,
+    "verdict_t": 1793452970.0952888
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

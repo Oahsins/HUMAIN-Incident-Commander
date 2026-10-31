@@ -1,0 +1,656 @@
+{
+  "case": {
+    "id": "h-22",
+    "input": {
+      "system": "bank",
+      "seed": 260022,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "blind_1",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "gateway",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "gateway",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "naive_verify",
+  "result": {
+    "arm": "naive_verify",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "[C1] gateway: down (not answering) and [A3] payment journey fails at step 'gateway': timeout: no answer within 3.0s. Gateway logs nothing and has no recent change."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.8,
+        "evidence": "Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)'. [B1] shows first item 95 waiting 14 s, and [C2]/[C3] show clearing down after exiting with code 1."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793454943.6879725,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 95
+        },
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)'. [B1] shows first item 95 waiting 14 s, and [C2]/[C3] show clearing down after exiting with code 1.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 95 set aside for the operations team"
+      },
+      {
+        "t": 1793454944.6955144,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)'. [B1] shows first item 95 waiting 14 s, and [C2]/[C3] show clearing down after exiting with code 1.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "t": 1793454947.3329833,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering) and [A3] payment journey fails at step 'gateway': timeout: no answer within 3.0s. Gateway logs nothing and has no recent change.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 95 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 95 set aside from clearing: repair and resubmit it, or close it with its customer"
+    },
+    "sbar": {
+      "situation": "The bank payment system has recovered after two separate faults. One recovery check at 20 s ran the main payment journey cleanly, with all component metrics clean.",
+      "background": "The gateway process went down with no recent change and no log output, so every payment journey timed out at the gateway after 3.0 s. Separately, the clearing worker crashed with exit code 1 on malformed queue item 95 (JSONDecodeError in clear_one at 'message = self.parse(item)'), and its backlog grew.",
+      "assessment": "Root causes were the gateway process being down (confidence 0.85) and a poison message on clearing (confidence 0.8). The incident commander set aside clearing item 95 for the operations team, then restarted clearing and restarted the gateway itself; all three actions completed.",
+      "recommendation": "Watch the gateway and the clearing backlog, since recovery rests on a single clean look. The operations team has been asked (soon) to review item 95 and either repair and resubmit it or close it with its customer, because that payment has not cleared."
+    },
+    "t_start": 1793454932.1798334,
+    "t_first_action": 1793454943.6879725,
+    "t_declared": 1793454952.0091498,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 35.6
+        }
+      },
+      {
+        "t": 1.15,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway, clearing",
+        "data": {
+          "ms": 1109.4
+        }
+      },
+      {
+        "t": 4.17,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at gateway",
+        "data": {
+          "ms": 3028.7
+        }
+      },
+      {
+        "t": 4.17,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "5 fault findings, 11 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "payments",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 11.4/s), less work from its callers"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "screening",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 9.2/s), less work from its callers"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "payment journey fails at step 'gateway': timeout: no answer within 3.0s"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "backlog: 14 items waiting, oldest 14 s; first item 95 waiting 14 s after 0 attempt(s)"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C3",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 13 s ago (exit code 1)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: stop by pipeline"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 4.2,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 25.0
+        }
+      },
+      {
+        "t": 4.22,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 19.4
+        }
+      },
+      {
+        "t": 11.51,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 7.289 s"
+      },
+      {
+        "t": 11.52,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 95 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 95
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.15,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.86,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 18.93,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 75.3
+        }
+      },
+      {
+        "t": 19.83,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 895.7
+        }
+      },
+      {
+        "t": 19.83,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "single look: clean"
+      },
+      {
+        "t": 19.83,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 24.82,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.991 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 3699,
+        "output_tokens": 675,
+        "latency_s": 7.289,
+        "estimated_cost_usd": 0.028296,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1000,
+        "output_tokens": 340,
+        "latency_s": 4.991,
+        "estimated_cost_usd": 0.0108,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 10,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793454943.6879725,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 95
+        },
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)'. [B1] shows first item 95 waiting 14 s, and [C2]/[C3] show clearing down after exiting with code 1.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 95 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793454944.6955144,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)'. [B1] shows first item 95 waiting 14 s, and [C2]/[C3] show clearing down after exiting with code 1.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793454947.3329833,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering) and [A3] payment journey fails at step 'gateway': timeout: no answer within 3.0s. Gateway logs nothing and has no recent change.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793455051.7618086,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793455021.762,
+      1793455041.762
+    ],
+    "journeys": {
+      "n": 225,
+      "ok": 225,
+      "success_rate": 1.0,
+      "p95_ms": 72.00002670288086,
+      "payments": {
+        "n": 176,
+        "ok": 176
+      },
+      "balances": {
+        "n": 49,
+        "fresh": 49
+      },
+      "p95_allowed_ms": 316.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "set_aside",
+          "item": 95,
+          "payment_id": "batch-017"
+        }
+      ],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793454919.6793902,
+      "until_t": 1793455041.7618086,
+      "breach_seconds": 30.0,
+      "failed_journeys": 53,
+      "time_to_mitigate_s": 30.0,
+      "mitigation_censored": false,
+      "late_clearings": 13,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 95
+      },
+      "t": 1793454919.6793902,
+      "at_s": 0
+    },
+    {
+      "type": "blind_1",
+      "target": "gateway",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793454921.7146683,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793454925.7424946,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793454926.7612212,
+      "at_s": 7
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793454943.6933627,
+      "params": {
+        "item": 95
+      },
+      "ok": true,
+      "refused": false,
+      "action": "quarantine",
+      "target": "clearing",
+      "detail": "clearing item 95 set aside for the operations team"
+    },
+    {
+      "t": 1793454945.3312132,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    },
+    {
+      "t": 1793454948.035416,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "gateway",
+      "detail": "gateway restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793454943.6879725,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 95
+      },
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)'. [B1] shows first item 95 waiting 14 s, and [C2]/[C3] show clearing down after exiting with code 1.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 95 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793454944.6955144,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)'. [B1] shows first item 95 waiting 14 s, and [C2]/[C3] show clearing down after exiting with code 1.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793454947.3329833,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] gateway: down (not answering) and [A3] payment journey fails at step 'gateway': timeout: no answer within 3.0s. Gateway logs nothing and has no recent change.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793454919.6793902,
+    "t_alert": 1793454931.7612212,
+    "horizon": 1793455041.7612212,
+    "verdict_t": 1793455051.823959
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

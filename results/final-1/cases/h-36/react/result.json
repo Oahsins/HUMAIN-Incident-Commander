@@ -1,0 +1,590 @@
+{
+  "arm": "react",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.85,
+      "evidence": "Primary p95 was about 1815 ms against a 14 ms baseline, with no change and no errors of its own. Payments calls to it timed out (error rate 0.49, rising to 1.0). After failover the standby answers in 15 ms and payments errors went to 0."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.8,
+      "evidence": "The pipeline raised balance_cache_ttl_s from 0.5 to 600 s just before the alert, which would serve stale balances. It was reverted to 0.5, and the probe now shows the app balance matches the ledger."
+    },
+    {
+      "target": "clearing",
+      "class": "process_down",
+      "confidence": 0.8,
+      "evidence": "The worker was down with exit code 15 and 19 items queued. The head item had 0 attempts and the logs held no errors, so no poison message. After a restart it drained the queue to 0 and the network calls succeed."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793456121.215445,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Screening primary is slow with no change of its own while payments times out on it; fail over to the healthy standby.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793456123.9585054,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Gateway balance_cache_ttl_s raised from 0.5 to 600 s just before the alert; that serves stale balances, so revert it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793456129.09186,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Clearing exited with code 15 (SIGTERM) and no errors logged, head item has 0 attempts so not poison; restart it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": null,
+  "sbar": {
+    "situation": "The bank system has recovered, confirmed by two clean recovery checks in a row, the last at 46 s. Screening is running on its standby, and payments errors are at 0.",
+    "background": "The pipeline raised the gateway setting balance_cache_ttl_s from 0.5 to 600 s just before the alert, which would serve stale balances. Separately, the primary screening link slowed to about 1815 ms p95 against a 14 ms baseline, and the clearing worker went down with exit code 15 and 19 items queued.",
+    "assessment": "Payments calls to the slow primary screening timed out (error rate 0.49 rising to 1.0), so the incident commander failed screening over to the standby, which now answers in 15 ms with payments errors at 0. The incident commander reverted gateway balance_cache_ttl_s to 0.5, and the probe shows app balances match the ledger. It also restarted the clearing worker, which had no poison message, and the worker drained its queue to 0 with network calls succeeding.",
+    "recommendation": "Investigate why the primary screening link is slow before failing back to it. Find out why the pipeline changed balance_cache_ttl_s and why the clearing worker exited with code 15. Operations should review balances shown or acted on while the 600 s cache was live, and the payments that timed out during the screening slowdown."
+  },
+  "t_start": 1793456110.7576392,
+  "t_first_action": 1793456121.215445,
+  "t_declared": 1793456156.7983263,
+  "trace": [
+    {
+      "t": 0.04,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 38.0
+      }
+    },
+    {
+      "t": 2.63,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.596 s"
+    },
+    {
+      "t": 2.63,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Start by observing all component metrics to see where symptoms are."
+    },
+    {
+      "t": 2.73,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: clearing",
+      "data": {
+        "ms": 98.0
+      }
+    },
+    {
+      "t": 7.1,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 4.368 s"
+    },
+    {
+      "t": 7.1,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "logs: Screening is very slow (1814 ms vs 14 ms baseline) and payments errors follow it; clearing is down and gateway cache TTL was raised to 600 s. Check screening logs first."
+    },
+    {
+      "t": 7.13,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from screening",
+      "data": {
+        "ms": 28.7
+      }
+    },
+    {
+      "t": 10.46,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.327 s"
+    },
+    {
+      "t": 10.46,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Screening primary is slow with no change of its own while payments times out on it; fail over to the healthy standby."
+    },
+    {
+      "t": 10.48,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "failover",
+      "summary": "failover screening: done (screening now served by its standby)",
+      "data": {
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 13.2,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.724 s"
+    },
+    {
+      "t": 13.2,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Gateway balance_cache_ttl_s raised from 0.5 to 600 s just before the alert; that serves stale balances, so revert it."
+    },
+    {
+      "t": 13.22,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.66,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.441 s"
+    },
+    {
+      "t": 15.66,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "logs: Clearing is down (exit code 15, head item 90, 0 attempts); check its logs before restarting."
+    },
+    {
+      "t": 15.68,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from clearing",
+      "data": {
+        "ms": 13.7
+      }
+    },
+    {
+      "t": 18.33,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.655 s"
+    },
+    {
+      "t": 18.33,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Clearing exited with code 15 (SIGTERM) and no errors logged, head item has 0 attempts so not poison; restart it."
+    },
+    {
+      "t": 19.0,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 21.36,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.365 s"
+    },
+    {
+      "t": 21.36,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Observe again to verify recovery across all components."
+    },
+    {
+      "t": 21.44,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 75.9
+      }
+    },
+    {
+      "t": 24.86,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.422 s"
+    },
+    {
+      "t": 24.86,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: The 30 s window still includes traffic from before the failover; clearing is draining and the standby is healthy. Observe a short window to confirm current state."
+    },
+    {
+      "t": 24.93,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 68.9
+      }
+    },
+    {
+      "t": 28.14,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.204 s"
+    },
+    {
+      "t": 28.14,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "probe: Everything is back to baseline in the last 8 s and the clearing queue has drained; run one probe to confirm the full payment journey end to end."
+    },
+    {
+      "t": 29.07,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 935.0
+      }
+    },
+    {
+      "t": 36.04,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 6.972 s"
+    },
+    {
+      "t": 36.04,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "done: The probe passes end to end with balances matching and every component at baseline, so declare done with the three root causes found."
+    },
+    {
+      "t": 40.1,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 60.7
+      }
+    },
+    {
+      "t": 41.01,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 907.7
+      }
+    },
+    {
+      "t": 41.01,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 45.1,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 90.4
+      }
+    },
+    {
+      "t": 46.04,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 937.6
+      }
+    },
+    {
+      "t": 46.04,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 46.04,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 51.38,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 5.343 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 2725,
+      "output_tokens": 88,
+      "latency_s": 2.596,
+      "estimated_cost_usd": 0.01266,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4498,
+      "output_tokens": 327,
+      "latency_s": 4.368,
+      "estimated_cost_usd": 0.024532,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4648,
+      "output_tokens": 147,
+      "latency_s": 3.327,
+      "estimated_cost_usd": 0.021532,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4797,
+      "output_tokens": 132,
+      "latency_s": 2.724,
+      "estimated_cost_usd": 0.021828,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5006,
+      "output_tokens": 105,
+      "latency_s": 2.441,
+      "estimated_cost_usd": 0.022124,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5127,
+      "output_tokens": 115,
+      "latency_s": 2.655,
+      "estimated_cost_usd": 0.022808,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5285,
+      "output_tokens": 83,
+      "latency_s": 2.365,
+      "estimated_cost_usd": 0.0228,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7429,
+      "output_tokens": 185,
+      "latency_s": 3.422,
+      "estimated_cost_usd": 0.033416,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 9566,
+      "output_tokens": 185,
+      "latency_s": 3.204,
+      "estimated_cost_usd": 0.041964,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 9921,
+      "output_tokens": 569,
+      "latency_s": 6.972,
+      "estimated_cost_usd": 0.051064,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1048,
+      "output_tokens": 440,
+      "latency_s": 5.343,
+      "estimated_cost_usd": 0.012992,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 14,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793456121.215445,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Screening primary is slow with no change of its own while payments times out on it; fail over to the healthy standby.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793456123.9585054,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Gateway balance_cache_ttl_s raised from 0.5 to 600 s just before the alert; that serves stale balances, so revert it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793456129.09186,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Clearing exited with code 15 (SIGTERM) and no errors logged, head item has 0 attempts so not poison; restart it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ]
+}

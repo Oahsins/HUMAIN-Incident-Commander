@@ -1,0 +1,449 @@
+{
+  "arm": "naive_verify",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.85,
+      "evidence": "Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and is now down. The backlog's first item, 91, has been waiting 14 s."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793454049.5576973,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 91
+      },
+      "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and is now down. The backlog's first item, 91, has been waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 91 set aside for the operations team"
+    },
+    {
+      "t": 1793454050.5836663,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and is now down. The backlog's first item, 91, has been waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "clearing"
+    ],
+    "class": null,
+    "reason": "item 91 was set aside from clearing's work queue",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "review item 91 set aside from clearing: repair and resubmit it, or close it with its customer"
+  },
+  "sbar": {
+    "situation": "Clearing has recovered and the payment probe passes at every step. No faults remain open.",
+    "background": "Clearing crashed on poison item 91 with exit code 1 and 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)'. Item 91 was first in the backlog and had waited 14 s.",
+    "assessment": "Root cause was a poison message on clearing (confidence 0.85). The incident commander quarantined item 91 and then restarted clearing; both actions succeeded and the worker has not exited since, with the last of two recovery looks clean at 26 s. The screening-standby stop/start events are routine scheduler or operator restarts with no symptom.",
+    "recommendation": "This has been escalated (soon) to the operations team for clearing. They must review item 91, now set aside from clearing, and either repair and resubmit it or close it with its customer, because that payment has not cleared."
+  },
+  "t_start": 1793454038.4199357,
+  "t_first_action": 1793454049.5576973,
+  "t_declared": 1793454063.96041,
+  "trace": [
+    {
+      "t": 0.04,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 40.3
+      }
+    },
+    {
+      "t": 0.11,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: clearing",
+      "data": {
+        "ms": 68.6
+      }
+    },
+    {
+      "t": 4.0,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at clearing",
+      "data": {
+        "ms": 3895.5
+      }
+    },
+    {
+      "t": 4.0,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "4 fault findings, 8 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "payment journey fails at step 'clearing': not cleared within 3 s (still pending)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "backlog: 119 items waiting, oldest 14 s; first item 91 waiting 14 s after 0 attempt(s)"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "down (not answering)"
+          },
+          {
+            "id": "C2",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "process exited 1 time(s) in 15 min, last 13 s ago (exit code 1)"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: stop by scheduler"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "6 s ago: stop by operator"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "6 s ago: start by operator (release=4.1)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 4.03,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "2 log records from clearing",
+      "data": {
+        "ms": 20.7
+      }
+    },
+    {
+      "t": 11.14,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 7.111 s"
+    },
+    {
+      "t": 11.16,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "quarantine",
+      "summary": "quarantine clearing: done (clearing item 91 set aside for the operations team)",
+      "data": {
+        "target": "clearing",
+        "params": {
+          "item": 91
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 12.81,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.9,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 98.6
+      }
+    },
+    {
+      "t": 17.89,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1987.2
+      }
+    },
+    {
+      "t": 17.89,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: clearing: backlog: 56 items waiting, oldest 6 s, 50.0 processed/s; first item 292 waiting 6 s after 0 attempt(s)"
+    },
+    {
+      "t": 17.96,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 68.9
+      }
+    },
+    {
+      "t": 18.88,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 923.3
+      }
+    },
+    {
+      "t": 18.88,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "0 fault findings, 8 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "info",
+            "text": "process exited 1 time(s) in 15 min, last 31 s ago (exit code 1); none since the action taken on it 7 s ago"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "clearing",
+            "severity": "info",
+            "text": "1 item(s) already set aside"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "24 s ago: stop by scheduler"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "24 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: stop by operator"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "7 s ago: quarantine by incident-commander (item=91)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "6 s ago: restart by incident-commander (release=3.2)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 23.52,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 4.637 s"
+    },
+    {
+      "t": 23.52,
+      "phase": "triage",
+      "kind": "note",
+      "name": "check",
+      "summary": "nothing new to try and the main journey passes: checking again"
+    },
+    {
+      "t": 24.61,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 88.1
+      }
+    },
+    {
+      "t": 25.54,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 929.8
+      }
+    },
+    {
+      "t": 25.54,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: clean"
+    },
+    {
+      "t": 25.54,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 29.98,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 4.437 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 3603,
+      "output_tokens": 664,
+      "latency_s": 7.111,
+      "estimated_cost_usd": 0.027692,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 3671,
+      "output_tokens": 375,
+      "latency_s": 4.637,
+      "estimated_cost_usd": 0.022184,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 875,
+      "output_tokens": 310,
+      "latency_s": 4.437,
+      "estimated_cost_usd": 0.0097,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 12,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793454049.5576973,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 91
+      },
+      "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and is now down. The backlog's first item, 91, has been waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 91 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793454050.5836663,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and is now down. The backlog's first item, 91, has been waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ]
+}

@@ -3,10 +3,12 @@
 describe() keeps the contract; kinds, ports, settings, actions, contacts and the Release API are as DISPATCH.md
 gives them; the code that runs inside the centre's processes, and every string describe() shows, avoid the
 reserved words; no file uses the word the repo's vocabulary rule bans; no log line carries a caller's number,
-words or location; and git tracks nothing in Session A's folder, targets/dispatch/faults, which no scan enters.
+words or location; and Session A's folder, targets/dispatch/faults, stays outside the content scans. Before
+reveal git tracks none of its files; after reveal its tracked inventory and hashes match the latest transfer seal.
 """
 
 import ast
+import hashlib
 import importlib
 import inspect
 import json
@@ -409,16 +411,27 @@ def test_no_log_line_carries_a_callers_number_words_or_location():
 
 # ----- Session A's folder -----
 
-def test_git_tracks_nothing_under_the_faults_folder():
-    """Session A may keep its own files there on its own machine; the repository holds none."""
+def test_git_tracked_faults_match_the_latest_transfer_seal():
+    """Before reveal nothing is tracked; afterwards only the latest sealed files and bytes are allowed."""
     git = shutil.which("git")
     if git is None:
         pytest.skip("git is not installed")
     try:
-        done = subprocess.run([git, "ls-files", "--", "targets/dispatch/faults"], cwd=ROOT, capture_output=True,
+        done = subprocess.run([git, "ls-files", "-z", "--", "targets/dispatch/faults"], cwd=ROOT, capture_output=True,
                               text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         pytest.skip("git could not run")
     if done.returncode != 0:
         pytest.skip("not a git checkout")
-    assert done.stdout.strip() == ""
+    tracked = set(filter(None, done.stdout.split("\0")))
+    if not tracked:
+        return
+    with open(os.path.join(ROOT, "scenarios", "transfer", "SEALED.json"), encoding="utf-8") as handle:
+        files = json.load(handle)["seals"][-1]["files"]
+    expected = {path: digest for path, digest in files.items() if path.startswith("targets/dispatch/faults/")}
+    assert tracked == set(expected)
+    for path in sorted(tracked):
+        with open(os.path.join(ROOT, path), "rb") as handle:
+            data = handle.read()
+        actual = hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
+        assert actual == expected[path], path

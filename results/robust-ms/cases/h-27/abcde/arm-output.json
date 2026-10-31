@@ -1,0 +1,711 @@
+{
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "[C1] screening down (not answering) and [C2] process exited 1 time(s) in 15 min, exit code 15. Payments logs show 'fraud screening timeout via primary' with target=primary, and [D3] calls to screening fail 100%."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.9,
+        "evidence": "[C3] clearing down and [C4] process exited 1 time(s), last 11 s ago. The log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' raised from clear_one -> parse(item), and [B3] first item 94 is waiting 12 s after 0 attempts."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793452097.808039,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "screening is down and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793452111.598382,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "poison_message: [C3] clearing down and [C4] process exited 1 time(s), last 11 s ago. The log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' raised from clear_one -> parse(item), and [B3] first item 94 is waiting 12 s after 0 attempts.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 94 set aside for the operations team"
+      },
+      {
+        "t": 1793452112.6323504,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: [C3] clearing down and [C4] process exited 1 time(s), last 11 s ago. The log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' raised from clear_one -> parse(item), and [B3] first item 94 is waiting 12 s after 0 attempts.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "t": 1793452135.5799186,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: [C1] screening is down (not answering) and [C2] its process exited with code 15 38 s ago with no restart since. No warnings or errors appear in its logs.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing",
+        "screening"
+      ],
+      "class": null,
+      "reason": "[C1] screening is down (not answering) and [C2] its process exited with code 15 38 s ago with no restart since. No warnings or errors appear in its logs.; item 94 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the on-call engineer; the operations team",
+      "ask": "The primary exited with code 15 and no logs explain why. A person must find the cause before the primary is trusted again, since screening must not be switched off and the standby is carrying fraud checks alone.; review item 94 set aside from clearing: repair and resubmit it, or close it with its customer"
+    },
+    "sbar": {
+      "situation": "The payment journey now passes because screening traffic runs on its standby, but the primary screening process is still down and its cause is unknown. Recovery was confirmed on two clean checks in a row.",
+      "background": "Screening's primary process exited with code 15 once in 15 minutes and stopped answering, and payments logs show fraud screening timeouts against the primary. Clearing's worker exited after a JSONDecodeError while parsing item 94, which was waiting with zero attempts. The incident commander itself failed screening over to its standby, quarantined item 94, and restarted both clearing and screening.",
+      "assessment": "Clearing's poison message is resolved, since item 94 was set aside and the worker restarted. Screening's root cause, a process_down with confidence 0.9, is not resolved, because the primary still has no explanation for its exit. The standby is carrying all fraud checks alone.",
+      "recommendation": "The on-call engineer must find why the screening primary exited with code 15 before trusting it again, and must not switch screening off while the standby is the only fraud check. The operations team must review item 94 in clearing, either repairing and resubmitting it or closing it with the customer, and must check any money or data effects of the held item."
+    },
+    "t_start": 1793452096.6835318,
+    "t_first_action": 1793452097.808039,
+    "t_declared": 1793452148.4622228,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 38.7
+        }
+      },
+      {
+        "t": 0.1,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening, clearing",
+        "data": {
+          "ms": 59.7
+        }
+      },
+      {
+        "t": 1.12,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1025.8
+        }
+      },
+      {
+        "t": 1.12,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "14 fault findings, 16 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "92% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "92% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "p95 1042 ms (baseline 64 ms)"
+            },
+            {
+              "id": "B2",
+              "letter": "B",
+              "component": "payments",
+              "severity": "fault",
+              "text": "p95 1031 ms (baseline 48 ms)"
+            },
+            {
+              "id": "B3",
+              "letter": "B",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "backlog: 17 items waiting, oldest 12 s; first item 94 waiting 12 s after 0 attempt(s)"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 9 s ago (exit code 15)"
+            },
+            {
+              "id": "C3",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C4",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 11 s ago (exit code 1)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments fail: 92%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments are slow: p95 1042 ms (payments itself answered in 48 ms at baseline)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening fail: 100%"
+            },
+            {
+              "id": "D4",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening are slow: p95 1029 ms (screening itself answered in 15 ms at baseline)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: stop by operator"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: start by operator (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.15,
+        "phase": "survey",
+        "kind": "action",
+        "name": "containment",
+        "summary": "failover screening: done (screening now served by its standby)",
+        "data": {
+          "target": "screening",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 1.18,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 33.2
+        }
+      },
+      {
+        "t": 1.21,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "6 log records from payments",
+        "data": {
+          "ms": 32.9
+        }
+      },
+      {
+        "t": 1.24,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 29.5
+        }
+      },
+      {
+        "t": 1.27,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 31.1
+        }
+      },
+      {
+        "t": 14.91,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-haiku-5-5 answered in 13.642 s"
+      },
+      {
+        "t": 14.95,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 94 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 94
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 16.6,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 22.68,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 86.5
+        }
+      },
+      {
+        "t": 23.61,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 924.9
+        }
+      },
+      {
+        "t": 23.61,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: screening: down (not answering); screening: process exited 1 time(s) in 15 min, last 32 s ago (exit code 15); none since the action taken on it 22 s ago"
+      },
+      {
+        "t": 27.71,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 105.1
+        }
+      },
+      {
+        "t": 28.77,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1053.5
+        }
+      },
+      {
+        "t": 28.77,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: screening: down (not answering); screening: process exited 1 time(s) in 15 min, last 37 s ago (exit code 15); none since the action taken on it 28 s ago"
+      },
+      {
+        "t": 28.84,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 70.8
+        }
+      },
+      {
+        "t": 29.73,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 894.7
+        }
+      },
+      {
+        "t": 29.73,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "2 fault findings, 10 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 38 s ago (exit code 15); none since the action taken on it 29 s ago"
+            },
+            {
+              "id": "C3",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "info",
+              "text": "process exited 1 time(s) in 15 min, last 40 s ago (exit code 1); none since the action taken on it 14 s ago"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "screening",
+              "severity": "info",
+              "text": "served by its standby"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "clearing",
+              "severity": "info",
+              "text": "1 item(s) already set aside"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "34 s ago: stop by operator"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "34 s ago: start by operator (release=4.1)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening",
+              "severity": "info",
+              "text": "28 s ago: failover by incident-commander (from=primary, to=standby)"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "clearing",
+              "severity": "info",
+              "text": "14 s ago: quarantine by incident-commander (item=94)"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "clearing",
+              "severity": "info",
+              "text": "13 s ago: restart by incident-commander (release=3.2)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 29.74,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 1.8
+        }
+      },
+      {
+        "t": 38.9,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-haiku-5-5 answered in 9.16 s"
+      },
+      {
+        "t": 39.55,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart screening: done (screening restarted)",
+        "data": {
+          "target": "screening",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 41.55,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate screening (soon) to the on-call engineer"
+      },
+      {
+        "t": 45.66,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 110.8
+        }
+      },
+      {
+        "t": 46.61,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 949.0
+        }
+      },
+      {
+        "t": 46.61,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 50.7,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 81.0
+        }
+      },
+      {
+        "t": 51.78,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1083.1
+        }
+      },
+      {
+        "t": 51.78,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 51.78,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 54.44,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-haiku-5-5 answered in 2.66 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "assess",
+        "input_tokens": 4204,
+        "output_tokens": 2745,
+        "latency_s": 13.642,
+        "estimated_cost_usd": 0.001793,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "reassess",
+        "input_tokens": 3806,
+        "output_tokens": 1716,
+        "latency_s": 9.16,
+        "estimated_cost_usd": 0.001239,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1118,
+        "output_tokens": 396,
+        "latency_s": 2.66,
+        "estimated_cost_usd": 0.00031,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 22,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793452097.808039,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "screening is down and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793452111.598382,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "poison_message: [C3] clearing down and [C4] process exited 1 time(s), last 11 s ago. The log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' raised from clear_one -> parse(item), and [B3] first item 94 is waiting 12 s after 0 attempts.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 94 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793452112.6323504,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: [C3] clearing down and [C4] process exited 1 time(s), last 11 s ago. The log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' raised from clear_one -> parse(item), and [B3] first item 94 is waiting 12 s after 0 attempts.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793452135.5799186,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: [C1] screening is down (not answering) and [C2] its process exited with code 15 38 s ago with no restart since. No warnings or errors appear in its logs.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      }
+    ]
+  },
+  "error": null
+}

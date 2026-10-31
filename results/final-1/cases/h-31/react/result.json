@@ -1,0 +1,590 @@
+{
+  "arm": "react",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_config",
+      "confidence": 0.95,
+      "evidence": "Pipeline changed max_transfer_minor from 1000000 to 1 just before rejects reached about 44%. Reverting it cleared the transfer-limit rejects."
+    },
+    {
+      "target": "clearing",
+      "class": "process_down",
+      "confidence": 0.8,
+      "evidence": "Clearing was down with exit code 15, its logs showed no errors, and it had no recent change. After a restart it processed the queue to the network normally."
+    },
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.9,
+      "evidence": "Screening primary p95 rose to about 1817 ms against a 15 ms baseline with no change of its own, so payments' screening calls timed out. After failover to the standby (15 ms), errors went to 0."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793455980.0789957,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "Payments' max_transfer_minor was set to 1 just before rejects began (~44%), a value that cannot work; revert it first. Clearing is also down and needs follow-up.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793455985.659231,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Clearing exited with SIGTERM, has no recent change, and its logs show no errors, so it looks like a plain process_down; restart it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "t": 1793455994.9287603,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Screening primary has become slow (p95 1816 ms against a 15 ms baseline) with no change of its own, so payments' screening calls are timing out. This is dependency_slow, so fail payments over to the standby, which is up.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": null,
+  "sbar": {
+    "situation": "The bank's payment service has recovered. Two recovery checks in a row ran the main journey and came back clean, the last at 49 s.",
+    "background": "The pipeline changed the payments setting max_transfer_minor from 1000000 to 1, and transfer rejects rose to about 44%. At the same time, clearing was down with exit code 15, and the screening primary slowed to about 1817 ms p95 against a 15 ms baseline, so payments' screening calls timed out.",
+    "assessment": "The incident commander reverted max_transfer_minor to 1000000, which cleared the transfer-limit rejects (bad config, confidence 0.95). It restarted clearing, which then processed the queue to the network normally (process down with no errors or recent change, confidence 0.8). It failed screening over to the standby (15 ms), which brought errors to 0 (slow dependency, confidence 0.9).",
+    "recommendation": "Escalate the slow screening primary to its owners and do not fail back until they find the cause. Find out why the pipeline set max_transfer_minor to 1 and why clearing exited with code 15. Operations should review the transfers rejected by the limit, and any payments that failed screening or waited in clearing during the outage."
+  },
+  "t_start": 1793455973.5931382,
+  "t_first_action": 1793455980.0789957,
+  "t_declared": 1793456022.6484342,
+  "trace": [
+    {
+      "t": 0.03,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 31.5
+      }
+    },
+    {
+      "t": 2.51,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.479 s"
+    },
+    {
+      "t": 2.51,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Start by observing all components to see symptoms and recent changes."
+    },
+    {
+      "t": 2.61,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: clearing",
+      "data": {
+        "ms": 98.6
+      }
+    },
+    {
+      "t": 6.49,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.876 s"
+    },
+    {
+      "t": 6.49,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Payments' max_transfer_minor was set to 1 just before rejects began (~44%), a value that cannot work; revert it first. Clearing is also down and needs follow-up."
+    },
+    {
+      "t": 6.51,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+      "data": {
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 9.11,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.595 s"
+    },
+    {
+      "t": 9.11,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "logs: Clearing is down with exit code 15 (SIGTERM) and an empty queue; check its logs before acting."
+    },
+    {
+      "t": 9.13,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from clearing",
+      "data": {
+        "ms": 23.7
+      }
+    },
+    {
+      "t": 12.07,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.931 s"
+    },
+    {
+      "t": 12.07,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Clearing exited with SIGTERM, has no recent change, and its logs show no errors, so it looks like a plain process_down; restart it."
+    },
+    {
+      "t": 12.73,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.32,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.588 s"
+    },
+    {
+      "t": 15.32,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Observe again to confirm payments rejects are gone and clearing is processing to the network."
+    },
+    {
+      "t": 15.39,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 65.8
+      }
+    },
+    {
+      "t": 21.34,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 5.949 s"
+    },
+    {
+      "t": 21.34,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Screening primary has become slow (p95 1816 ms against a 15 ms baseline) with no change of its own, so payments' screening calls are timing out. This is dependency_slow, so fail payments over to the standby, which is up."
+    },
+    {
+      "t": 21.37,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "failover",
+      "summary": "failover screening: done (screening now served by its standby)",
+      "data": {
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 24.16,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.793 s"
+    },
+    {
+      "t": 24.16,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Observe again to confirm screening latency is back to normal on the standby and that the remaining rejects have cleared."
+    },
+    {
+      "t": 24.24,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 84.8
+      }
+    },
+    {
+      "t": 28.85,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 4.606 s"
+    },
+    {
+      "t": 28.85,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: The 20 s window mixes traffic from before the failover with traffic after it; the standby is healthy at 15 ms and clearing is now sending to the network. A short window will show the state after the failover only."
+    },
+    {
+      "t": 28.94,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 88.4
+      }
+    },
+    {
+      "t": 32.61,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.671 s"
+    },
+    {
+      "t": 32.61,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "probe: Every metric is back to baseline. Before declaring done, run one probe of the main journey to confirm the payment is posted and cleared and that the gateway's cached balance shows it."
+    },
+    {
+      "t": 33.52,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 907.2
+      }
+    },
+    {
+      "t": 39.11,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 5.59 s"
+    },
+    {
+      "t": 39.11,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "done: The probe passes end to end and every metric is at baseline. Three faults were found and fixed; the primary screening slowness has no change of its own, so it should be reported, but the failover already restores service."
+    },
+    {
+      "t": 43.23,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 114.3
+      }
+    },
+    {
+      "t": 44.13,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 901.5
+      }
+    },
+    {
+      "t": 44.13,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 48.18,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 48.5
+      }
+    },
+    {
+      "t": 49.06,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 879.1
+      }
+    },
+    {
+      "t": 49.06,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 49.06,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 54.05,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 4.995 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 2725,
+      "output_tokens": 94,
+      "latency_s": 2.479,
+      "estimated_cost_usd": 0.01278,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4612,
+      "output_tokens": 246,
+      "latency_s": 3.876,
+      "estimated_cost_usd": 0.023368,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4840,
+      "output_tokens": 117,
+      "latency_s": 2.595,
+      "estimated_cost_usd": 0.0217,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4973,
+      "output_tokens": 161,
+      "latency_s": 2.931,
+      "estimated_cost_usd": 0.023112,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5144,
+      "output_tokens": 103,
+      "latency_s": 2.588,
+      "estimated_cost_usd": 0.022636,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7214,
+      "output_tokens": 376,
+      "latency_s": 5.949,
+      "estimated_cost_usd": 0.036376,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7420,
+      "output_tokens": 111,
+      "latency_s": 2.793,
+      "estimated_cost_usd": 0.0319,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 9718,
+      "output_tokens": 258,
+      "latency_s": 4.606,
+      "estimated_cost_usd": 0.044032,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 12004,
+      "output_tokens": 204,
+      "latency_s": 3.671,
+      "estimated_cost_usd": 0.052096,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 12383,
+      "output_tokens": 444,
+      "latency_s": 5.59,
+      "estimated_cost_usd": 0.058412,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 994,
+      "output_tokens": 402,
+      "latency_s": 4.995,
+      "estimated_cost_usd": 0.012016,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 14,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793455980.0789957,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "Payments' max_transfer_minor was set to 1 just before rejects began (~44%), a value that cannot work; revert it first. Clearing is also down and needs follow-up.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793455985.659231,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Clearing exited with SIGTERM, has no recent change, and its logs show no errors, so it looks like a plain process_down; restart it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793455994.9287603,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Screening primary has become slow (p95 1816 ms against a 15 ms baseline) with no change of its own, so payments' screening calls are timing out. This is dependency_slow, so fail payments over to the standby, which is up.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    }
+  ]
+}

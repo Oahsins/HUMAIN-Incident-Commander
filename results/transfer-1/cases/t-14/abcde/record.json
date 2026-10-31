@@ -1,0 +1,593 @@
+{
+  "case": {
+    "id": "t-14",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310014,
+      "faults": [
+        {
+          "type": "sealed_10",
+          "at_s": 0,
+          "params": {
+            "target": "unit-sync",
+            "variant": "v4"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 2,
+          "params": {
+            "target": "call-handling",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 4,
+          "params": {
+            "target": "call-handling",
+            "variant": "v3"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "unit-sync",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "unit-sync",
+            "params": {
+              "key": "batch_size"
+            }
+          }
+        },
+        {
+          "target": "call-handling",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "call-handling",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "unit-sync",
+        "class": "bad_config",
+        "confidence": 0.95,
+        "evidence": "E1 shows batch_size changed from 200 to 0 ten seconds ago, and the log says 'setting batch_size cannot be used; work is paused until it changes'. The backlog holds 304 items at 0.0 processed/s."
+      },
+      {
+        "target": "call-handling",
+        "class": "bad_release",
+        "confidence": 0.7,
+        "evidence": "E2 shows call-handling was deployed from 5.2 to 5.3 seven seconds ago, and A1 shows 7% of requests refused against a baseline of 0%."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793446171.494115,
+        "action": "revert_config",
+        "target": "unit-sync",
+        "params": {
+          "key": "batch_size"
+        },
+        "reason": "bad_config: E1 shows batch_size changed from 200 to 0 ten seconds ago, and the log says 'setting batch_size cannot be used; work is paused until it changes'. The backlog holds 304 items at 0.0 processed/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+      },
+      {
+        "t": 1793446172.5150342,
+        "action": "rollback",
+        "target": "call-handling",
+        "params": {},
+        "reason": "bad_release: E2 shows call-handling was deployed from 5.2 to 5.3 seven seconds ago, and A1 shows 7% of requests refused against a baseline of 0%.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "call-handling 5.3 -> 5.2"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Dispatch has recovered. The last two recovery checks, ending at 24 s, ran the main journey cleanly with healthy metrics on every component.",
+      "background": "An operator changed the unit-sync setting batch_size from 200 to 0, which paused all unit status processing. About three seconds later, call-handling was deployed from version 5.2 to 5.3, and 7% of calls began to be refused against a normal 0%.",
+      "assessment": "The batch_size of 0 stalled unit-sync with 304 items in the backlog and none being processed. This failed the journey and let CAD unit timers expire (confidence 0.95). The call-handling 5.3 release is the likely cause of the refused calls (confidence 0.7). The incident commander itself restored batch_size to 200 and rolled call-handling back from 5.3 to 5.2, and both actions completed.",
+      "recommendation": "Confirm that the 304-item unit-sync backlog has drained and that CAD unit statuses are correct. Have operations review the calls refused and the unit timers that expired during the incident. Keep call-handling on 5.2 until the 5.3 release has been investigated, and find out why the operator set batch_size to 0."
+    },
+    "t_start": 1793446161.6377058,
+    "t_first_action": 1793446171.494115,
+    "t_declared": 1793446185.2740908,
+    "trace": [
+      {
+        "t": 0.03,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "dispatch: 9 components",
+        "data": {
+          "ms": 25.7
+        }
+      },
+      {
+        "t": 0.13,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 105.6
+        }
+      },
+      {
+        "t": 1.93,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey failed at unit-sync",
+        "data": {
+          "ms": 1796.8
+        }
+      },
+      {
+        "t": 1.93,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "5 fault findings, 8 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "7% of requests are refused (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "unit-sync",
+              "severity": "fault",
+              "text": "emergency_call journey fails at step 'unit-sync': unit record not updated within 1.5 s"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "unit-sync",
+              "severity": "fault",
+              "text": "backlog: 304 items waiting, oldest 10 s, 0.0 processed/s; first item 257 waiting 10 s after 0 attempt(s)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "cad",
+              "severity": "fault",
+              "text": "data check failed: unit status timers expired = 2"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "unit-sync",
+              "severity": "fault",
+              "text": "data check failed: unit reports overdue = 20"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "unit-sync",
+              "severity": "info",
+              "text": "10 s ago: config by operator (key=batch_size, from=200, to=0)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "call-handling",
+              "severity": "info",
+              "text": "7 s ago: deploy by pipeline (from=5.2, to=5.3)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "call-handling",
+              "severity": "info",
+              "text": "6 s ago: config by pipeline (key=rollover_s, from=2.5, to=3.0)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.96,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "112 log records from call-handling",
+        "data": {
+          "ms": 33.5
+        }
+      },
+      {
+        "t": 1.98,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "65 log records from unit-sync",
+        "data": {
+          "ms": 15.1
+        }
+      },
+      {
+        "t": 1.99,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "42 log records from cad",
+        "data": {
+          "ms": 14.9
+        }
+      },
+      {
+        "t": 9.86,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 7.864 s"
+      },
+      {
+        "t": 9.88,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config unit-sync: done (unit-sync batch_size restored from 0 to 200 (changed earlier by operator))",
+        "data": {
+          "target": "unit-sync",
+          "params": {
+            "key": "batch_size"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 11.59,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback call-handling: done (call-handling 5.3 -> 5.2)",
+        "data": {
+          "target": "call-handling",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 18.67,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 84.9
+        }
+      },
+      {
+        "t": 19.18,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 508.2
+        }
+      },
+      {
+        "t": 19.18,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 23.26,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 75.2
+        }
+      },
+      {
+        "t": 23.64,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 379.8
+        }
+      },
+      {
+        "t": 23.64,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 23.64,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 28.52,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.881 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 3901,
+        "output_tokens": 763,
+        "latency_s": 7.864,
+        "estimated_cost_usd": 0.030864,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 956,
+        "output_tokens": 395,
+        "latency_s": 4.881,
+        "estimated_cost_usd": 0.011724,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 12,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793446171.494115,
+        "action": "revert_config",
+        "target": "unit-sync",
+        "params": {
+          "key": "batch_size"
+        },
+        "reason": "bad_config: E1 shows batch_size changed from 200 to 0 ten seconds ago, and the log says 'setting batch_size cannot be used; work is paused until it changes'. The backlog holds 304 items at 0.0 processed/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+      },
+      {
+        "event": "act",
+        "t": 1793446172.5150342,
+        "action": "rollback",
+        "target": "call-handling",
+        "params": {},
+        "reason": "bad_release: E2 shows call-handling was deployed from 5.2 to 5.3 seven seconds ago, and A1 shows 7% of requests refused against a baseline of 0%.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "call-handling 5.3 -> 5.2"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "slo_ok": true,
+    "t": 1793446281.256563,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793446251.257,
+      1793446271.257
+    ],
+    "journeys": {
+      "n": 49,
+      "ok": 49,
+      "success_rate": 1.0,
+      "p95_ms": 36.7,
+      "p90_ms": 35.9,
+      "p95_allowed_ms": 286.9,
+      "by_source": {
+        "normal": {
+          "n": 49,
+          "ok": 49
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 3,
+      "failures": {}
+    },
+    "integrity": {
+      "ok": true,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793446152.2524166,
+      "until_t": 1793446271.256563,
+      "breach_seconds": 25.0,
+      "failed_journeys": 34,
+      "time_to_mitigate_s": 25.0,
+      "mitigation_censored": false,
+      "told_without_incident": 23,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 33.0,
+      "calls_dropped": 5,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 17
+    },
+    "reasons": []
+  },
+  "manifest": [
+    {
+      "type": "sealed_10",
+      "target": "unit-sync",
+      "class": "bad_config",
+      "detail": {
+        "key": "batch_size",
+        "value": 0
+      },
+      "t": 1793446152.2524166,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_1",
+      "target": "call-handling",
+      "class": "bad_release",
+      "detail": {
+        "release": "5.3"
+      },
+      "t": 1793446154.9252243,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "call-handling",
+        "key": "rollover_s",
+        "value": 3.0
+      },
+      "t": 1793446156.2560806,
+      "at_s": 4
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793446171.5130446,
+      "params": {
+        "key": "batch_size"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "unit-sync",
+      "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+    },
+    {
+      "t": 1793446173.2223551,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "call-handling",
+      "detail": "call-handling 5.3 -> 5.2"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793446171.494115,
+      "action": "revert_config",
+      "target": "unit-sync",
+      "params": {
+        "key": "batch_size"
+      },
+      "reason": "bad_config: E1 shows batch_size changed from 200 to 0 ten seconds ago, and the log says 'setting batch_size cannot be used; work is paused until it changes'. The backlog holds 304 items at 0.0 processed/s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+    },
+    {
+      "event": "act",
+      "t": 1793446172.5150342,
+      "action": "rollback",
+      "target": "call-handling",
+      "params": {},
+      "reason": "bad_release: E2 shows call-handling was deployed from 5.2 to 5.3 seven seconds ago, and A1 shows 7% of requests refused against a baseline of 0%.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "call-handling 5.3 -> 5.2"
+    }
+  ],
+  "timing": {
+    "t0": 1793446152.2524166,
+    "t_alert": 1793446161.2560806,
+    "horizon": 1793446271.2560806,
+    "verdict_t": 1793446281.3092942
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9200,
+  "error": null
+}

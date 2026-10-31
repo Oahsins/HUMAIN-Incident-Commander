@@ -1,0 +1,1070 @@
+{
+  "case": {
+    "id": "t-15",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310015,
+      "faults": [
+        {
+          "type": "sealed_3",
+          "at_s": 0,
+          "params": {
+            "target": "dispatcher",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_10",
+          "at_s": 2,
+          "params": {
+            "target": "alerting",
+            "variant": "v7"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 4,
+          "params": {
+            "target": "cad",
+            "variant": "v2"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "alerting",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "alerting",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "dispatcher",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "dispatcher",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "alerting",
+        "class": "dependency_slow",
+        "confidence": 0.8,
+        "evidence": "Probe shows dispatcher=ok but alerting=FAIL: 'alert not delivered on primary within 1.0 s'. Dispatcher logs 'station alert for assignment 75 not delivered via alerting (refused)' with 89% of calls failing, and repeated no_acknowledgement from units that were never alerted."
+      },
+      {
+        "target": "dispatcher",
+        "class": "bad_release",
+        "confidence": 0.75,
+        "evidence": "[E1] the operator deployed dispatcher 2.1→2.2 30 s ago, and [B1] shows a backlog of 16 items with the oldest at 23 s. Dispatcher keeps logging 'did not acknowledge incident ... in time' (e.g. assignment 213/214, 6 s ago) even after alerting was moved to its standby."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793446168.4373477,
+        "action": "failover",
+        "target": "alerting",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "dependency_slow: Probe shows dispatcher=ok but alerting=FAIL: 'alert not delivered on primary within 1.0 s'. Dispatcher logs 'station alert for assignment 75 not delivered via alerting (refused)' with 89% of calls failing, and repeated no_acknowledgement from units that were never alerted.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "alerting now served by its standby"
+      },
+      {
+        "t": 1793446189.15944,
+        "action": "rollback",
+        "target": "dispatcher",
+        "params": {},
+        "reason": "bad_release: [E1] the operator deployed dispatcher 2.1→2.2 30 s ago, and [B1] shows a backlog of 16 items with the oldest at 23 s. Dispatcher keeps logging 'did not acknowledge incident ... in time' (e.g. assignment 213/214, 6 s ago) even after alerting was moved to its standby.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "dispatcher 2.2 -> 2.1"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Dispatch has recovered. The recovery check ran four looks, and the last two at 46 s were clean in a row.",
+      "background": "The operator deployed dispatcher 2.1 to 2.2 about 30 s before the symptoms began. Alerts then stopped reaching units on the primary alerting path, and a backlog of 16 items built up with the oldest at 23 s.",
+      "assessment": "There were two causes: the alerting primary refused station alerts, failing 89% of calls, and the dispatcher 2.2 release kept missing unit acknowledgements even after the alerting failover. The incident commander failed alerting over to its standby, which succeeded, and then rolled dispatcher back from 2.2 to 2.1, which also succeeded.",
+      "recommendation": "Find out why the alerting primary refused deliveries before moving traffic back to it. Hold dispatcher 2.2 until its acknowledgement fault is understood. The operations team should review the 16 backlogged assignments, including 75, 213 and 214, to confirm every unit was alerted and acknowledged."
+    },
+    "t_start": 1793446155.4909105,
+    "t_first_action": 1793446168.4373477,
+    "t_declared": 1793446201.9403803,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "dispatch: 9 components",
+        "data": {
+          "ms": 42.6
+        }
+      },
+      {
+        "t": 0.15,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 108.8
+        }
+      },
+      {
+        "t": 1.39,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey failed at alerting",
+        "data": {
+          "ms": 1237.1
+        }
+      },
+      {
+        "t": 1.39,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "2 fault findings, 5 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "alerting",
+              "severity": "info",
+              "text": "traffic 0.2/s (baseline 1.9/s), less work from its callers"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "alerting",
+              "severity": "fault",
+              "text": "emergency_call journey fails at step 'alerting': alert not delivered on primary within 1.0 s"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "dispatcher",
+              "severity": "fault",
+              "text": "calls to alerting fail: 89%"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "dispatcher",
+              "severity": "info",
+              "text": "9 s ago: deploy by operator (from=2.1, to=2.2)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "cad",
+              "severity": "info",
+              "text": "5 s ago: config by operator (key=write_timeout_ms, from=1000, to=2000)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.41,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from alerting",
+        "data": {
+          "ms": 23.1
+        }
+      },
+      {
+        "t": 1.45,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "166 log records from dispatcher",
+        "data": {
+          "ms": 34.7
+        }
+      },
+      {
+        "t": 12.95,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 11.499 s"
+      },
+      {
+        "t": 12.97,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "failover",
+        "summary": "failover alerting: done (alerting now served by its standby)",
+        "data": {
+          "target": "alerting",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 16.06,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 87.0
+        }
+      },
+      {
+        "t": 16.67,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 612.0
+        }
+      },
+      {
+        "t": 16.67,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: dispatcher: backlog: 48 items waiting, oldest 23 s, 5.2 processed/s; dispatcher: calls to alerting fail: 100%"
+      },
+      {
+        "t": 20.8,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 128.4
+        }
+      },
+      {
+        "t": 21.19,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 389.4
+        }
+      },
+      {
+        "t": 21.19,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: dispatcher: backlog: 18 items waiting, oldest 23 s, 8.8 processed/s"
+      },
+      {
+        "t": 21.3,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 109.3
+        }
+      },
+      {
+        "t": 21.72,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 425.0
+        }
+      },
+      {
+        "t": 21.72,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "1 fault findings, 6 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "alerting",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 1.9/s): moved to its standby"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "dispatcher",
+              "severity": "fault",
+              "text": "backlog: 16 items waiting, oldest 23 s, 7.8 processed/s"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "alerting",
+              "severity": "info",
+              "text": "served by its standby"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "dispatcher",
+              "severity": "info",
+              "text": "30 s ago: deploy by operator (from=2.1, to=2.2)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "cad",
+              "severity": "info",
+              "text": "27 s ago: config by operator (key=write_timeout_ms, from=1000, to=2000)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "alerting",
+              "severity": "info",
+              "text": "8 s ago: failover by incident-commander (from=primary, to=standby)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 21.74,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "200 log records from dispatcher",
+        "data": {
+          "ms": 18.6
+        }
+      },
+      {
+        "t": 33.67,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-opus-5-5 answered in 11.927 s"
+      },
+      {
+        "t": 34.38,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback dispatcher: done (dispatcher 2.2 -> 2.1)",
+        "data": {
+          "target": "dispatcher",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 41.46,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 77.7
+        }
+      },
+      {
+        "t": 41.92,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 455.9
+        }
+      },
+      {
+        "t": 41.92,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 46.04,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 122.5
+        }
+      },
+      {
+        "t": 46.45,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 410.5
+        }
+      },
+      {
+        "t": 46.45,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 46.45,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 51.17,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.722 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 4403,
+        "output_tokens": 1066,
+        "latency_s": 11.499,
+        "estimated_cost_usd": 0.038932,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "reassess",
+        "input_tokens": 4598,
+        "output_tokens": 1036,
+        "latency_s": 11.927,
+        "estimated_cost_usd": 0.039112,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1057,
+        "output_tokens": 356,
+        "latency_s": 4.722,
+        "estimated_cost_usd": 0.011348,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 18,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793446168.4373477,
+        "action": "failover",
+        "target": "alerting",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "dependency_slow: Probe shows dispatcher=ok but alerting=FAIL: 'alert not delivered on primary within 1.0 s'. Dispatcher logs 'station alert for assignment 75 not delivered via alerting (refused)' with 89% of calls failing, and repeated no_acknowledgement from units that were never alerted.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "alerting now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793446189.15944,
+        "action": "rollback",
+        "target": "dispatcher",
+        "params": {},
+        "reason": "bad_release: [E1] the operator deployed dispatcher 2.1→2.2 30 s ago, and [B1] shows a backlog of 16 items with the oldest at 23 s. Dispatcher keeps logging 'did not acknowledge incident ... in time' (e.g. assignment 213/214, 6 s ago) even after alerting was moved to its standby.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "dispatcher 2.2 -> 2.1"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "slo_ok": true,
+    "t": 1793446275.1492438,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793446245.149,
+      1793446265.149
+    ],
+    "journeys": {
+      "n": 93,
+      "ok": 93,
+      "success_rate": 1.0,
+      "p95_ms": 38.1,
+      "p90_ms": 37.2,
+      "p95_allowed_ms": 287.3,
+      "by_source": {
+        "normal": {
+          "n": 47,
+          "ok": 47
+        },
+        "surge": {
+          "n": 46,
+          "ok": 46
+        }
+      },
+      "linked": 3,
+      "failures": {}
+    },
+    "integrity": {
+      "ok": true,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": [
+        {
+          "kind": "dropped_incident",
+          "incident_id": 45,
+          "calls": [
+            "C-1c6037b7"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 48,
+          "calls": [
+            "C-c7a3e2d1"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 51,
+          "calls": [
+            "C-cd26d770"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 54,
+          "calls": [
+            "C-a387dd8b"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 57,
+          "calls": [
+            "C-1777679a"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 60,
+          "calls": [
+            "C-2ce3a8a0"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 63,
+          "calls": [
+            "C-576ccc2a"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 66,
+          "calls": [
+            "C-ae8efce4"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 69,
+          "calls": [
+            "C-dd104749"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 72,
+          "calls": [
+            "C-9b524e7a"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 75,
+          "calls": [
+            "C-1f77767a"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 78,
+          "calls": [
+            "C-4dce7aaa"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 84,
+          "calls": [
+            "C-f7a0aa04"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 87,
+          "calls": [
+            "C-aa145fb2"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 90,
+          "calls": [
+            "C-97d9f6ba"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 93,
+          "calls": [
+            "C-940fd15a"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 96,
+          "calls": [
+            "C-7076bd96"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 99,
+          "calls": [
+            "C-3f4add71"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 102,
+          "calls": [
+            "C-6124c3d4"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 105,
+          "calls": [
+            "C-bd8e51b6"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 108,
+          "calls": [
+            "C-0f235692"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 111,
+          "calls": [
+            "C-eb81b175"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 114,
+          "calls": [
+            "C-b78a644d"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 120,
+          "calls": [
+            "C-06fab4a3"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 123,
+          "calls": [
+            "C-35f86398"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 126,
+          "calls": [
+            "C-5638f49a"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 129,
+          "calls": [
+            "C-f0aa733f"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 132,
+          "calls": [
+            "C-7a010771"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 135,
+          "calls": [
+            "C-47a1a362"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 138,
+          "calls": [
+            "C-345f6a55"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 141,
+          "calls": [
+            "C-eff24eb6"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 144,
+          "calls": [
+            "C-ff8553dc"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 147,
+          "calls": [
+            "C-5eb7ada7"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 150,
+          "calls": [
+            "C-a0afc398"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 153,
+          "calls": [
+            "C-20ec21c2"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 156,
+          "calls": [
+            "C-833f35fb"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 159,
+          "calls": [
+            "C-73af9989"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 162,
+          "calls": [
+            "C-0a4f3990"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 165,
+          "calls": [
+            "C-63cb4c60"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 168,
+          "calls": [
+            "C-80e0bb7b"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 171,
+          "calls": [
+            "C-3feed4df"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 174,
+          "calls": [
+            "C-4e6d9fd2"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 177,
+          "calls": [
+            "C-a18f5de9"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 180,
+          "calls": [
+            "C-f0b81eea"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 183,
+          "calls": [
+            "C-3f3c8511"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 186,
+          "calls": [
+            "C-805c2c0c"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 189,
+          "calls": [
+            "C-06fa4811"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 192,
+          "calls": [
+            "C-8b7701ed"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 195,
+          "calls": [
+            "C-b4e51ab9"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 198,
+          "calls": [
+            "C-bba66927"
+          ]
+        }
+      ]
+    },
+    "impact": {
+      "since_t": 1793446147.2542436,
+      "until_t": 1793446265.1492438,
+      "breach_seconds": 45.0,
+      "failed_journeys": 150,
+      "time_to_mitigate_s": 45.0,
+      "mitigation_censored": false,
+      "told_without_incident": 0,
+      "incidents_dropped": 61,
+      "unit_record_wrong_seconds": 0.0,
+      "calls_dropped": 0,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0
+    },
+    "reasons": []
+  },
+  "manifest": [
+    {
+      "type": "sealed_3",
+      "target": "dispatcher",
+      "class": "bad_release",
+      "detail": {
+        "release": "2.2",
+        "pid": 59492
+      },
+      "t": 1793446147.2542436,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_10",
+      "target": "alerting",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "dispatcher->alerting",
+        "drop_pct": 1.0
+      },
+      "t": 1793446148.1373556,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "cad",
+        "key": "write_timeout_ms",
+        "value": 2000
+      },
+      "t": 1793446150.1488295,
+      "at_s": 4
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793446168.4573586,
+      "params": {
+        "to": "standby"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "failover",
+      "target": "alerting",
+      "detail": "alerting now served by its standby"
+    },
+    {
+      "t": 1793446189.8701088,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "dispatcher",
+      "detail": "dispatcher 2.2 -> 2.1"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793446168.4373477,
+      "action": "failover",
+      "target": "alerting",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "dependency_slow: Probe shows dispatcher=ok but alerting=FAIL: 'alert not delivered on primary within 1.0 s'. Dispatcher logs 'station alert for assignment 75 not delivered via alerting (refused)' with 89% of calls failing, and repeated no_acknowledgement from units that were never alerted.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "alerting now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793446189.15944,
+      "action": "rollback",
+      "target": "dispatcher",
+      "params": {},
+      "reason": "bad_release: [E1] the operator deployed dispatcher 2.1→2.2 30 s ago, and [B1] shows a backlog of 16 items with the oldest at 23 s. Dispatcher keeps logging 'did not acknowledge incident ... in time' (e.g. assignment 213/214, 6 s ago) even after alerting was moved to its standby.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "dispatcher 2.2 -> 2.1"
+    }
+  ],
+  "timing": {
+    "t0": 1793446147.2542436,
+    "t_alert": 1793446155.1488295,
+    "horizon": 1793446265.1488295,
+    "verdict_t": 1793446275.2252014
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9300,
+  "error": null
+}

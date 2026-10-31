@@ -1,0 +1,450 @@
+{
+  "case": {
+    "id": "t-14",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310014,
+      "faults": [
+        {
+          "type": "sealed_10",
+          "at_s": 0,
+          "params": {
+            "target": "unit-sync",
+            "variant": "v4"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 2,
+          "params": {
+            "target": "call-handling",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 4,
+          "params": {
+            "target": "call-handling",
+            "variant": "v3"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "unit-sync",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "unit-sync",
+            "params": {
+              "key": "batch_size"
+            }
+          }
+        },
+        {
+          "target": "call-handling",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "call-handling",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "call-handling",
+        "class": "bad_release",
+        "confidence": 0.8,
+        "evidence": "A changed release coincides with local failures."
+      },
+      {
+        "target": "unit-sync",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "A setting change coincides with degraded service."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793445873.5538123,
+        "action": "rollback",
+        "target": "call-handling",
+        "params": {},
+        "reason": "A changed release coincides with local failures.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "call-handling 5.3 -> 5.2"
+      },
+      {
+        "t": 1793445880.2325714,
+        "action": "revert_config",
+        "target": "unit-sync",
+        "params": {
+          "key": "batch_size"
+        },
+        "reason": "A setting change coincides with degraded service.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The runbook ended with recovered.",
+      "background": "Surveyed 9 components; attempted 2 bounded actions.",
+      "assessment": "call-handling: bad_release; unit-sync: bad_config",
+      "recommendation": "Continue monitoring the system."
+    },
+    "t_start": 1793445871.5887706,
+    "t_first_action": 1793445873.5538123,
+    "t_declared": 1793445893.710941,
+    "trace": [
+      {
+        "t": 0.03575849533081055,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.12804841995239258,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.9648969173431396,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.9650392532348633,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A changed release coincides with local failures."
+      },
+      {
+        "t": 2.677358627319336,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 2.677372932434082,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "A changed release coincides with local failures."
+      },
+      {
+        "t": 6.815701961517334,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 8.643693447113037,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 8.643797874450684,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 8.675340414047241,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 8.675354957580566,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 10.785451173782349,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.123806476593018,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.12393856048584,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 1; checking a ten-second window."
+      },
+      {
+        "t": 16.22905397415161,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 16.663130283355713,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 16.66321897506714,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 2; checking a ten-second window."
+      },
+      {
+        "t": 21.759549140930176,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 22.12207794189453,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 22.12216806411743,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 3; checking a ten-second window."
+      },
+      {
+        "t": 22.12217950820923,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with recovered."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "slo_ok": true,
+    "t": 1793445991.1652622,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793445961.165,
+      1793445981.165
+    ],
+    "journeys": {
+      "n": 48,
+      "ok": 48,
+      "success_rate": 1.0,
+      "p95_ms": 36.4,
+      "p90_ms": 36.0,
+      "p95_allowed_ms": 287.2,
+      "by_source": {
+        "normal": {
+          "n": 48,
+          "ok": 48
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 3,
+      "failures": {}
+    },
+    "integrity": {
+      "ok": true,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793445862.1781797,
+      "until_t": 1793445981.1652622,
+      "breach_seconds": 20.0,
+      "failed_journeys": 27,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "told_without_incident": 11,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 62.0,
+      "calls_dropped": 6,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 18
+    },
+    "reasons": []
+  },
+  "manifest": [
+    {
+      "type": "sealed_10",
+      "target": "unit-sync",
+      "class": "bad_config",
+      "detail": {
+        "key": "batch_size",
+        "value": 0
+      },
+      "t": 1793445862.1781797,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_1",
+      "target": "call-handling",
+      "class": "bad_release",
+      "detail": {
+        "release": "5.3"
+      },
+      "t": 1793445864.8729897,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "call-handling",
+        "key": "rollover_s",
+        "value": 3.0
+      },
+      "t": 1793445866.1647918,
+      "at_s": 4
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793445874.2641678,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "call-handling",
+      "detail": "call-handling 5.3 -> 5.2"
+    },
+    {
+      "t": 1793445880.255213,
+      "params": {
+        "key": "batch_size"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "unit-sync",
+      "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793445873.553826,
+      "action": "rollback",
+      "target": "call-handling",
+      "params": {},
+      "reason": "A changed release coincides with local failures.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "call-handling 5.3 -> 5.2"
+    },
+    {
+      "event": "act",
+      "t": 1793445880.2325869,
+      "action": "revert_config",
+      "target": "unit-sync",
+      "params": {
+        "key": "batch_size"
+      },
+      "reason": "A setting change coincides with degraded service.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+    }
+  ],
+  "timing": {
+    "t0": 1793445862.1781797,
+    "t_alert": 1793445871.1647918,
+    "horizon": 1793445981.1647918,
+    "verdict_t": 1793445991.2406228
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9200,
+  "error": null
+}

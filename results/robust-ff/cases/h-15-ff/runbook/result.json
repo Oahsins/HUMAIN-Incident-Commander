@@ -1,0 +1,320 @@
+{
+  "arm": "runbook",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.8,
+      "evidence": "A held lock is blocking writes."
+    },
+    {
+      "target": "payments",
+      "class": "bad_config",
+      "confidence": 0.8,
+      "evidence": "A setting change coincides with degraded service."
+    },
+    {
+      "target": "clearing",
+      "class": "process_down",
+      "confidence": 0.8,
+      "evidence": "The process is down or is not answering."
+    },
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.8,
+      "evidence": "Callers see failures or excessive delay on this dependency."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793436260.1923766,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "A held lock is blocking writes.",
+      "sent": true,
+      "declined": false,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793436262.3796818,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "A setting change coincides with degraded service.",
+      "sent": true,
+      "declined": false,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by operator)"
+    },
+    {
+      "t": 1793436265.5124345,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "declined": false,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "detail": "clearing restarted"
+    },
+    {
+      "t": 1793436270.267258,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Callers see failures or excessive delay on this dependency.",
+      "sent": true,
+      "declined": false,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "detail": "screening now served by its standby"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": null,
+  "sbar": {
+    "situation": "The runbook ended with recovered.",
+    "background": "Surveyed 8 components; attempted 4 bounded actions.",
+    "assessment": "ledger: lock_held; payments: bad_config; clearing: process_down; screening: dependency_slow",
+    "recommendation": "Continue monitoring the system."
+  },
+  "t_start": 1793436260.0321374,
+  "t_first_action": 1793436260.1923766,
+  "t_declared": 1793436285.3221805,
+  "trace": [
+    {
+      "t": 0.032946109771728516,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 0.14766240119934082,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 0.15999197959899902,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 0.16023564338684082,
+      "phase": "triage",
+      "kind": "note",
+      "name": "first_matching_rule",
+      "summary": "A held lock is blocking writes."
+    },
+    {
+      "t": 0.24672842025756836,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "act",
+      "summary": "Requested a bounded action."
+    },
+    {
+      "t": 0.24674201011657715,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "A held lock is blocking writes."
+    },
+    {
+      "t": 2.3022215366363525,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 2.347344160079956,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 2.3475401401519775,
+      "phase": "triage",
+      "kind": "note",
+      "name": "first_matching_rule",
+      "summary": "A setting change coincides with degraded service."
+    },
+    {
+      "t": 2.366234302520752,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "act",
+      "summary": "Requested a bounded action."
+    },
+    {
+      "t": 2.366248607635498,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "A setting change coincides with degraded service."
+    },
+    {
+      "t": 4.448861837387085,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 5.4801716804504395,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 5.480294704437256,
+      "phase": "triage",
+      "kind": "note",
+      "name": "first_matching_rule",
+      "summary": "The process is down or is not answering."
+    },
+    {
+      "t": 6.099790573120117,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "act",
+      "summary": "Requested a bounded action."
+    },
+    {
+      "t": 6.099802732467651,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "The process is down or is not answering."
+    },
+    {
+      "t": 9.162467002868652,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 10.234985828399658,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 10.23511815071106,
+      "phase": "triage",
+      "kind": "note",
+      "name": "first_matching_rule",
+      "summary": "Callers see failures or excessive delay on this dependency."
+    },
+    {
+      "t": 10.26128602027893,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "act",
+      "summary": "Requested a bounded action."
+    },
+    {
+      "t": 10.261299133300781,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "failover",
+      "summary": "Callers see failures or excessive delay on this dependency."
+    },
+    {
+      "t": 12.367772579193115,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 13.329472780227661,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 13.329591512680054,
+      "phase": "verify",
+      "kind": "note",
+      "name": "consecutive_pass",
+      "summary": "Successful probe 1; checking a ten-second window."
+    },
+    {
+      "t": 18.40824317932129,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 19.30752658843994,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 19.307658433914185,
+      "phase": "verify",
+      "kind": "note",
+      "name": "consecutive_pass",
+      "summary": "Successful probe 2; checking a ten-second window."
+    },
+    {
+      "t": 24.40084409713745,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 25.289961576461792,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "Read the current system."
+    },
+    {
+      "t": 25.290040731430054,
+      "phase": "verify",
+      "kind": "note",
+      "name": "consecutive_pass",
+      "summary": "Successful probe 3; checking a ten-second window."
+    },
+    {
+      "t": 25.29005455970764,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "sbar",
+      "summary": "The runbook ended with recovered."
+    }
+  ],
+  "calls": []
+}

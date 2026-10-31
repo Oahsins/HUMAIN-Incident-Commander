@@ -1,0 +1,622 @@
+{
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.9,
+        "evidence": "The reconciliation session held a write lock on the ledger. Payments logged repeated 'database is locked' write failures, 108 write errors in total. After release_lock, write errors dropped to 0."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.85,
+        "evidence": "Release 1.5 was deployed just before the incident. Payments then logged response_unavailable warnings, the error rate reached 81%, and duplicate payments grew from client retries. After rolling back to 1.3, errors fell to 0 and the duplicate count stopped growing."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "balance_cache_ttl_s was changed from 0.5 to 600 s just before the incident, which would make the gateway serve stale balances. I reverted it to 0.5, and the probe now confirms the app balance matches the ledger."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793455821.498667,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "The ledger has a write lock held by reconciliation, with 108 write errors, which explains the payments failures. Releasing it comes first; the payments 1.5 deploy (26 duplicate payments) and the gateway cache TTL change to 600 s are suspects to handle next.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793455830.9842186,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Payments has been logging 'response_unavailable' since about the time of the 1.5 deploy, before the lock errors began, and the 26 duplicate payments suggest client retries after dropped responses. That points to a bad release, so I'll roll payments back.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      },
+      {
+        "t": 1793455835.5622766,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "Gateway's balance_cache_ttl_s was raised from 0.5 to 600 s just before the incident, which would show stale balances after payments. This is a bad config, so I'll revert that key.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "ledger"
+      ],
+      "class": null,
+      "reason": "Every component is back to baseline and the duplicate count has held at 93 since the rollback. Those 93 duplicate payments are already posted, and I am not allowed to reverse money, so a person must review them before I declare done.",
+      "urgency": "now",
+      "to": "the on-call engineer",
+      "ask": "There are 93 duplicate payments in the ledger. They were posted while payments release 1.5 was live, because 1.5 dropped responses and clients retried. That release has been rolled back to 1.3, and the duplicate count has not grown since. Please identify and reverse or refund the duplicates through the proper finance and operations process. Duplicates already cleared to the network may need recall through the network operator. Separately, the reconciliation batch held a ledger write lock long enough to block posting; I ended its session, so please review its locking before it runs again."
+    },
+    "sbar": {
+      "situation": "The bank's payment journey has recovered: two recovery checks in a row ran clean, the last at 64 s. The incident is escalated to the on-call engineer for 93 duplicate payments and the reconciliation job's ledger locking.",
+      "background": "Just before the incident, payments release 1.5 was deployed and the gateway setting balance_cache_ttl_s was changed by an operator from 0.5 to 600 s. Separately, the reconciliation session held a write lock on the ledger, and payments logged 108 'database is locked' write errors.",
+      "assessment": "The incident commander ended the reconciliation session's ledger lock itself, and write errors dropped to 0. It also rolled payments back from 1.5 to 1.3, which had dropped responses at an 81% error rate; errors fell to 0 and duplicates stopped growing. It reverted the gateway balance_cache_ttl_s from 600 to 0.5 s, and the probe confirms the app balance matches the ledger.",
+      "recommendation": "Identify the 93 duplicate payments posted while 1.5 was live, and reverse or refund them through the finance and operations process; operations must review this money effect. Duplicates already cleared to the network may need recall through the network operator. Review the reconciliation batch's ledger locking before it runs again."
+    },
+    "t_start": 1793455813.622587,
+    "t_first_action": 1793455821.498667,
+    "t_declared": 1793455878.0572014,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 37.9
+        }
+      },
+      {
+        "t": 3.33,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.292 s"
+      },
+      {
+        "t": 3.33,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all component metrics to see where the symptoms are."
+      },
+      {
+        "t": 3.47,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 138.0
+        }
+      },
+      {
+        "t": 7.88,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.406 s"
+      },
+      {
+        "t": 7.88,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: The ledger has a write lock held by reconciliation, with 108 write errors, which explains the payments failures. Releasing it comes first; the payments 1.5 deploy (26 duplicate payments) and the gateway cache TTL change to 600 s are suspects to handle next."
+      },
+      {
+        "t": 7.94,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 11.91,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.971 s"
+      },
+      {
+        "t": 11.91,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: The lock is released. Next I'll check the payments logs to see whether the 1.5 release is causing the duplicate payments or errors of its own."
+      },
+      {
+        "t": 11.93,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "15 log records from payments",
+        "data": {
+          "ms": 22.9
+        }
+      },
+      {
+        "t": 17.36,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.43 s"
+      },
+      {
+        "t": 17.36,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Payments has been logging 'response_unavailable' since about the time of the 1.5 deploy, before the lock errors began, and the 26 duplicate payments suggest client retries after dropped responses. That points to a bad release, so I'll roll payments back."
+      },
+      {
+        "t": 18.04,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 21.94,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.899 s"
+      },
+      {
+        "t": 21.94,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Gateway's balance_cache_ttl_s was raised from 0.5 to 600 s just before the incident, which would show stale balances after payments. This is a bad config, so I'll revert that key."
+      },
+      {
+        "t": 21.96,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 24.83,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.866 s"
+      },
+      {
+        "t": 24.83,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: All three suspected faults have been addressed. I'll run a probe to confirm the payment journey now succeeds end to end."
+      },
+      {
+        "t": 25.75,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 928.0
+        }
+      },
+      {
+        "t": 29.2,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.446 s"
+      },
+      {
+        "t": 29.2,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The probe passes, but at 926 ms it sits close to the 1000 ms limit. I'll observe metrics to confirm error rates and latency have recovered before declaring done."
+      },
+      {
+        "t": 29.3,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 95.7
+        }
+      },
+      {
+        "t": 34.46,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.167 s"
+      },
+      {
+        "t": 34.46,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Gateway still shows a 21% error rate on calls to payments while payments itself reports none, and duplicate payments rose from 26 to 93. I'll read the gateway logs to see whether this is leftover from before the rollback or a separate fault."
+      },
+      {
+        "t": 34.48,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 13.9
+        }
+      },
+      {
+        "t": 39.76,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.279 s"
+      },
+      {
+        "t": 39.76,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The 20 s window began at about t=823, before the payments rollback at t=831, so the gateway errors may just be leftovers from 1.5. I'll observe a shorter, post-fix window to check that errors and duplicate growth have stopped."
+      },
+      {
+        "t": 39.85,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 91.2
+        }
+      },
+      {
+        "t": 47.44,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 7.587 s"
+      },
+      {
+        "t": 47.44,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "escalate: Every component is back to baseline and the duplicate count has held at 93 since the rollback. Those 93 duplicate payments are already posted, and I am not allowed to reverse money, so a person must review them before I declare done."
+      },
+      {
+        "t": 53.49,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.05 s"
+      },
+      {
+        "t": 53.49,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: All components are at baseline, the duplicate payments have been escalated, and the three faults have been fixed, so I'm declaring done with the root causes."
+      },
+      {
+        "t": 58.57,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 87.6
+        }
+      },
+      {
+        "t": 59.48,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 906.0
+        }
+      },
+      {
+        "t": 59.48,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 63.56,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 75.3
+        }
+      },
+      {
+        "t": 64.43,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 878.6
+        }
+      },
+      {
+        "t": 64.43,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 64.43,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "escalated"
+      },
+      {
+        "t": 69.74,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 5.307 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 89,
+        "latency_s": 3.292,
+        "estimated_cost_usd": 0.01268,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4689,
+        "output_tokens": 305,
+        "latency_s": 4.406,
+        "estimated_cost_usd": 0.024856,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4925,
+        "output_tokens": 245,
+        "latency_s": 3.971,
+        "estimated_cost_usd": 0.0246,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5601,
+        "output_tokens": 370,
+        "latency_s": 5.43,
+        "estimated_cost_usd": 0.029804,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5844,
+        "output_tokens": 265,
+        "latency_s": 3.899,
+        "estimated_cost_usd": 0.028676,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6107,
+        "output_tokens": 142,
+        "latency_s": 2.866,
+        "estimated_cost_usd": 0.027268,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6455,
+        "output_tokens": 187,
+        "latency_s": 3.446,
+        "estimated_cost_usd": 0.02956,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8605,
+        "output_tokens": 383,
+        "latency_s": 5.167,
+        "estimated_cost_usd": 0.04208,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8770,
+        "output_tokens": 301,
+        "latency_s": 5.279,
+        "estimated_cost_usd": 0.0411,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 10958,
+        "output_tokens": 587,
+        "latency_s": 7.587,
+        "estimated_cost_usd": 0.055572,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 11307,
+        "output_tokens": 522,
+        "latency_s": 6.05,
+        "estimated_cost_usd": 0.055668,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1299,
+        "output_tokens": 429,
+        "latency_s": 5.307,
+        "estimated_cost_usd": 0.013776,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 14,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793455821.498667,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "The ledger has a write lock held by reconciliation, with 108 write errors, which explains the payments failures. Releasing it comes first; the payments 1.5 deploy (26 duplicate payments) and the gateway cache TTL change to 600 s are suspects to handle next.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793455830.9842186,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Payments has been logging 'response_unavailable' since about the time of the 1.5 deploy, before the lock errors began, and the 26 duplicate payments suggest client retries after dropped responses. That points to a bad release, so I'll roll payments back.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      },
+      {
+        "event": "act",
+        "t": 1793455835.5622766,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "Gateway's balance_cache_ttl_s was raised from 0.5 to 600 s just before the incident, which would show stale balances after payments. This is a bad config, so I'll revert that key.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+      }
+    ]
+  },
+  "error": null
+}

@@ -1,0 +1,736 @@
+{
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "Gateway was not answering, logged no errors, and had an unchanged release and config; a restart restored it to its baseline p95 and error rate."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.9,
+        "evidence": "Clearing crashed with a JSONDecodeError while parsing head item 94. After item 94 was quarantined and the worker restarted, the queue drained at 8.5/s without further exits."
+      },
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.9,
+        "evidence": "The reconciliation session held a write lock on accounts. It blocked the quarantine ('database is locked') and caused 90 ledger write errors and about 43% payment errors. After release_lock, write errors fell to 0 and payments returned to baseline."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793456419.9239907,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is not answering with no errors logged, consistent with a stopped process; restart it to restore the entry point.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "t": 1793456427.4048812,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "Clearing crashed on a JSON parse error and the queue head is item 94, so it is the likely poison item; quarantine it before restarting the worker.",
+        "sent": true,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "could not quarantine item 94: database is locked"
+      },
+      {
+        "t": 1793456433.0548677,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "The quarantine failed because the reconciliation session holds a long write lock on the ledger, so release that lock first.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793456435.8395402,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "The lock is released, so retry quarantining poison item 94.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 94 set aside for the operations team"
+      },
+      {
+        "t": 1793456438.3207798,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 94 is quarantined, so restart the clearing worker, which is still down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 94 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 94 set aside from clearing: repair and resubmit it, or close it with its customer"
+    },
+    "sbar": {
+      "situation": "The bank system has recovered. The recovery check was clean on 2 looks in a row, the last at 59 seconds.",
+      "background": "Three faults overlapped: the gateway process stopped answering, clearing crashed on a malformed item 94, and the reconciliation session held a write lock on the ledger accounts table. Gateway release and config were unchanged.",
+      "assessment": "The incident commander restarted gateway itself, which restored baseline p95 and error rate. Its first quarantine of item 94 failed with 'database is locked', so it ended the reconciliation session holding the accounts lock (write errors fell from 90 to 0, payment errors from about 43% to baseline). It then quarantined item 94 and restarted clearing, and the queue drained at 8.5/s with no further crashes.",
+      "recommendation": "The operations team has been asked (soon) to review quarantined clearing item 94 and either repair and resubmit it or close it with its customer. The reconciliation batch was ended and its transaction rolled back, so rerun it off-peak and review why it holds a long write lock on accounts."
+    },
+    "t_start": 1793456408.062876,
+    "t_first_action": 1793456419.9239907,
+    "t_declared": 1793456466.9605079,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 40.2
+        }
+      },
+      {
+        "t": 3.76,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.717 s"
+      },
+      {
+        "t": 3.76,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all component metrics to see where symptoms are."
+      },
+      {
+        "t": 4.88,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway, clearing",
+        "data": {
+          "ms": 1121.7
+        }
+      },
+      {
+        "t": 8.69,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.81 s"
+      },
+      {
+        "t": 8.69,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Gateway is down, clearing exited, and reconciliation holds a ledger write lock; check gateway logs first to see why it stopped."
+      },
+      {
+        "t": 8.71,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 16.5
+        }
+      },
+      {
+        "t": 11.86,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.154 s"
+      },
+      {
+        "t": 11.86,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Gateway is not answering with no errors logged, consistent with a stopped process; restart it to restore the entry point."
+      },
+      {
+        "t": 12.59,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.98,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.391 s"
+      },
+      {
+        "t": 14.98,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Now check clearing logs to see why it exited."
+      },
+      {
+        "t": 15.0,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 15.3
+        }
+      },
+      {
+        "t": 19.34,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.344 s"
+      },
+      {
+        "t": 19.34,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Clearing crashed on a JSON parse error and the queue head is item 94, so it is the likely poison item; quarantine it before restarting the worker."
+      },
+      {
+        "t": 21.61,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: failed (could not quarantine item 94: database is locked)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 94
+          },
+          "sent": true,
+          "ok": false,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 24.99,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.377 s"
+      },
+      {
+        "t": 24.99,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: The quarantine failed because the reconciliation session holds a long write lock on the ledger, so release that lock first."
+      },
+      {
+        "t": 25.06,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 27.78,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.717 s"
+      },
+      {
+        "t": 27.78,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: The lock is released, so retry quarantining poison item 94."
+      },
+      {
+        "t": 27.79,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 94 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 94
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 30.26,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.465 s"
+      },
+      {
+        "t": 30.26,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Item 94 is quarantined, so restart the clearing worker, which is still down."
+      },
+      {
+        "t": 30.91,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 33.6,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.683 s"
+      },
+      {
+        "t": 33.6,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Observe again to confirm recovery and look for any faults that were hidden."
+      },
+      {
+        "t": 33.66,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 62.5
+        }
+      },
+      {
+        "t": 37.1,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.439 s"
+      },
+      {
+        "t": 37.1,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: The 30 s window still includes the time the ledger lock was held (90 write errors), so payments errors may be leftover; run a probe to check the current state."
+      },
+      {
+        "t": 38.01,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 911.7
+        }
+      },
+      {
+        "t": 42.27,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.259 s"
+      },
+      {
+        "t": 42.27,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The probe passes; observe a short window that excludes the lock period to confirm the errors have stopped and nothing else is hidden."
+      },
+      {
+        "t": 42.39,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 125.1
+        }
+      },
+      {
+        "t": 48.87,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.477 s"
+      },
+      {
+        "t": 48.87,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: All components are back at baseline with no errors, no lock holders and clearing draining normally; the screening-standby restart was routine maintenance with no fault shown, so declare done."
+      },
+      {
+        "t": 52.96,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 86.9
+        }
+      },
+      {
+        "t": 53.88,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 923.1
+        }
+      },
+      {
+        "t": 53.88,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 57.97,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 89.1
+        }
+      },
+      {
+        "t": 58.9,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 924.2
+        }
+      },
+      {
+        "t": 58.9,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 58.9,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 63.7,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.799 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 94,
+        "latency_s": 3.717,
+        "estimated_cost_usd": 0.01278,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4429,
+        "output_tokens": 229,
+        "latency_s": 3.81,
+        "estimated_cost_usd": 0.022296,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4568,
+        "output_tokens": 179,
+        "latency_s": 3.154,
+        "estimated_cost_usd": 0.021852,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4729,
+        "output_tokens": 97,
+        "latency_s": 2.391,
+        "estimated_cost_usd": 0.020856,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4968,
+        "output_tokens": 318,
+        "latency_s": 4.344,
+        "estimated_cost_usd": 0.026232,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5161,
+        "output_tokens": 194,
+        "latency_s": 3.377,
+        "estimated_cost_usd": 0.024524,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5350,
+        "output_tokens": 118,
+        "latency_s": 2.717,
+        "estimated_cost_usd": 0.02376,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5520,
+        "output_tokens": 114,
+        "latency_s": 2.465,
+        "estimated_cost_usd": 0.02436,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5677,
+        "output_tokens": 103,
+        "latency_s": 2.683,
+        "estimated_cost_usd": 0.024768,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7730,
+        "output_tokens": 187,
+        "latency_s": 3.439,
+        "estimated_cost_usd": 0.03466,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8107,
+        "output_tokens": 186,
+        "latency_s": 4.259,
+        "estimated_cost_usd": 0.036148,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 10196,
+        "output_tokens": 476,
+        "latency_s": 6.477,
+        "estimated_cost_usd": 0.050304,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1114,
+        "output_tokens": 358,
+        "latency_s": 4.799,
+        "estimated_cost_usd": 0.011616,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 16,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793456419.9239907,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is not answering with no errors logged, consistent with a stopped process; restart it to restore the entry point.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793456427.4048812,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "Clearing crashed on a JSON parse error and the queue head is item 94, so it is the likely poison item; quarantine it before restarting the worker.",
+        "sent": true,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "could not quarantine item 94: database is locked"
+      },
+      {
+        "event": "act",
+        "t": 1793456433.0548677,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "The quarantine failed because the reconciliation session holds a long write lock on the ledger, so release that lock first.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793456435.8395402,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "The lock is released, so retry quarantining poison item 94.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 94 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793456438.3207798,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 94 is quarantined, so restart the clearing worker, which is still down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
+  },
+  "error": null
+}

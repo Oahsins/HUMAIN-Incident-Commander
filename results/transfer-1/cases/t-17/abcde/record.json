@@ -1,0 +1,394 @@
+{
+  "case": {
+    "id": "t-17",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310017,
+      "faults": [
+        {
+          "type": "sealed_10",
+          "at_s": 0,
+          "params": {
+            "target": "call-network",
+            "variant": "v9"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 2,
+          "params": {
+            "target": "cad",
+            "variant": "v2"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 4,
+          "params": {
+            "target": "alerting-backup",
+            "variant": "v5"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 6,
+          "params": {
+            "target": "unit-sync",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "call-network",
+          "class": "external_outage",
+          "fix": {
+            "action": "escalate",
+            "target": "call-network",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": true,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "call-network",
+        "class": "external_outage",
+        "confidence": 0.93,
+        "evidence": "D2 shows call-network 'down (not answering)', and D3 shows '100% of requests fail (baseline 0%) (run by another organisation)'. Call-handling logs 'ALI gave no answer (refused)'."
+      }
+    ],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "call-network"
+      ],
+      "class": "external_outage",
+      "reason": "D2 shows call-network 'down (not answering)', and D3 shows '100% of requests fail (baseline 0%) (run by another organisation)'. Call-handling logs 'ALI gave no answer (refused)'.",
+      "urgency": "now",
+      "to": "call network provider",
+      "ask": "Contact the 9-1-1 call network provider and ask them to restore the ALI location service. Until then, call-takers must get the location verbally from callers."
+    },
+    "sbar": {
+      "situation": "Recovery is not confirmed. The call network's location service (ALI) is down, so every emergency_call journey in dispatch fails at the location step.",
+      "background": "The ALI service on call-network stopped answering, and 100% of requests now fail against a 0% baseline. Call-handling logs show 'ALI gave no answer (refused)'. ALI is run by another organisation.",
+      "assessment": "The root cause is an external outage on call-network (confidence 0.93). No allowed action could fix it, so the incident commander escalated it to the call network provider itself. Recent changes look like routine tuning and are not the cause.",
+      "recommendation": "Follow up with the 9-1-1 call network provider and confirm they are restoring the ALI location service. Until it returns, make sure call-takers get each caller's location verbally, then confirm emergency_call journeys pass the location step again."
+    },
+    "t_start": 1793446748.2681756,
+    "t_first_action": null,
+    "t_declared": 1793446754.118574,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "dispatch: 9 components",
+        "data": {
+          "ms": 36.3
+        }
+      },
+      {
+        "t": 0.13,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components; down: call-network",
+        "data": {
+          "ms": 93.6
+        }
+      },
+      {
+        "t": 0.4,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey failed at call-network",
+        "data": {
+          "ms": 269.9
+        }
+      },
+      {
+        "t": 0.4,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "4 fault findings, 7 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "call-network",
+              "severity": "fault",
+              "text": "emergency_call journey fails at step 'call-network': location not verified (unavailable)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "calls to call-network fail: 100%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "call-network",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "call-network",
+              "severity": "fault",
+              "text": "100% of requests fail (baseline 0%) (run by another organisation)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "cad",
+              "severity": "info",
+              "text": "10 s ago: config by pipeline (key=write_timeout_ms, from=1000, to=2000)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "alerting-backup",
+              "severity": "info",
+              "text": "8 s ago: deploy by pipeline (from=1.6, to=1.6.1)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "unit-sync",
+              "severity": "info",
+              "text": "6 s ago: config by operator (key=batch_size, from=200, to=100)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 0.44,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "122 log records from call-handling",
+        "data": {
+          "ms": 35.8
+        }
+      },
+      {
+        "t": 5.85,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 5.414 s"
+      },
+      {
+        "t": 5.85,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate call-network (now) to call network provider"
+      },
+      {
+        "t": 5.85,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "escalated"
+      },
+      {
+        "t": 9.83,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 3.976 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 3933,
+        "output_tokens": 474,
+        "latency_s": 5.414,
+        "estimated_cost_usd": 0.025212,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 767,
+        "output_tokens": 286,
+        "latency_s": 3.976,
+        "estimated_cost_usd": 0.008788,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 4,
+    "audit": []
+  },
+  "checker": {
+    "recovered": false,
+    "slo_ok": false,
+    "t": 1793446867.832653,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793446837.833,
+      1793446857.833
+    ],
+    "journeys": {
+      "n": 47,
+      "ok": 34,
+      "success_rate": 0.7234,
+      "p95_ms": 33.1,
+      "p90_ms": 31.5,
+      "p95_allowed_ms": 288.0,
+      "by_source": {
+        "normal": {
+          "n": 47,
+          "ok": 34
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 1,
+      "failures": {
+        "slow_entry": 13
+      }
+    },
+    "integrity": {
+      "ok": true,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793446736.8388662,
+      "until_t": 1793446857.832653,
+      "breach_seconds": 125.0,
+      "failed_journeys": 85,
+      "time_to_mitigate_s": 121.0,
+      "mitigation_censored": true,
+      "told_without_incident": 0,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 0.0,
+      "calls_dropped": 0,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0
+    },
+    "reasons": [
+      "13 of 47 calls failed: 13 told more than 3 s after answer"
+    ]
+  },
+  "manifest": [
+    {
+      "type": "sealed_10",
+      "target": "call-network",
+      "class": "external_outage",
+      "detail": {
+        "route": "call-handling->call-network",
+        "drop_pct": 1.0
+      },
+      "t": 1793446736.8388662,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "cad",
+        "key": "write_timeout_ms",
+        "value": 2000
+      },
+      "t": 1793446738.8226688,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "alerting-backup",
+        "release": "1.6.1"
+      },
+      "t": 1793446741.4980037,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "unit-sync",
+        "key": "batch_size",
+        "value": 100
+      },
+      "t": 1793446742.832269,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793446736.8388662,
+    "t_alert": 1793446747.832269,
+    "horizon": 1793446857.832269,
+    "verdict_t": 1793446867.8984973
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9200,
+  "error": null
+}

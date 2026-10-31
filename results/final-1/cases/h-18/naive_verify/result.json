@@ -1,0 +1,705 @@
+{
+  "arm": "naive_verify",
+  "mode": "auto",
+  "outcome": "escalated",
+  "root_causes": [
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.93,
+      "evidence": "[B4] 'lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)'. Payments logs 'ledger write failed: database is locked' and clearing logs 'could not mark cleared: database is locked'."
+    },
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.6,
+      "evidence": "[E1] 'deploy by pipeline (from=1.3, to=1.5)' happened 13 s ago, just before [D3] 'data check failed: duplicate payments = 14'. A blocked lock would make writes fail, not post duplicates."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793454493.8871396,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: [B4] 'lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)'. Payments logs 'ledger write failed: database is locked' and clearing logs 'could not mark cleared: database is locked'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793454494.9882624,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: [E1] 'deploy by pipeline (from=1.3, to=1.5)' happened 13 s ago, just before [D3] 'data check failed: duplicate payments = 14'. A blocked lock would make writes fail, not post duplicates.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "payments"
+    ],
+    "class": "bad_release",
+    "reason": "Pipeline deployed payments 1.3->1.5 30 s ago (E1), just before 34% of calls to payments failed (D1) and 'duplicate payments = 16' appeared (D3). After the rollback to 1.3 (E5) the probe shows payments=ok.; E1: payments was deployed 1.3 -> 1.5 46 s ago, and D1 then reported 'duplicate payments = 16'; after the E5 rollback to 1.3 the probe passes (payments=ok, ledger=ok).",
+    "urgency": "soon",
+    "to": "the on-call engineer",
+    "ask": "The rollback to 1.3 is done and the journey passes. The 16 duplicate payments created under release 1.5 remain in the ledger. Payments operations and finance must review them through the bank's normal correction process. Do not reverse or edit postings automatically. The 1.5 defect should be fixed before it is redeployed.; Release 1.5 is already rolled back to 1.3. A person must review the 16 duplicate payments in the ledger and reconcile them through the bank's controlled correction process (no automated reversal is allowed), and fix the duplicate posting in 1.5 before redeploying it."
+  },
+  "sbar": {
+    "situation": "Recovery is not confirmed: the last check at 47 s was not clean because the ledger still holds 16 duplicate payments. The payment journey itself now passes.",
+    "background": "The pipeline deployed payments 1.5 over 1.3 about 13 s before the ledger data check first found 14 duplicate payments. At the same time a reconciliation batch held a write lock on the ledger for 10.4 s, so payments and clearing writes failed with 'database is locked'.",
+    "assessment": "The ledger lock held by the reconciliation session (confidence 0.93) blocked writes, and the incident commander released it by ending that session, which succeeded. The 1.5 release most likely caused the duplicates (confidence 0.6), so the incident commander rolled payments back from 1.5 to 1.3, which succeeded, but the 16 duplicates it created remain.",
+    "recommendation": "This was escalated to the payments on-call engineer. Payments operations and finance must review the 16 duplicate payments and reconcile them through the bank's controlled correction process, with no automated reversal or editing of postings. Fix the duplicate posting defect in 1.5 before it is redeployed."
+  },
+  "t_start": 1793454482.3714998,
+  "t_first_action": 1793454493.8871396,
+  "t_declared": 1793454529.5500703,
+  "trace": [
+    {
+      "t": 0.03,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 31.0
+      }
+    },
+    {
+      "t": 0.16,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 130.6
+      }
+    },
+    {
+      "t": 1.41,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at payments",
+      "data": {
+        "ms": 1250.1
+      }
+    },
+    {
+      "t": 1.41,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "11 fault findings, 16 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "93% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "93% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "payment journey fails at step 'payments': 503 ledger busy"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "p95 1214 ms (baseline 58 ms)"
+          },
+          {
+            "id": "B2",
+            "letter": "B",
+            "component": "payments",
+            "severity": "fault",
+            "text": "p95 1203 ms (baseline 45 ms)"
+          },
+          {
+            "id": "B3",
+            "letter": "B",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "backlog: 5 items waiting, oldest 11 s, 0.0 processed/s; first item 121 waiting 11 s after 0 attempt(s)"
+          },
+          {
+            "id": "B4",
+            "letter": "B",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)"
+          },
+          {
+            "id": "B5",
+            "letter": "B",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "63 failed writes in the window"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "reconciliation",
+            "severity": "info",
+            "text": "job running"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 93%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments are slow: p95 1214 ms (payments itself answered in 45 ms at baseline)"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 14"
+          },
+          {
+            "id": "D4",
+            "letter": "D",
+            "component": "network",
+            "severity": "info",
+            "text": "traffic 0.5/s (baseline 9.0/s), less work from its callers (run by another organisation)"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "13 s ago: deploy by pipeline (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "6 s ago: stop by operator"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "6 s ago: start by operator (release=4.1)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 1.43,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "2 log records from gateway",
+      "data": {
+        "ms": 17.4
+      }
+    },
+    {
+      "t": 1.46,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "8 log records from payments",
+      "data": {
+        "ms": 34.1
+      }
+    },
+    {
+      "t": 1.49,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "5 log records from clearing",
+      "data": {
+        "ms": 31.3
+      }
+    },
+    {
+      "t": 1.52,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 21.8
+      }
+    },
+    {
+      "t": 11.52,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 9.998 s"
+    },
+    {
+      "t": 11.62,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 13.33,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 16.42,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 88.1
+      }
+    },
+    {
+      "t": 17.38,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 958.5
+      }
+    },
+    {
+      "t": 17.38,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: ledger: data check failed: duplicate payments = 16"
+    },
+    {
+      "t": 17.49,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 104.3
+      }
+    },
+    {
+      "t": 18.59,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1100.7
+      }
+    },
+    {
+      "t": 18.59,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "5 fault findings, 10 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "34% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "p95 1200 ms (baseline 58 ms)"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 34%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments are slow: p95 1200 ms (payments itself answered in 45 ms at baseline)"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 16"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "30 s ago: deploy by pipeline (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: stop by operator"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "ledger",
+            "severity": "info",
+            "text": "6 s ago: lock_release by incident-commander (sessions=['reconciliation'])"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "5 s ago: deploy by incident-commander (from=1.5, to=1.3, rollback=True)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 18.61,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "2 log records from gateway",
+      "data": {
+        "ms": 20.6
+      }
+    },
+    {
+      "t": 18.62,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 15.6
+      }
+    },
+    {
+      "t": 31.06,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 12.433 s"
+    },
+    {
+      "t": 31.06,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate payments (soon) to the on-call engineer"
+    },
+    {
+      "t": 32.16,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 99.7
+      }
+    },
+    {
+      "t": 33.08,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 928.1
+      }
+    },
+    {
+      "t": 33.08,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: ledger: data check failed: duplicate payments = 16"
+    },
+    {
+      "t": 33.13,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 44.6
+      }
+    },
+    {
+      "t": 34.23,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1102.3
+      }
+    },
+    {
+      "t": 34.23,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "1 fault findings, 6 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 16"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "46 s ago: deploy by pipeline (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "39 s ago: stop by operator"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "39 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "ledger",
+            "severity": "info",
+            "text": "22 s ago: lock_release by incident-commander (sessions=['reconciliation'])"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "20 s ago: deploy by incident-commander (from=1.5, to=1.3, rollback=True)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 34.23,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 1.8
+      }
+    },
+    {
+      "t": 45.13,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 10.896 s"
+    },
+    {
+      "t": 45.13,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate payments (soon) to the on-call engineer"
+    },
+    {
+      "t": 46.22,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 92.0
+      }
+    },
+    {
+      "t": 47.18,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 955.8
+      }
+    },
+    {
+      "t": 47.18,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: ledger: data check failed: duplicate payments = 16"
+    },
+    {
+      "t": 47.18,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "escalated"
+    },
+    {
+      "t": 51.86,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 4.685 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 4115,
+      "output_tokens": 953,
+      "latency_s": 9.998,
+      "estimated_cost_usd": 0.03552,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 3864,
+      "output_tokens": 1162,
+      "latency_s": 12.433,
+      "estimated_cost_usd": 0.038696,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 3644,
+      "output_tokens": 998,
+      "latency_s": 10.896,
+      "estimated_cost_usd": 0.034536,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1201,
+      "output_tokens": 387,
+      "latency_s": 4.685,
+      "estimated_cost_usd": 0.012544,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 22,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793454493.8871396,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: [B4] 'lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)'. Payments logs 'ledger write failed: database is locked' and clearing logs 'could not mark cleared: database is locked'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793454494.9882624,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: [E1] 'deploy by pipeline (from=1.3, to=1.5)' happened 13 s ago, just before [D3] 'data check failed: duplicate payments = 14'. A blocked lock would make writes fail, not post duplicates.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ]
+}

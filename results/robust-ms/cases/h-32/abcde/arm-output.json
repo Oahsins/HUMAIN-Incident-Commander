@@ -1,0 +1,622 @@
+{
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.6,
+        "evidence": "[E1] payments deploy 12 s ago (from=1.3, to=1.5), and screening_failed timeouts via primary began 10 s ago and are still rising while screening logs no errors. [D3] payments calls to screening fail 100%, and the gateway's [D1] 88% failures and [D2] slow calls to payments trace back to the same payments failures."
+      },
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.7,
+        "evidence": "[B3] screening p95 1822 ms (baseline 15 ms) and [D4] payments calls to screening are slow at p95 1029 ms, while payments timeouts are set to 1.0 s. Failover to the standby is the allowed fix for a slow dependency."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.9,
+        "evidence": "[C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item). [B4] first item 93 has waited 14 s with 0 attempts, and the backlog is 53 items."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793452098.7569122,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793452128.9757755,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "bad_release: [E1] payments deploy 12 s ago (from=1.3, to=1.5), and screening_failed timeouts via primary began 10 s ago and are still rising while screening logs no errors. [D3] payments calls to screening fail 100%, and the gateway's [D1] 88% failures and [D2] slow calls to payments trace back to t",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      },
+      {
+        "t": 1793452131.6604328,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 93
+        },
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item). [B4] first item 93 has waited 14 s with 0 attempts, and the backlog is 53 items.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 93 set aside for the operations team"
+      },
+      {
+        "t": 1793452132.6827486,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item). [B4] first item 93 has waited 14 s with 0 attempts, and the backlog is 53 items.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing",
+        "ledger",
+        "payments"
+      ],
+      "class": null,
+      "reason": "[E1] payments deploy 12 s ago (from=1.3, to=1.5), and screening_failed timeouts via primary began 10 s ago and are still rising while screening logs no errors. [D3] payments calls to screening fail 100%, and the gateway's [D1] 88% failures and [D2] slow calls to payments trace back to the same payments failures.; past damage, no longer growing: data check failed: duplicate payments = 229; item 93 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the on-call engineer; the operations team",
+      "ask": "Duplicate payments (D5, count 17) must be reviewed by a person. Do not edit postings or balances, and do not refund or reverse money.; find and put right the records behind 'data check failed: duplicate payments = 229'; the incident commander cannot change data; review item 93 set aside from clearing: repair and resubmit it, or close it with its customer"
+    },
+    "sbar": {
+      "situation": "The bank has recovered: the last recovery check passed clean twice in a row at 57 s. Duplicate payments (D5, count 17) still need a person to review, because no allowed action can fix postings.",
+      "background": "Payments went from 1.3 to 1.5 about 12 s before the incident; screening timeouts via the primary began 10 s later. The incident commander itself rolled payments back from 1.5 to 1.3, failed screening over to its standby, quarantined clearing item 93 for the operations team, and restarted clearing. Clearing had exited 1 time in 15 min, and its backlog was 53 items.",
+      "assessment": "Screening was slow, with p95 at 1822 ms against a 15 ms baseline, and payments timeouts are set to 1.0 s, so calls failed. Payments was the most likely bad release (confidence 0.6), and its gateway symptoms (A1, B1, D1, D2) were carried over from it. Clearing crashed on a malformed item: JSONDecodeError in clear_one at parse(item) on item 93 (confidence 0.9). The data check still fails with duplicate payments = 229.",
+      "recommendation": "Take over the open items: the data check failure 'duplicate payments = 229' and the 17 duplicate payments (D5). Find and correct the records behind them, but do not edit postings or balances and do not refund or reverse money; the operations team, ledger and payments owners must review any money effects. Repair and resubmit item 93, or close it with its customer. Confirm payments stays on 1.3 and screening stays on standby before any redeploy."
+    },
+    "t_start": 1793452097.5369923,
+    "t_first_action": 1793452098.7569122,
+    "t_declared": 1793452154.2820153,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 40.2
+        }
+      },
+      {
+        "t": 0.14,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 102.6
+        }
+      },
+      {
+        "t": 1.22,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1076.9
+        }
+      },
+      {
+        "t": 1.22,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "14 fault findings, 21 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "88% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "88% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "p95 1046 ms (baseline 59 ms)"
+            },
+            {
+              "id": "B2",
+              "letter": "B",
+              "component": "payments",
+              "severity": "fault",
+              "text": "p95 1030 ms (baseline 44 ms)"
+            },
+            {
+              "id": "B3",
+              "letter": "B",
+              "component": "screening",
+              "severity": "fault",
+              "text": "p95 1822 ms (baseline 15 ms)"
+            },
+            {
+              "id": "B4",
+              "letter": "B",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "backlog: 53 items waiting, oldest 14 s; first item 93 waiting 14 s after 0 attempt(s)"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 13 s ago (exit code 1)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments fail: 88%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments are slow: p95 1046 ms (payments itself answered in 44 ms at baseline)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening fail: 100%"
+            },
+            {
+              "id": "D4",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening are slow: p95 1029 ms (screening itself answered in 15 ms at baseline)"
+            },
+            {
+              "id": "D5",
+              "letter": "D",
+              "component": "ledger",
+              "severity": "fault",
+              "text": "data check failed: duplicate payments = 17"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "12 s ago: deploy by operator (from=1.3, to=1.5)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: stop by operator"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: start by operator (release=4.1)"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: stop by pipeline"
+            },
+            {
+              "id": "E7",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: start by pipeline (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.24,
+        "phase": "survey",
+        "kind": "action",
+        "name": "containment",
+        "summary": "failover screening: done (screening now served by its standby)",
+        "data": {
+          "target": "screening",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 1.25,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from gateway",
+        "data": {
+          "ms": 10.4
+        }
+      },
+      {
+        "t": 1.27,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "8 log records from payments",
+        "data": {
+          "ms": 24.7
+        }
+      },
+      {
+        "t": 1.29,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 13.3
+        }
+      },
+      {
+        "t": 1.32,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 33.7
+        }
+      },
+      {
+        "t": 23.02,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-haiku-5-5 answered in 21.699 s"
+      },
+      {
+        "t": 23.02,
+        "phase": "triage",
+        "kind": "note",
+        "name": "coverage",
+        "summary": "findings not accounted for: A1, B1, D1, D2; asking again"
+      },
+      {
+        "t": 31.44,
+        "phase": "triage",
+        "kind": "model",
+        "name": "coverage",
+        "summary": "claude-haiku-5-5 answered in 8.417 s"
+      },
+      {
+        "t": 32.12,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 34.15,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 93 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 93
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 35.81,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 37.81,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate payments (now) to the on-call engineer"
+      },
+      {
+        "t": 42.89,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 78.9
+        }
+      },
+      {
+        "t": 46.74,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3845.9
+        }
+      },
+      {
+        "t": 46.74,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: clearing: payment journey fails at step 'clearing': not cleared within 3 s (still pending); clearing: backlog: 184 items waiting, oldest 17 s, 52.8 processed/s; first item 494 waiting 17 s after 0 attempt(s); ledger: data check failed: duplicate payments = 229"
+      },
+      {
+        "t": 50.84,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 98.3
+        }
+      },
+      {
+        "t": 51.77,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 931.2
+        }
+      },
+      {
+        "t": 51.77,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 55.87,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 100.5
+        }
+      },
+      {
+        "t": 56.74,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 874.2
+        }
+      },
+      {
+        "t": 56.74,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 56.75,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 60.05,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-haiku-5-5 answered in 3.3 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "assess",
+        "input_tokens": 4475,
+        "output_tokens": 4437,
+        "latency_s": 21.699,
+        "estimated_cost_usd": 0.002666,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "coverage",
+        "input_tokens": 5762,
+        "output_tokens": 2046,
+        "latency_s": 8.417,
+        "estimated_cost_usd": 0.001599,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1388,
+        "output_tokens": 525,
+        "latency_s": 3.3,
+        "estimated_cost_usd": 0.000401,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 17,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793452098.7569122,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793452128.9757755,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "bad_release: [E1] payments deploy 12 s ago (from=1.3, to=1.5), and screening_failed timeouts via primary began 10 s ago and are still rising while screening logs no errors. [D3] payments calls to screening fail 100%, and the gateway's [D1] 88% failures and [D2] slow calls to payments trace back to t",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      },
+      {
+        "event": "act",
+        "t": 1793452131.6604328,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 93
+        },
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item). [B4] first item 93 has waited 14 s with 0 attempts, and the backlog is 53 items.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 93 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793452132.6827486,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item). [B4] first item 93 has waited 14 s with 0 attempts, and the backlog is 53 items.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
+  },
+  "error": null
+}

@@ -1,0 +1,422 @@
+{
+  "case": {
+    "id": "h-12",
+    "input": {
+      "system": "bank",
+      "seed": 260012,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "blind_1",
+          "at_s": 0,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "gateway",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "gateway",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": [],
+      "notes": ""
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.88,
+        "evidence": "[C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'; downstream payments and screening traffic is 0.0/s."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793449087.659766,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'; downstream payments and screening traffic is 0.0/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Payments are flowing again after the gateway process went down. Two recovery checks in a row came back clean, the last at 21 seconds.",
+      "background": "The gateway process stopped answering, so every payment journey timed out at the gateway after 3.0 seconds. Payments and screening received no traffic (0.0/s); no recent change to the gateway was reported.",
+      "assessment": "The root cause was the gateway process being down (confidence 0.88). The incident commander restarted the gateway itself, and the restart completed; a rollback was not warranted, and the screening-standby restart was routine maintenance that caused no symptom.",
+      "recommendation": "Find out why the gateway process went down, since the restart cleared the symptom but not the cause. Operations should review payments that timed out at the gateway during the outage, as those were not processed or screened."
+    },
+    "t_start": 1793449079.1787884,
+    "t_first_action": 1793449087.659766,
+    "t_declared": 1793449100.255699,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 38.0
+        }
+      },
+      {
+        "t": 1.12,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway",
+        "data": {
+          "ms": 1077.4
+        }
+      },
+      {
+        "t": 4.13,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at gateway",
+        "data": {
+          "ms": 3018.6
+        }
+      },
+      {
+        "t": 4.13,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "2 fault findings, 6 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "payments",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 11.3/s), less work from its callers"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "screening",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 8.7/s), less work from its callers"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "payment journey fails at step 'gateway': timeout: no answer within 3.0s"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 4.16,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 22.5
+        }
+      },
+      {
+        "t": 8.48,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 4.323 s"
+      },
+      {
+        "t": 9.15,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.25,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 106.1
+        }
+      },
+      {
+        "t": 16.18,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 923.4
+        }
+      },
+      {
+        "t": 16.18,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 20.24,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 58.0
+        }
+      },
+      {
+        "t": 21.08,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 840.7
+        }
+      },
+      {
+        "t": 21.08,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 21.08,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 24.77,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 3.69 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 3374,
+        "output_tokens": 308,
+        "latency_s": 4.323,
+        "estimated_cost_usd": 0.019656,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 791,
+        "output_tokens": 271,
+        "latency_s": 3.69,
+        "estimated_cost_usd": 0.008584,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 9,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793449087.659766,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'; downstream payments and screening traffic is 0.0/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793449198.7874596,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793449168.787,
+      1793449188.787
+    ],
+    "journeys": {
+      "n": 216,
+      "ok": 216,
+      "success_rate": 1.0,
+      "p95_ms": 66.99991226196289,
+      "payments": {
+        "n": 164,
+        "ok": 164
+      },
+      "balances": {
+        "n": 52,
+        "fresh": 52
+      },
+      "p95_allowed_ms": 317.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793449065.7118351,
+      "until_t": 1793449188.7874596,
+      "breach_seconds": 15.0,
+      "failed_journeys": 43,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "blind_1",
+      "target": "gateway",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793449065.7118351,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793449073.7868454,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793449088.3250299,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "gateway",
+      "detail": "gateway restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793449087.659766,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'; downstream payments and screening traffic is 0.0/s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793449065.7118351,
+    "t_alert": 1793449078.7868454,
+    "horizon": 1793449188.7868454,
+    "verdict_t": 1793449198.8461354
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

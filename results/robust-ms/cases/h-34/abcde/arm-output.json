@@ -1,0 +1,747 @@
+{
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.93,
+        "evidence": "[B4] ledger lock held by session reconciliation (write) for 10.4 s on UPDATE accounts, and [B5] 65 failed writes; payments logs show 'database is locked' with rising occurrences, and the probe fails at payments with 503 ledger busy."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.9,
+        "evidence": "[C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item); [B3] first item 90 has waited 15 s with 0 attempts, so the worker dies on it before it can be sent."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.9,
+        "evidence": "[E1] gateway: 49 s ago: config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0). The probe shows the app serving 99999900 while the ledger holds 99999600, so the cache is serving old balances."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793452561.2739189,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: [B4] ledger lock held by session reconciliation (write) for 10.4 s on UPDATE accounts, and [B5] 65 failed writes; payments logs show 'database is locked' with rising occurrences, and the probe fails at payments with 503 ledger busy.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793452562.3633626,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 90
+        },
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item); [B3] first item 90 has waited 15 s with 0 attempts, so the worker dies on it before it can be sent.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 90 set aside for the operations team"
+      },
+      {
+        "t": 1793452563.3903878,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item); [B3] first item 90 has waited 15 s with 0 attempts, so the worker dies on it before it can be sent.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "t": 1793452591.117985,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E1] gateway: 49 s ago: config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0). The probe shows the app serving 99999900 while the ledger holds 99999600, so the cache is serving old balances.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 90 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 90 set aside from clearing: repair and resubmit it, or close it with its customer"
+    },
+    "sbar": {
+      "situation": "The incident is recovered and the recovery check is clean in two looks in a row. Item 90 in clearing is set aside and needs an operations decision.",
+      "background": "A reconciliation session held the ledger lock for 10.4 s on UPDATE accounts, causing 65 failed writes with 'database is locked' errors. Clearing exited once in 15 minutes after a JSONDecodeError in clear_one at parse(item) on poison item 90. The scheduler raised gateway balance_cache_ttl_s from 0.5 to 600.0 seconds, so the app served stale balances.",
+      "assessment": "The incident commander took each action itself. It released the ledger lock by ending the reconciliation session, quarantined item 90 on clearing, and restarted clearing. It reverted balance_cache_ttl_s on the gateway from 600.0 to 0.5. The recovery check passed in look 2 at 57 s, but it had not confirmed recovery until then.",
+      "recommendation": "Confirm the gateway balance cache is still at 0.5 seconds and watch for mismatches between the app balance and the ledger balance. The operations team should review item 90 on clearing and either repair and resubmit it or close it with its customer, as escalated. Operations should also review any money or data effects from the stale balances and the 65 failed writes."
+    },
+    "t_start": 1793452544.943976,
+    "t_first_action": 1793452561.2739189,
+    "t_declared": 1793452602.0081851,
+    "trace": [
+      {
+        "t": 0.03,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 27.8
+        }
+      },
+      {
+        "t": 0.07,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 39.8
+        }
+      },
+      {
+        "t": 1.29,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1218.8
+        }
+      },
+      {
+        "t": 1.29,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "12 fault findings, 18 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "93% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "100% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "payment journey fails at step 'payments': 503 ledger busy"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "p95 1220 ms (baseline 62 ms)"
+            },
+            {
+              "id": "B2",
+              "letter": "B",
+              "component": "payments",
+              "severity": "fault",
+              "text": "p95 1208 ms (baseline 47 ms)"
+            },
+            {
+              "id": "B3",
+              "letter": "B",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "backlog: 39 items waiting, oldest 15 s; first item 90 waiting 15 s after 0 attempt(s)"
+            },
+            {
+              "id": "B4",
+              "letter": "B",
+              "component": "ledger",
+              "severity": "fault",
+              "text": "lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)"
+            },
+            {
+              "id": "B5",
+              "letter": "B",
+              "component": "ledger",
+              "severity": "fault",
+              "text": "65 failed writes in the window"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 14 s ago (exit code 1)"
+            },
+            {
+              "id": "C3",
+              "letter": "C",
+              "component": "reconciliation",
+              "severity": "info",
+              "text": "job running"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments fail: 100%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments are slow: p95 1219 ms (payments itself answered in 47 ms at baseline)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "13 s ago: config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: stop by pipeline"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "5 s ago: stop by operator"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "5 s ago: start by operator (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.31,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 23.5
+        }
+      },
+      {
+        "t": 1.34,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "6 log records from payments",
+        "data": {
+          "ms": 30.3
+        }
+      },
+      {
+        "t": 1.37,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 31.8
+        }
+      },
+      {
+        "t": 1.39,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "0 log records from ledger",
+        "data": {
+          "ms": 21.5
+        }
+      },
+      {
+        "t": 16.33,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-haiku-5-5 answered in 14.935 s"
+      },
+      {
+        "t": 16.42,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 17.45,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 90 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 90
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 19.08,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 25.17,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 88.9
+        }
+      },
+      {
+        "t": 26.15,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 977.5
+        }
+      },
+      {
+        "t": 26.15,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 30.25,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 100.6
+        }
+      },
+      {
+        "t": 31.15,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at balance",
+        "data": {
+          "ms": 905.6
+        }
+      },
+      {
+        "t": 31.15,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999800"
+      },
+      {
+        "t": 35.26,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 102.7
+        }
+      },
+      {
+        "t": 36.16,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at balance",
+        "data": {
+          "ms": 900.8
+        }
+      },
+      {
+        "t": 36.16,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: not clean (0 of 2 in a row); still abnormal: payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999700"
+      },
+      {
+        "t": 36.27,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 113.3
+        }
+      },
+      {
+        "t": 37.2,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at balance",
+        "data": {
+          "ms": 927.6
+        }
+      },
+      {
+        "t": 37.2,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "1 fault findings, 11 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": null,
+              "severity": "fault",
+              "text": "payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999600"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "info",
+              "text": "process exited 1 time(s) in 15 min, last 51 s ago (exit code 1); none since the action taken on it 19 s ago"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "clearing",
+              "severity": "info",
+              "text": "1 item(s) already set aside"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "49 s ago: config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "42 s ago: stop by pipeline"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "42 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "42 s ago: stop by operator"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "42 s ago: start by operator (release=4.1)"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "ledger",
+              "severity": "info",
+              "text": "20 s ago: lock_release by incident-commander (sessions=['reconciliation'])"
+            },
+            {
+              "id": "E7",
+              "letter": "E",
+              "component": "clearing",
+              "severity": "info",
+              "text": "19 s ago: quarantine by incident-commander (item=90)"
+            },
+            {
+              "id": "E8",
+              "letter": "E",
+              "component": "clearing",
+              "severity": "info",
+              "text": "18 s ago: restart by incident-commander (release=3.2)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 46.17,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-haiku-5-5 answered in 8.976 s"
+      },
+      {
+        "t": 46.18,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 51.26,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 81.9
+        }
+      },
+      {
+        "t": 51.98,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 718.6
+        }
+      },
+      {
+        "t": 51.98,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 56.08,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 97.6
+        }
+      },
+      {
+        "t": 57.06,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 984.7
+        }
+      },
+      {
+        "t": 57.06,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 57.06,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 59.93,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-haiku-5-5 answered in 2.865 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "assess",
+        "input_tokens": 4185,
+        "output_tokens": 3146,
+        "latency_s": 14.935,
+        "estimated_cost_usd": 0.001992,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "reassess",
+        "input_tokens": 3863,
+        "output_tokens": 1935,
+        "latency_s": 8.976,
+        "estimated_cost_usd": 0.001354,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1263,
+        "output_tokens": 435,
+        "latency_s": 2.865,
+        "estimated_cost_usd": 0.000344,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 23,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793452561.2739189,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: [B4] ledger lock held by session reconciliation (write) for 10.4 s on UPDATE accounts, and [B5] 65 failed writes; payments logs show 'database is locked' with rising occurrences, and the probe fails at payments with 503 ledger busy.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793452562.3633626,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 90
+        },
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item); [B3] first item 90 has waited 15 s with 0 attempts, so the worker dies on it before it can be sent.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 90 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793452563.3903878,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: [C2] clearing exited 1 time(s) in 15 min, and the crash log shows JSONDecodeError in clear_one at parse(item); [B3] first item 90 has waited 15 s with 0 attempts, so the worker dies on it before it can be sent.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793452591.117985,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E1] gateway: 49 s ago: config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0). The probe shows the app serving 99999900 while the ledger holds 99999600, so the cache is serving old balances.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      }
+    ]
+  },
+  "error": null
+}

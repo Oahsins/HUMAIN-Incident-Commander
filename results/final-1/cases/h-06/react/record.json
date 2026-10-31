@@ -1,0 +1,548 @@
+{
+  "case": {
+    "id": "h-06",
+    "input": {
+      "system": "bank",
+      "seed": 260006,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "sealed_3",
+          "at_s": 0,
+          "params": {
+            "target": "network",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "network",
+          "class": "external_outage",
+          "fix": {
+            "action": "escalate",
+            "target": "network",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": true,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": ""
+    }
+  },
+  "arm": "react",
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "network",
+        "class": "external_outage",
+        "confidence": 0.85,
+        "evidence": "Network p95 is 2010 ms with 6.2% errors against a 28.5 ms, 0% baseline. Clearing logs show repeated network_send_failed timeouts with items staying pending. The clearing queue is at 137. Every other step of the probe passes."
+      }
+    ],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "network"
+      ],
+      "class": null,
+      "reason": "Clearing logs show network timeouts and not a malformed item, so item 92 is not poison. The national payment network is failing (p95 ~2 s, ~6% errors against a 28 ms baseline), which is an external outage I must escalate.; The network has worsened from partial to total failure (100% errors, not answering). This is the same external outage, so no allowed action fixes it; I'll update the escalation with the new severity.",
+      "urgency": "now",
+      "to": "the organisation that runs network",
+      "ask": "The national payment network, run by another organisation, is timing out. Clearing calls see p95 of about 2010 ms against a 28 ms baseline, with about 6% errors. The clearing queue is building: 137 items, and head item 92 has had 6 attempts. Please contact the network operator to restore service. Our clearing worker is healthy and will drain the queue on its own once the network recovers. Do not quarantine or resend items.; Update: the national payment network is now fully down. Clearing calls fail 100%, with p95 about 2002 ms against a 28 ms baseline. The clearing backlog is 443 items, the oldest waiting 50 s, and nothing has been processed. Please get the network operator to restore service urgently. Payments are still accepted and posted correctly in the ledger, and balances are correct. The clearing worker is healthy and will drain the backlog once the network answers. Do not quarantine, resend or reverse any payments."
+    },
+    "sbar": {
+      "situation": "Recovery is not confirmed: after 4 looks, the last at 71 s, the payment journey still fails at the clearing step because the external national payment network is fully down. Clearing has 695 items waiting, the oldest 78 s, and nothing is being processed.",
+      "background": "The national payment network, run by another organisation, began timing out, with p95 of 2010 ms and 6.2% errors against a 28.5 ms, 0% baseline. It then went fully down, and clearing calls to it now fail 100%.",
+      "assessment": "Root cause is an external outage on the network (confidence 0.85): clearing logs show repeated network_send_failed timeouts, every other probe step passes, and head item 92 has now made 35 attempts. The incident commander escalated to the network operator twice, the second time as a full outage, and the network has not recovered; it did not quarantine, resend or reverse anything, because the clearing worker is healthy and will drain the backlog once the network answers.",
+      "recommendation": "Follow up with the network operator on the escalation, and watch for the clearing backlog to drain once service returns; do not quarantine, resend or reverse payments. Operations should review the 695 payments that are accepted and posted in the ledger but not yet cleared, with balances correct, until clearing catches up."
+    },
+    "t_start": 1793453291.7479122,
+    "t_first_action": null,
+    "t_declared": 1793453368.9347286,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 40.8
+        }
+      },
+      {
+        "t": 2.52,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.479 s"
+      },
+      {
+        "t": 2.52,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all component metrics to see where symptoms are."
+      },
+      {
+        "t": 3.59,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 1065.8
+        }
+      },
+      {
+        "t": 8.03,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.439 s"
+      },
+      {
+        "t": 8.03,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: The network shows 2 s latency and 6% errors while the clearing queue builds up; I'll check clearing logs to tell an external timeout apart from a poison item."
+      },
+      {
+        "t": 8.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "9 log records from clearing",
+        "data": {
+          "ms": 14.0
+        }
+      },
+      {
+        "t": 13.62,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.584 s"
+      },
+      {
+        "t": 13.62,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "escalate: Clearing logs show network timeouts and not a malformed item, so item 92 is not poison. The national payment network is failing (p95 ~2 s, ~6% errors against a 28 ms baseline), which is an external outage I must escalate."
+      },
+      {
+        "t": 17.9,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.278 s"
+      },
+      {
+        "t": 17.9,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Gateway traffic is lower than its baseline and the standby was just restarted, so I'll probe the payment journey to check for hidden faults such as a stale balance before declaring done."
+      },
+      {
+        "t": 21.76,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3856.8
+        }
+      },
+      {
+        "t": 27.2,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.442 s"
+      },
+      {
+        "t": 27.2,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: Payment acceptance, ledger postings and balance all work; the only failing step is clearing, and that is waiting on the external network, which has been escalated. Nothing else needs an allowed action, so I'm declaring done."
+      },
+      {
+        "t": 29.28,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: network",
+        "data": {
+          "ms": 1076.0
+        }
+      },
+      {
+        "t": 33.06,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3783.4
+        }
+      },
+      {
+        "t": 33.06,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: clearing: payment journey fails at step 'clearing': not cleared within 3 s (still pending); clearing: backlog: 367 items waiting, oldest 41 s, 0.0 processed/s; first item 92 waiting 41 s after 18 attempt(s); clearing: calls to network fail: 100% (+1 more)"
+      },
+      {
+        "t": 38.18,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: network",
+        "data": {
+          "ms": 1113.5
+        }
+      },
+      {
+        "t": 41.91,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3730.3
+        }
+      },
+      {
+        "t": 41.91,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: clearing: payment journey fails at step 'clearing': not cleared within 3 s (still pending); clearing: backlog: 443 items waiting, oldest 50 s, 0.0 processed/s; first item 92 waiting 50 s after 22 attempt(s); clearing: calls to network fail: 100% (+1 more)"
+      },
+      {
+        "t": 48.66,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.756 s"
+      },
+      {
+        "t": 48.66,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "escalate: The network has worsened from partial to total failure (100% errors, not answering). This is the same external outage, so no allowed action fixes it; I'll update the escalation with the new severity."
+      },
+      {
+        "t": 56.03,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 7.367 s"
+      },
+      {
+        "t": 56.03,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: The sustained check flagged only the network outage and its effect on clearing. Every other component checked out normal, and the standby restart was a routine pipeline restart on the same release, so no allowed action remains and I'm declaring done."
+      },
+      {
+        "t": 58.13,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: network",
+        "data": {
+          "ms": 1097.5
+        }
+      },
+      {
+        "t": 61.93,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3802.3
+        }
+      },
+      {
+        "t": 61.93,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: clearing: payment journey fails at step 'clearing': not cleared within 3 s (still pending); clearing: backlog: 614 items waiting, oldest 70 s, 0.0 processed/s; first item 92 waiting 70 s after 31 attempt(s); clearing: calls to network fail: 100% (+1 more)"
+      },
+      {
+        "t": 67.01,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: network",
+        "data": {
+          "ms": 1079.5
+        }
+      },
+      {
+        "t": 70.82,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3813.3
+        }
+      },
+      {
+        "t": 70.82,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: clearing: payment journey fails at step 'clearing': not cleared within 3 s (still pending); clearing: backlog: 695 items waiting, oldest 78 s, 0.0 processed/s; first item 92 waiting 78 s after 35 attempt(s); clearing: calls to network fail: 100% (+1 more)"
+      },
+      {
+        "t": 77.19,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "model call failed: Provider unavailable or the request timed out."
+      },
+      {
+        "t": 77.19,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "gave_up"
+      },
+      {
+        "t": 82.67,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 5.487 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 88,
+        "latency_s": 2.479,
+        "estimated_cost_usd": 0.01266,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4476,
+        "output_tokens": 231,
+        "latency_s": 4.439,
+        "estimated_cost_usd": 0.022524,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4660,
+        "output_tokens": 394,
+        "latency_s": 5.584,
+        "estimated_cost_usd": 0.02652,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4980,
+        "output_tokens": 257,
+        "latency_s": 4.278,
+        "estimated_cost_usd": 0.02506,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5360,
+        "output_tokens": 396,
+        "latency_s": 5.442,
+        "estimated_cost_usd": 0.02936,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6106,
+        "output_tokens": 508,
+        "latency_s": 6.756,
+        "estimated_cost_usd": 0.034584,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6434,
+        "output_tokens": 558,
+        "latency_s": 7.367,
+        "estimated_cost_usd": 0.036896,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 6.362,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": "timeout",
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1212,
+        "output_tokens": 422,
+        "latency_s": 5.487,
+        "estimated_cost_usd": 0.013288,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 12,
+    "audit": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793453411.4279766,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793453381.428,
+      1793453401.428
+    ],
+    "journeys": {
+      "n": 222,
+      "ok": 222,
+      "success_rate": 1.0,
+      "p95_ms": 65.00005722045898,
+      "payments": {
+        "n": 175,
+        "ok": 175
+      },
+      "balances": {
+        "n": 47,
+        "fresh": 47
+      },
+      "p95_allowed_ms": 326.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 1114,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "1114 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793453280.375124,
+      "until_t": 1793453401.4279766,
+      "breach_seconds": 0.0,
+      "failed_journeys": 0,
+      "time_to_mitigate_s": 0.0,
+      "mitigation_censored": false,
+      "late_clearings": 1022,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "sealed_3",
+      "target": "network",
+      "class": "external_outage",
+      "detail": {},
+      "t": 1793453280.375124,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793453286.4276292,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793453280.375124,
+    "t_alert": 1793453291.4276292,
+    "horizon": 1793453401.4276292,
+    "verdict_t": 1793453411.4851317
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

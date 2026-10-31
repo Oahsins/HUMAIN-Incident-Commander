@@ -1,0 +1,435 @@
+{
+  "case": {
+    "id": "h-22",
+    "input": {
+      "system": "bank",
+      "seed": 260022,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "blind_1",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "gateway",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "gateway",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "react",
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "gave_up",
+    "root_causes": [],
+    "actions": [
+      {
+        "t": 1793455090.3318918,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is not answering with no recent change or log errors, consistent with a stopped process; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Recovery was not confirmed for the bank system. The incident commander gave up before the incident was resolved.",
+      "background": "The facts provided do not say what changed or when. The only recorded event is the incident commander's action on the gateway.",
+      "assessment": "The root cause was not identified. The incident commander restarted the gateway itself, and the restart completed, but this did not confirm recovery.",
+      "recommendation": "Check whether the bank system is healthy now and find the root cause, starting with the gateway. Ask the operations team to review whether the gateway restart affected any transactions or data."
+    },
+    "t_start": 1793455079.8723707,
+    "t_first_action": 1793455090.3318918,
+    "t_declared": 1793455093.180051,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 38.5
+        }
+      },
+      {
+        "t": 2.75,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.714 s"
+      },
+      {
+        "t": 2.75,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all component metrics to see where symptoms are."
+      },
+      {
+        "t": 3.84,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway, clearing",
+        "data": {
+          "ms": 1086.1
+        }
+      },
+      {
+        "t": 6.81,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.969 s"
+      },
+      {
+        "t": 6.81,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Gateway is down and clearing exited; check gateway logs to see why it is not answering."
+      },
+      {
+        "t": 6.82,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 12.9
+        }
+      },
+      {
+        "t": 10.46,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.637 s"
+      },
+      {
+        "t": 10.46,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Gateway is not answering with no recent change or log errors, consistent with a stopped process; restart it."
+      },
+      {
+        "t": 11.15,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.31,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "model call failed: The model declined this request (refusal)."
+      },
+      {
+        "t": 13.31,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "gave_up"
+      },
+      {
+        "t": 16.2,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 2.894 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 94,
+        "latency_s": 2.714,
+        "estimated_cost_usd": 0.01278,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4484,
+        "output_tokens": 147,
+        "latency_s": 2.969,
+        "estimated_cost_usd": 0.020876,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4608,
+        "output_tokens": 208,
+        "latency_s": 3.637,
+        "estimated_cost_usd": 0.022592,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 2.162,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 530,
+        "output_tokens": 189,
+        "latency_s": 2.894,
+        "estimated_cost_usd": 0.0059,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 4,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793455090.3318918,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is not answering with no recent change or log errors, consistent with a stopped process; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793455199.4767637,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793455169.477,
+      1793455189.477
+    ],
+    "journeys": {
+      "n": 224,
+      "ok": 224,
+      "success_rate": 1.0,
+      "p95_ms": 73.00019264221191,
+      "payments": {
+        "n": 176,
+        "ok": 176
+      },
+      "balances": {
+        "n": 48,
+        "fresh": 48
+      },
+      "p95_allowed_ms": 328.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 907,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "907 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793455067.4055274,
+      "until_t": 1793455189.4767637,
+      "breach_seconds": 25.0,
+      "failed_journeys": 39,
+      "time_to_mitigate_s": 25.0,
+      "mitigation_censored": false,
+      "late_clearings": 823,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 92
+      },
+      "t": 1793455067.4055274,
+      "at_s": 0
+    },
+    {
+      "type": "blind_1",
+      "target": "gateway",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793455069.4333677,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793455073.49226,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793455074.47631,
+      "at_s": 7
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793455091.0168588,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "gateway",
+      "detail": "gateway restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793455090.3318918,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "Gateway is not answering with no recent change or log errors, consistent with a stopped process; restart it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793455067.4055274,
+    "t_alert": 1793455079.47631,
+    "horizon": 1793455189.47631,
+    "verdict_t": 1793455199.5481238
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

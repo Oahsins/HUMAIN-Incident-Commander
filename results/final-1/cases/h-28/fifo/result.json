@@ -1,0 +1,455 @@
+{
+  "arm": "fifo",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.88,
+      "evidence": "[B3] shows screening p95 at 1823 ms (baseline 14 ms), and payments logs repeat 'fraud screening timeout via primary ... timeout_s=1.0'. Payments fails at step 'payments' with '503 screening unavailable (timeout)'."
+    },
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.6,
+      "evidence": "[E1] shows payments deployed 13 s ago (from=1.3, to=1.5), and [D5] shows the ledger data check failed with 'duplicate payments = 15'. Payments is the only component that posts payments to the ledger."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793458386.679611,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793458399.9122176,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: [E1] shows payments deployed 13 s ago (from=1.3, to=1.5), and [D5] shows the ledger data check failed with 'duplicate payments = 15'. Payments is the only component that posts payments to the ledger.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "ledger"
+    ],
+    "class": null,
+    "reason": "past damage, no longer growing: data check failed: duplicate payments = 92",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "find and put right the records behind 'data check failed: duplicate payments = 92'; the incident commander cannot change data"
+  },
+  "sbar": {
+    "situation": "The bank payments service has recovered. The last two recovery checks, ending at 33 s, were clean.",
+    "background": "Payments release 1.5 was deployed 13 s before the incident, replacing 1.3. At the same time the screening primary slowed to a p95 of 1823 ms against a 14 ms baseline.",
+    "assessment": "Payments timed out after 1.0 s on every call to the slow screening primary and returned 503 for 96% of requests; the incident commander failed screening over to its standby, and screening is now served by the standby. Payments 1.5 likely caused duplicate payments in the ledger; the incident commander rolled payments back from 1.5 to 1.3, and that is done.",
+    "recommendation": "Keep payments on 1.3 and screening on the standby until the screening primary slowness and the 1.5 duplicate-payment fault are understood. The ledger was escalated to the operations team (soon) to find and fix the duplicate payment records; the check found 15 at diagnosis and 92 at escalation, and the incident commander cannot change data, so operations must review these for money effects."
+  },
+  "t_start": 1793458385.4655058,
+  "t_first_action": 1793458386.679611,
+  "t_declared": 1793458418.7034857,
+  "trace": [
+    {
+      "t": 0.02,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 22.1
+      }
+    },
+    {
+      "t": 0.13,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 112.3
+      }
+    },
+    {
+      "t": 1.21,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at payments",
+      "data": {
+        "ms": 1079.5
+      }
+    },
+    {
+      "t": 1.21,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "11 fault findings, 16 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "96% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "96% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "p95 1044 ms (baseline 60 ms)"
+          },
+          {
+            "id": "B2",
+            "letter": "B",
+            "component": "payments",
+            "severity": "fault",
+            "text": "p95 1024 ms (baseline 48 ms)"
+          },
+          {
+            "id": "B3",
+            "letter": "B",
+            "component": "screening",
+            "severity": "fault",
+            "text": "p95 1823 ms (baseline 14 ms)"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 96%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments are slow: p95 1044 ms (payments itself answered in 48 ms at baseline)"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening fail: 100%"
+          },
+          {
+            "id": "D4",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening are slow: p95 1027 ms (screening itself answered in 14 ms at baseline)"
+          },
+          {
+            "id": "D5",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 15"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "13 s ago: deploy by pipeline (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "5 s ago: stop by scheduler"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "5 s ago: start by scheduler (release=4.1)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 1.23,
+      "phase": "survey",
+      "kind": "action",
+      "name": "containment",
+      "summary": "failover screening: done (screening now served by its standby)",
+      "data": {
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 1.25,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 18.3
+      }
+    },
+    {
+      "t": 1.27,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "9 log records from payments",
+      "data": {
+        "ms": 15.9
+      }
+    },
+    {
+      "t": 1.3,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from screening",
+      "data": {
+        "ms": 30.3
+      }
+    },
+    {
+      "t": 1.31,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 11.4
+      }
+    },
+    {
+      "t": 14.45,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 13.138 s"
+    },
+    {
+      "t": 15.16,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 22.24,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 84.1
+      }
+    },
+    {
+      "t": 23.16,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 921.2
+      }
+    },
+    {
+      "t": 23.16,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: ledger: data check failed: duplicate payments = 92"
+    },
+    {
+      "t": 27.25,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 86.9
+      }
+    },
+    {
+      "t": 28.23,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 975.2
+      }
+    },
+    {
+      "t": 28.23,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 32.33,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 100.0
+      }
+    },
+    {
+      "t": 33.24,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 911.8
+      }
+    },
+    {
+      "t": 33.24,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 3: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 33.24,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 38.28,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 5.038 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 4110,
+      "output_tokens": 1206,
+      "latency_s": 13.138,
+      "estimated_cost_usd": 0.04056,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1054,
+      "output_tokens": 361,
+      "latency_s": 5.038,
+      "estimated_cost_usd": 0.011436,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 15,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793458386.679611,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793458399.9122176,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: [E1] shows payments deployed 13 s ago (from=1.3, to=1.5), and [D5] shows the ledger data check failed with 'duplicate payments = 15'. Payments is the only component that posts payments to the ledger.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ]
+}

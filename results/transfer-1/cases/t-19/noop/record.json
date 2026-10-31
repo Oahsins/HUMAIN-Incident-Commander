@@ -1,0 +1,240 @@
+{
+  "case": {
+    "id": "t-19",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310019,
+      "faults": [
+        {
+          "type": "sealed_1",
+          "at_s": 0,
+          "params": {
+            "target": "call-handling",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_5",
+          "at_s": 2,
+          "params": {
+            "target": "unit-sync",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_10",
+          "at_s": 4,
+          "params": {
+            "target": "cad-db",
+            "variant": "v8"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 6,
+          "params": {
+            "target": "cad",
+            "variant": "v2"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "cad-db",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "cad-db",
+            "params": {}
+          }
+        },
+        {
+          "target": "call-handling",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "call-handling",
+            "params": {}
+          }
+        },
+        {
+          "target": "unit-sync",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "unit-sync",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "noop",
+  "result": {
+    "arm": "noop",
+    "mode": "auto",
+    "outcome": "no_incident",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "No intervention control.",
+      "background": "No observations or actions.",
+      "assessment": "Recovery is decided by the independent checker.",
+      "recommendation": "Retain the checker verdict."
+    },
+    "t_start": 1793446872.7470973,
+    "t_first_action": null,
+    "t_declared": 1793446872.7470975,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "slo_ok": false,
+    "t": 1793446992.3261657,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793446962.326,
+      1793446982.326
+    ],
+    "journeys": {
+      "n": 95,
+      "ok": 0,
+      "success_rate": 0.0,
+      "p95_ms": 36.4,
+      "p90_ms": 35.4,
+      "p95_allowed_ms": 286.9,
+      "by_source": {
+        "normal": {
+          "n": 95,
+          "ok": 0
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 0,
+      "failures": {
+        "not_told": 72,
+        "no_incident": 23
+      }
+    },
+    "integrity": {
+      "ok": false,
+      "told_without_incident": 23,
+      "told_without_incident_by": {
+        "missing": 23,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 3,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 3
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 1,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793446862.0260127,
+      "until_t": 1793446982.3261657,
+      "breach_seconds": 125.0,
+      "failed_journeys": 532,
+      "time_to_mitigate_s": 120.3,
+      "mitigation_censored": true,
+      "told_without_incident": 151,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 344.5,
+      "calls_dropped": 0,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0
+    },
+    "reasons": [
+      "95 of 95 calls failed: 72 answered but not told help is on the way, 23 told with no incident of theirs in CAD",
+      "23 callers were told help is on the way but CAD holds no incident of theirs",
+      "3 units' CAD records differed from their crews for longer than the 3 s status lag"
+    ]
+  },
+  "manifest": [
+    {
+      "type": "sealed_1",
+      "target": "call-handling",
+      "class": "bad_release",
+      "detail": {
+        "release": "5.3"
+      },
+      "t": 1793446862.0260127,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_5",
+      "target": "unit-sync",
+      "class": "bad_release",
+      "detail": {
+        "release": "4.1"
+      },
+      "t": 1793446864.0062404,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_10",
+      "target": "cad-db",
+      "class": "lock_held",
+      "detail": {
+        "pid": 11708,
+        "hold_s": 600
+      },
+      "t": 1793446865.321929,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "cad",
+        "key": "write_timeout_ms",
+        "value": 2000
+      },
+      "t": 1793446867.3257978,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793446862.0260127,
+    "t_alert": 1793446872.3257978,
+    "horizon": 1793446982.3257978,
+    "verdict_t": 1793446992.3714604
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9100,
+  "error": null
+}

@@ -1,0 +1,1052 @@
+{
+  "case": {
+    "id": "h-38",
+    "input": {
+      "system": "bank",
+      "seed": 260038,
+      "condition": "model_swap",
+      "faults": [
+        {
+          "type": "bad_setting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "crash",
+          "at_s": 2,
+          "params": {
+            "target": "screening"
+          }
+        },
+        {
+          "type": "stale_balances",
+          "at_s": 4,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "screening",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "screening",
+            "params": {}
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.95,
+        "evidence": "[E1] payments: 14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1). Payments log shows repeated 'payment rejected: amount exceeds transfer limit ... limit_minor=1' with amounts of 7323 to 45752."
+      },
+      {
+        "target": "screening",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "[C1] screening: down (not answering). [C2] screening: process exited 1 time(s) in 15 min, last 12 s ago (exit code 15)."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.9,
+        "evidence": "[E2] gateway: 40 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0). [A2] FAULT payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999600."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793451950.3070939,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "screening is down and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793451962.1430707,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: [C1] screening: down (not answering). [C2] screening: process exited 1 time(s) in 15 min, last 12 s ago (exit code 15).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "t": 1793451964.7785277,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: [E1] payments: 14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1). Payments log shows repeated 'payment rejected: amount exceeds transfer limit ... limit_minor=1' with amounts of 7323 to 45752.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793451993.2791123,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E2] gateway: 40 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0). [A2] FAULT payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999600.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The incident is recovered: the last two recovery checks ran clean, and the payment journey now completes. The incident commander reverted the gateway and payments settings itself, and failed screening over to its standby.",
+      "background": "The pipeline changed payments max_transfer_minor from 1000000 to 1 about 14 seconds before the incident was handled, and payments began rejecting transfers above 1 minor unit. Ops-maintenance changed gateway balance_cache_ttl_s from 0.5 to 600.0 about 40 seconds earlier, so the gateway served stale balances. Screening exited with code 15 and was not answering.",
+      "assessment": "Three root causes were found: bad_config on payments (confidence 0.95), process_down on screening (confidence 0.9), and bad_config on gateway (confidence 0.9). The incident commander reverted payments max_transfer_minor to 1000000 and gateway balance_cache_ttl_s to 0.5 by hand. It also failed screening over to its standby and restarted screening. All four actions reported done.",
+      "recommendation": "Confirm the payment journey stays clean and watch screening, since it crashed twice in 15 minutes and is still served by its standby. Have the operations team review the balance mismatch: the app showed 99999900 while the ledger held 99999600 during the stale-cache window, and any payments rejected at the 1-unit limit need reconciliation. Investigate why the pipeline and ops-maintenance changed these settings, and why the gateway cache TTL was raised."
+    },
+    "t_start": 1793451950.0778828,
+    "t_first_action": 1793451950.3070939,
+    "t_declared": 1793452004.384927,
+    "trace": [
+      {
+        "t": 0.05,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 53.8
+        }
+      },
+      {
+        "t": 0.16,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 102.1
+        }
+      },
+      {
+        "t": 0.23,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 73.0
+        }
+      },
+      {
+        "t": 0.23,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "5 fault findings, 13 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "79% of requests are refused (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "95% of requests are refused (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "payment journey fails at step 'payments': 422 amount exceeds transfer limit"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 12 s ago (exit code 15)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "10 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "8 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by pipeline"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E7",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E8",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 0.25,
+        "phase": "survey",
+        "kind": "action",
+        "name": "containment",
+        "summary": "failover screening: done (screening now served by its standby)",
+        "data": {
+          "target": "screening",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 0.27,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 18.1
+        }
+      },
+      {
+        "t": 0.28,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "8 log records from payments",
+        "data": {
+          "ms": 17.0
+        }
+      },
+      {
+        "t": 0.31,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 27.9
+        }
+      },
+      {
+        "t": 12.07,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-haiku-5-5 answered in 11.752 s"
+      },
+      {
+        "t": 12.7,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart screening: done (screening restarted)",
+        "data": {
+          "target": "screening",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.72,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+        "data": {
+          "target": "payments",
+          "params": {
+            "key": "max_transfer_minor"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 19.84,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 116.0
+        }
+      },
+      {
+        "t": 20.58,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 739.0
+        }
+      },
+      {
+        "t": 20.58,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 24.68,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 102.5
+        }
+      },
+      {
+        "t": 25.56,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at balance",
+        "data": {
+          "ms": 877.4
+        }
+      },
+      {
+        "t": 25.56,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999800"
+      },
+      {
+        "t": 29.68,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 122.9
+        }
+      },
+      {
+        "t": 30.59,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at balance",
+        "data": {
+          "ms": 903.6
+        }
+      },
+      {
+        "t": 30.59,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: not clean (0 of 2 in a row); still abnormal: payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999700"
+      },
+      {
+        "t": 30.65,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 66.2
+        }
+      },
+      {
+        "t": 31.66,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at balance",
+        "data": {
+          "ms": 1011.4
+        }
+      },
+      {
+        "t": 31.66,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "1 fault findings, 15 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "screening",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 9.5/s): moved to its standby"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": null,
+              "severity": "fault",
+              "text": "payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999600"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "screening",
+              "severity": "info",
+              "text": "process exited 1 time(s) in 15 min, last 42 s ago (exit code 15); none since the action taken on it 20 s ago"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "screening",
+              "severity": "info",
+              "text": "served by its standby"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "44 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "40 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "38 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "38 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "37 s ago: stop by pipeline"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "37 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E7",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "36 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E8",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "36 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E9",
+              "letter": "E",
+              "component": "screening",
+              "severity": "info",
+              "text": "30 s ago: failover by incident-commander (from=primary, to=standby)"
+            },
+            {
+              "id": "E10",
+              "letter": "E",
+              "component": "screening",
+              "severity": "info",
+              "text": "19 s ago: restart by incident-commander (release=4.1)"
+            },
+            {
+              "id": "E11",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "16 s ago: config by incident-commander (key=max_transfer_minor, revert=True, from=1, to=1000000)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 43.2,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-haiku-5-5 answered in 11.536 s"
+      },
+      {
+        "t": 43.21,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 48.33,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 118.9
+        }
+      },
+      {
+        "t": 49.25,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 923.4
+        }
+      },
+      {
+        "t": 49.25,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 53.35,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 102.0
+        }
+      },
+      {
+        "t": 54.31,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 954.2
+        }
+      },
+      {
+        "t": 54.31,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 54.31,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 57.7,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-haiku-5-5 answered in 3.395 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "assess",
+        "input_tokens": 4149,
+        "output_tokens": 2257,
+        "latency_s": 11.752,
+        "estimated_cost_usd": 0.001543,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "reassess",
+        "input_tokens": 4074,
+        "output_tokens": 2382,
+        "latency_s": 11.536,
+        "estimated_cost_usd": 0.001598,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1212,
+        "output_tokens": 504,
+        "latency_s": 3.395,
+        "estimated_cost_usd": 0.000373,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 22,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793451950.3070939,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "screening is down and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793451962.1430707,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: [C1] screening: down (not answering). [C2] screening: process exited 1 time(s) in 15 min, last 12 s ago (exit code 15).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793451964.7785277,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: [E1] payments: 14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1). Payments log shows repeated 'payment rejected: amount exceeds transfer limit ... limit_minor=1' with amounts of 7323 to 45752.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "event": "act",
+        "t": 1793451993.2791123,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E2] gateway: 40 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0). [A2] FAULT payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999600.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793452069.6783028,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793452039.678,
+      1793452059.678
+    ],
+    "journeys": {
+      "n": 229,
+      "ok": 229,
+      "success_rate": 1.0,
+      "p95_ms": 73.99988174438477,
+      "payments": {
+        "n": 174,
+        "ok": 174
+      },
+      "balances": {
+        "n": 55,
+        "fresh": 55
+      },
+      "p95_allowed_ms": 321.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793451936.6415622,
+      "until_t": 1793452059.6783028,
+      "breach_seconds": 60.0,
+      "failed_journeys": 332,
+      "time_to_mitigate_s": 60.0,
+      "mitigation_censored": false,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793451936.6415622,
+      "at_s": 0
+    },
+    {
+      "type": "crash",
+      "target": "screening",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793451938.6850543,
+      "at_s": 2
+    },
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793451940.6355302,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793451942.6834126,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793451943.696021,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793451944.677688,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793451950.3243468,
+      "params": {
+        "to": "standby"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "failover",
+      "target": "screening",
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793451962.7743347,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "screening",
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793451964.7989626,
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "payments",
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793451993.282762,
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "gateway",
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793451950.3070939,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "screening is down and the main journey fails",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793451962.1430707,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: [C1] screening: down (not answering). [C2] screening: process exited 1 time(s) in 15 min, last 12 s ago (exit code 15).",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793451964.7785277,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: [E1] payments: 14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1). Payments log shows repeated 'payment rejected: amount exceeds transfer limit ... limit_minor=1' with amounts of 7323 to 45752.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793451993.2791123,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: [E2] gateway: 40 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0). [A2] FAULT payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999600.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
+    }
+  ],
+  "timing": {
+    "t0": 1793451936.6415622,
+    "t_alert": 1793451949.677688,
+    "horizon": 1793452059.677688,
+    "verdict_t": 1793452069.7272243
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

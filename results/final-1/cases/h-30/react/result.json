@@ -1,0 +1,521 @@
+{
+  "arm": "react",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.93,
+      "evidence": "Clearing crashed with a JSONDecodeError while parsing head item 98 and 120 items backed up behind it. After item 98 was quarantined and clearing restarted, the queue drained and network calls resumed."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.85,
+      "evidence": "An operator raised balance_cache_ttl_s from 0.5 s to 600 s shortly before the alert, which would serve stale balances after payments. After the revert, the probe shows the app balance matching the ledger."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793455525.3363445,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 98
+      },
+      "reason": "Clearing crashed on a JSON parse error, so the head item 98 is a malformed message it cannot read. I'll quarantine item 98, then restart clearing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 98 set aside for the operations team"
+    },
+    {
+      "t": 1793455527.6949308,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Item 98 is quarantined, so clearing can now be restarted to work through the queue.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "t": 1793455531.8641095,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "The gateway's balance cache TTL was raised from 0.5 s to 600 s just before the alert. That would keep balances stale after payments and break the payment journey's final step, so I'll revert that setting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "clearing"
+    ],
+    "class": null,
+    "reason": "item 98 was set aside from clearing's work queue",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "review item 98 set aside from clearing: repair and resubmit it, or close it with its customer"
+  },
+  "sbar": {
+    "situation": "The bank system has recovered. Two recovery checks in a row came back clean, the last at 41 s, and screening, payments and ledger are healthy.",
+    "background": "An operator raised the gateway setting balance_cache_ttl_s from 0.5 s to 600 s shortly before the alert. Clearing then crashed with a JSONDecodeError on a malformed message, item 98, and 120 items backed up behind it.",
+    "assessment": "There were two root causes: a poison message on clearing (confidence 0.93) and a bad config on the gateway (confidence 0.85). The incident commander quarantined item 98 and restarted clearing itself, after which the queue drained and network calls resumed. It also reverted balance_cache_ttl_s to 0.5 s, and the app balance now matches the ledger.",
+    "recommendation": "This was escalated to the operations team (priority: soon). They must review quarantined clearing item 98 and either repair and resubmit it or close it with its customer. Check with the operator who raised balance_cache_ttl_s to 600 s so the change is not reapplied."
+  },
+  "t_start": 1793455516.2674103,
+  "t_first_action": 1793455525.3363445,
+  "t_declared": 1793455557.2373605,
+  "trace": [
+    {
+      "t": 0.06,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 57.1
+      }
+    },
+    {
+      "t": 2.55,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.496 s"
+    },
+    {
+      "t": 2.55,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Start by observing all components to see symptoms and recent changes."
+    },
+    {
+      "t": 2.65,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: clearing",
+      "data": {
+        "ms": 95.8
+      }
+    },
+    {
+      "t": 5.99,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.339 s"
+    },
+    {
+      "t": 5.99,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "logs: Clearing is down with 120 items queued, and the gateway's balance cache TTL was just raised from 0.5 s to 600 s, which risks stale balances. I'll check the clearing logs first."
+    },
+    {
+      "t": 6.0,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "2 log records from clearing",
+      "data": {
+        "ms": 14.2
+      }
+    },
+    {
+      "t": 9.07,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.065 s"
+    },
+    {
+      "t": 9.07,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Clearing crashed on a JSON parse error, so the head item 98 is a malformed message it cannot read. I'll quarantine item 98, then restart clearing."
+    },
+    {
+      "t": 9.1,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "quarantine",
+      "summary": "quarantine clearing: done (clearing item 98 set aside for the operations team)",
+      "data": {
+        "target": "clearing",
+        "params": {
+          "item": 98
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 11.43,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.328 s"
+    },
+    {
+      "t": 11.43,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Item 98 is quarantined, so clearing can now be restarted to work through the queue."
+    },
+    {
+      "t": 12.04,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.6,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.554 s"
+    },
+    {
+      "t": 15.6,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: The gateway's balance cache TTL was raised from 0.5 s to 600 s just before the alert. That would keep balances stale after payments and break the payment journey's final step, so I'll revert that setting."
+    },
+    {
+      "t": 15.62,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 18.21,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.598 s"
+    },
+    {
+      "t": 18.21,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Both fixes are applied, so I'll observe to confirm clearing is draining its queue and the network is getting calls."
+    },
+    {
+      "t": 18.3,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 89.0
+      }
+    },
+    {
+      "t": 22.25,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.945 s"
+    },
+    {
+      "t": 22.25,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "probe: Clearing has drained its queue to 2 items and the network is answering normally. I'll run a probe to confirm the payment journey works end to end, including the balance step."
+    },
+    {
+      "t": 23.17,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 925.8
+      }
+    },
+    {
+      "t": 30.89,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 7.712 s"
+    },
+    {
+      "t": 30.89,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "done: The probe passes end to end: two balanced postings, cleared, and the balance matches the ledger, while every metric is back at baseline. I'll declare done with both root causes."
+    },
+    {
+      "t": 35.0,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 115.3
+      }
+    },
+    {
+      "t": 35.93,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 927.7
+      }
+    },
+    {
+      "t": 35.93,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 40.02,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 90.2
+      }
+    },
+    {
+      "t": 40.97,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 948.7
+      }
+    },
+    {
+      "t": 40.97,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 40.97,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 45.33,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 4.363 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 2725,
+      "output_tokens": 88,
+      "latency_s": 2.496,
+      "estimated_cost_usd": 0.01266,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4497,
+      "output_tokens": 204,
+      "latency_s": 3.339,
+      "estimated_cost_usd": 0.022068,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4774,
+      "output_tokens": 173,
+      "latency_s": 3.065,
+      "estimated_cost_usd": 0.022556,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4952,
+      "output_tokens": 99,
+      "latency_s": 2.328,
+      "estimated_cost_usd": 0.021788,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5094,
+      "output_tokens": 207,
+      "latency_s": 3.554,
+      "estimated_cost_usd": 0.024516,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5319,
+      "output_tokens": 106,
+      "latency_s": 2.598,
+      "estimated_cost_usd": 0.023396,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7419,
+      "output_tokens": 182,
+      "latency_s": 3.945,
+      "estimated_cost_usd": 0.033316,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7780,
+      "output_tokens": 552,
+      "latency_s": 7.712,
+      "estimated_cost_usd": 0.04216,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1035,
+      "output_tokens": 358,
+      "latency_s": 4.363,
+      "estimated_cost_usd": 0.0113,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 12,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793455525.3363445,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 98
+      },
+      "reason": "Clearing crashed on a JSON parse error, so the head item 98 is a malformed message it cannot read. I'll quarantine item 98, then restart clearing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 98 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793455527.6949308,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Item 98 is quarantined, so clearing can now be restarted to work through the queue.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793455531.8641095,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "The gateway's balance cache TTL was raised from 0.5 s to 600 s just before the alert. That would keep balances stale after payments and break the payment journey's final step, so I'll revert that setting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ]
+}

@@ -1,0 +1,478 @@
+{
+  "arm": "abcde",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "alerting",
+      "class": "dependency_slow",
+      "confidence": 0.8,
+      "evidence": "Probe shows dispatcher=ok but alerting=FAIL: 'alert not delivered on primary within 1.0 s'. Dispatcher logs 'station alert for assignment 75 not delivered via alerting (refused)' with 89% of calls failing, and repeated no_acknowledgement from units that were never alerted."
+    },
+    {
+      "target": "dispatcher",
+      "class": "bad_release",
+      "confidence": 0.75,
+      "evidence": "[E1] the operator deployed dispatcher 2.1→2.2 30 s ago, and [B1] shows a backlog of 16 items with the oldest at 23 s. Dispatcher keeps logging 'did not acknowledge incident ... in time' (e.g. assignment 213/214, 6 s ago) even after alerting was moved to its standby."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793446168.4373477,
+      "action": "failover",
+      "target": "alerting",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "dependency_slow: Probe shows dispatcher=ok but alerting=FAIL: 'alert not delivered on primary within 1.0 s'. Dispatcher logs 'station alert for assignment 75 not delivered via alerting (refused)' with 89% of calls failing, and repeated no_acknowledgement from units that were never alerted.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "alerting now served by its standby"
+    },
+    {
+      "t": 1793446189.15944,
+      "action": "rollback",
+      "target": "dispatcher",
+      "params": {},
+      "reason": "bad_release: [E1] the operator deployed dispatcher 2.1→2.2 30 s ago, and [B1] shows a backlog of 16 items with the oldest at 23 s. Dispatcher keeps logging 'did not acknowledge incident ... in time' (e.g. assignment 213/214, 6 s ago) even after alerting was moved to its standby.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "dispatcher 2.2 -> 2.1"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": null,
+  "sbar": {
+    "situation": "Dispatch has recovered. The recovery check ran four looks, and the last two at 46 s were clean in a row.",
+    "background": "The operator deployed dispatcher 2.1 to 2.2 about 30 s before the symptoms began. Alerts then stopped reaching units on the primary alerting path, and a backlog of 16 items built up with the oldest at 23 s.",
+    "assessment": "There were two causes: the alerting primary refused station alerts, failing 89% of calls, and the dispatcher 2.2 release kept missing unit acknowledgements even after the alerting failover. The incident commander failed alerting over to its standby, which succeeded, and then rolled dispatcher back from 2.2 to 2.1, which also succeeded.",
+    "recommendation": "Find out why the alerting primary refused deliveries before moving traffic back to it. Hold dispatcher 2.2 until its acknowledgement fault is understood. The operations team should review the 16 backlogged assignments, including 75, 213 and 214, to confirm every unit was alerted and acknowledged."
+  },
+  "t_start": 1793446155.4909105,
+  "t_first_action": 1793446168.4373477,
+  "t_declared": 1793446201.9403803,
+  "trace": [
+    {
+      "t": 0.04,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "dispatch: 9 components",
+      "data": {
+        "ms": 42.6
+      }
+    },
+    {
+      "t": 0.15,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 108.8
+      }
+    },
+    {
+      "t": 1.39,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey failed at alerting",
+      "data": {
+        "ms": 1237.1
+      }
+    },
+    {
+      "t": 1.39,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "2 fault findings, 5 findings in all, 9 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "alerting",
+            "severity": "info",
+            "text": "traffic 0.2/s (baseline 1.9/s), less work from its callers"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "alerting",
+            "severity": "fault",
+            "text": "emergency_call journey fails at step 'alerting': alert not delivered on primary within 1.0 s"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "dispatcher",
+            "severity": "fault",
+            "text": "calls to alerting fail: 89%"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "dispatcher",
+            "severity": "info",
+            "text": "9 s ago: deploy by operator (from=2.1, to=2.2)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "cad",
+            "severity": "info",
+            "text": "5 s ago: config by operator (key=write_timeout_ms, from=1000, to=2000)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 1.41,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from alerting",
+      "data": {
+        "ms": 23.1
+      }
+    },
+    {
+      "t": 1.45,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "166 log records from dispatcher",
+      "data": {
+        "ms": 34.7
+      }
+    },
+    {
+      "t": 12.95,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 11.499 s"
+    },
+    {
+      "t": 12.97,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "failover",
+      "summary": "failover alerting: done (alerting now served by its standby)",
+      "data": {
+        "target": "alerting",
+        "params": {
+          "to": "standby"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 16.06,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 87.0
+      }
+    },
+    {
+      "t": 16.67,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 612.0
+      }
+    },
+    {
+      "t": 16.67,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: dispatcher: backlog: 48 items waiting, oldest 23 s, 5.2 processed/s; dispatcher: calls to alerting fail: 100%"
+    },
+    {
+      "t": 20.8,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 128.4
+      }
+    },
+    {
+      "t": 21.19,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 389.4
+      }
+    },
+    {
+      "t": 21.19,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: not clean (0 of 2 in a row); still abnormal: dispatcher: backlog: 18 items waiting, oldest 23 s, 8.8 processed/s"
+    },
+    {
+      "t": 21.3,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 109.3
+      }
+    },
+    {
+      "t": 21.72,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 425.0
+      }
+    },
+    {
+      "t": 21.72,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "1 fault findings, 6 findings in all, 9 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "alerting",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 1.9/s): moved to its standby"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "dispatcher",
+            "severity": "fault",
+            "text": "backlog: 16 items waiting, oldest 23 s, 7.8 processed/s"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "alerting",
+            "severity": "info",
+            "text": "served by its standby"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "dispatcher",
+            "severity": "info",
+            "text": "30 s ago: deploy by operator (from=2.1, to=2.2)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "cad",
+            "severity": "info",
+            "text": "27 s ago: config by operator (key=write_timeout_ms, from=1000, to=2000)"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "alerting",
+            "severity": "info",
+            "text": "8 s ago: failover by incident-commander (from=primary, to=standby)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 21.74,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "200 log records from dispatcher",
+      "data": {
+        "ms": 18.6
+      }
+    },
+    {
+      "t": 33.67,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 11.927 s"
+    },
+    {
+      "t": 34.38,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback dispatcher: done (dispatcher 2.2 -> 2.1)",
+      "data": {
+        "target": "dispatcher",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 41.46,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 77.7
+      }
+    },
+    {
+      "t": 41.92,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 455.9
+      }
+    },
+    {
+      "t": 41.92,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 46.04,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 122.5
+      }
+    },
+    {
+      "t": 46.45,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 410.5
+      }
+    },
+    {
+      "t": 46.45,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 46.45,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 51.17,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 4.722 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 4403,
+      "output_tokens": 1066,
+      "latency_s": 11.499,
+      "estimated_cost_usd": 0.038932,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 4598,
+      "output_tokens": 1036,
+      "latency_s": 11.927,
+      "estimated_cost_usd": 0.039112,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1057,
+      "output_tokens": 356,
+      "latency_s": 4.722,
+      "estimated_cost_usd": 0.011348,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 18,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793446168.4373477,
+      "action": "failover",
+      "target": "alerting",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "dependency_slow: Probe shows dispatcher=ok but alerting=FAIL: 'alert not delivered on primary within 1.0 s'. Dispatcher logs 'station alert for assignment 75 not delivered via alerting (refused)' with 89% of calls failing, and repeated no_acknowledgement from units that were never alerted.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "alerting now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793446189.15944,
+      "action": "rollback",
+      "target": "dispatcher",
+      "params": {},
+      "reason": "bad_release: [E1] the operator deployed dispatcher 2.1→2.2 30 s ago, and [B1] shows a backlog of 16 items with the oldest at 23 s. Dispatcher keeps logging 'did not acknowledge incident ... in time' (e.g. assignment 213/214, 6 s ago) even after alerting was moved to its standby.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "dispatcher 2.2 -> 2.1"
+    }
+  ]
+}

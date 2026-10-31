@@ -1,0 +1,454 @@
+{
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "cad",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "cad is 'down (not answering)' and 'process exited 1 time(s) in 15 min, last 11 s ago (exit code 15)'. call-handling logs 'call ... was not entered in CAD (timeout)' and its calls to cad fail 100%. cad had no recent release or setting change."
+      },
+      {
+        "target": "unit-sync",
+        "class": "bad_config",
+        "confidence": 0.9,
+        "evidence": "Operator changed batch_size from 200 to 0 9 s ago. unit-sync logs 'setting batch_size cannot be used; work is paused until it changes', and 20 unit reports are overdue."
+      },
+      {
+        "target": "dispatcher",
+        "class": "bad_config",
+        "confidence": 0.85,
+        "evidence": "Operator changed ack_timeout_s from 2.0 to 0.05 7 s ago. Right after, every assignment logs 'did not acknowledge incident ... in time', and units are being committed again and again for incidents 19 and 20."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793446607.2373085,
+        "action": "restart",
+        "target": "cad",
+        "params": {},
+        "reason": "process_down: cad is 'down (not answering)' and 'process exited 1 time(s) in 15 min, last 11 s ago (exit code 15)'. call-handling logs 'call ... was not entered in CAD (timeout)' and its calls to cad fail 100%. cad had no recent release or setting change.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "cad restarted"
+      },
+      {
+        "t": 1793446609.8726685,
+        "action": "revert_config",
+        "target": "dispatcher",
+        "params": {
+          "key": "ack_timeout_s"
+        },
+        "reason": "bad_config: Operator changed ack_timeout_s from 2.0 to 0.05 7 s ago. Right after, every assignment logs 'did not acknowledge incident ... in time', and units are being committed again and again for incidents 19 and 20.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "dispatcher ack_timeout_s restored from 0.05 to 2.0 (changed earlier by operator)"
+      },
+      {
+        "t": 1793446610.8794112,
+        "action": "revert_config",
+        "target": "unit-sync",
+        "params": {
+          "key": "batch_size"
+        },
+        "reason": "bad_config: Operator changed batch_size from 200 to 0 9 s ago. unit-sync logs 'setting batch_size cannot be used; work is paused until it changes', and 20 unit reports are overdue.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Dispatch has recovered after three faults. The last two recovery checks were clean, ending at 26 s.",
+      "background": "The cad process exited with exit code 15 and stopped answering, so calls could not be entered in CAD. Shortly after, an operator changed unit-sync batch_size from 200 to 0 and dispatcher ack_timeout_s from 2.0 to 0.05.",
+      "assessment": "The incident commander restarted cad itself, and it came back. It also reverted dispatcher ack_timeout_s to 2.0 and unit-sync batch_size to 200, which stopped the alert timeouts and unpaused unit status processing.",
+      "recommendation": "Find out why cad exited with code 15, and confirm with the operator why both settings were changed. Ask operations to review calls that were not entered in CAD during the outage, the 20 overdue unit reports, and the units committed repeatedly to incidents 19 and 20."
+    },
+    "t_start": 1793446595.4046066,
+    "t_first_action": 1793446607.2373085,
+    "t_declared": 1793446620.922236,
+    "trace": [
+      {
+        "t": 0.02,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "dispatch: 9 components",
+        "data": {
+          "ms": 23.6
+        }
+      },
+      {
+        "t": 0.14,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components; down: cad",
+        "data": {
+          "ms": 117.8
+        }
+      },
+      {
+        "t": 1.5,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey failed at cad",
+        "data": {
+          "ms": 1355.7
+        }
+      },
+      {
+        "t": 1.5,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "10 fault findings, 13 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "47% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "cad",
+              "severity": "fault",
+              "text": "emergency_call journey fails at step 'cad': 504 cad timed out"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "p95 1015 ms (baseline 31 ms)"
+            },
+            {
+              "id": "B2",
+              "letter": "B",
+              "component": "dispatcher",
+              "severity": "fault",
+              "text": "backlog: 2 items waiting, oldest 12 s, 3.8 processed/s"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "cad",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "cad",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 11 s ago (exit code 15)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "calls to cad fail: 100%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "calls to cad are slow: p95 1015 ms (cad itself answered in 15 ms at baseline)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "cad",
+              "severity": "fault",
+              "text": "data check failed: unit status timers expired = 3"
+            },
+            {
+              "id": "D4",
+              "letter": "D",
+              "component": "unit-sync",
+              "severity": "fault",
+              "text": "data check failed: unit reports overdue = 20"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "unit-sync",
+              "severity": "info",
+              "text": "9 s ago: config by operator (key=batch_size, from=200, to=0)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "dispatcher",
+              "severity": "info",
+              "text": "7 s ago: config by operator (key=ack_timeout_s, from=2.0, to=0.05)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "call-handling",
+              "severity": "info",
+              "text": "5 s ago: config by pipeline (key=rollover_s, from=2.5, to=3.0)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.51,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "128 log records from call-handling",
+        "data": {
+          "ms": 16.5
+        }
+      },
+      {
+        "t": 1.54,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "26 log records from cad",
+        "data": {
+          "ms": 22.5
+        }
+      },
+      {
+        "t": 1.57,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "90 log records from dispatcher",
+        "data": {
+          "ms": 34.5
+        }
+      },
+      {
+        "t": 1.6,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "61 log records from unit-sync",
+        "data": {
+          "ms": 29.1
+        }
+      },
+      {
+        "t": 11.83,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 10.232 s"
+      },
+      {
+        "t": 12.47,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart cad: done (cad restarted)",
+        "data": {
+          "target": "cad",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.47,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config dispatcher: done (dispatcher ack_timeout_s restored from 0.05 to 2.0 (changed earlier by operator))",
+        "data": {
+          "target": "dispatcher",
+          "params": {
+            "key": "ack_timeout_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.48,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config unit-sync: done (unit-sync batch_size restored from 0 to 200 (changed earlier by operator))",
+        "data": {
+          "target": "unit-sync",
+          "params": {
+            "key": "batch_size"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 20.56,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 77.1
+        }
+      },
+      {
+        "t": 21.04,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 483.9
+        }
+      },
+      {
+        "t": 21.04,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 25.12,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 74.2
+        }
+      },
+      {
+        "t": 25.52,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 399.0
+        }
+      },
+      {
+        "t": 25.52,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 25.52,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 29.3,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 3.78 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 5269,
+        "output_tokens": 1088,
+        "latency_s": 10.232,
+        "estimated_cost_usd": 0.042836,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1182,
+        "output_tokens": 310,
+        "latency_s": 3.78,
+        "estimated_cost_usd": 0.010928,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 14,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793446607.2373085,
+        "action": "restart",
+        "target": "cad",
+        "params": {},
+        "reason": "process_down: cad is 'down (not answering)' and 'process exited 1 time(s) in 15 min, last 11 s ago (exit code 15)'. call-handling logs 'call ... was not entered in CAD (timeout)' and its calls to cad fail 100%. cad had no recent release or setting change.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "cad restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793446609.8726685,
+        "action": "revert_config",
+        "target": "dispatcher",
+        "params": {
+          "key": "ack_timeout_s"
+        },
+        "reason": "bad_config: Operator changed ack_timeout_s from 2.0 to 0.05 7 s ago. Right after, every assignment logs 'did not acknowledge incident ... in time', and units are being committed again and again for incidents 19 and 20.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "dispatcher ack_timeout_s restored from 0.05 to 2.0 (changed earlier by operator)"
+      },
+      {
+        "event": "act",
+        "t": 1793446610.8794112,
+        "action": "revert_config",
+        "target": "unit-sync",
+        "params": {
+          "key": "batch_size"
+        },
+        "reason": "bad_config: Operator changed batch_size from 200 to 0 9 s ago. unit-sync logs 'setting batch_size cannot be used; work is paused until it changes', and 20 unit reports are overdue.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+      }
+    ]
+  },
+  "error": null
+}

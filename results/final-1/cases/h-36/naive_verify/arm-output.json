@@ -1,0 +1,448 @@
+{
+  "result": {
+    "arm": "naive_verify",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.9,
+        "evidence": "Screening p95 is 1820 ms against a 15 ms baseline [B3]. Payments logs show 'fraud screening timeout via primary ... timeout_s=1.0', and payments reports 'calls to screening fail: 100%' [D3]."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "Clearing is 'down (not answering)', and its process exited 11 s ago with exit code 15 [C1, C2]. The backlog has first item 91 waiting after 0 attempts [B4], so this is not a poison message."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.7,
+        "evidence": "Event E1, 8 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0). A 600 s balance cache means a balance will not reflect a new payment for up to 10 minutes. This is masked now only because payments are failing."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793456258.976071,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793456271.115887,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: Event E1, 8 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0). A 600 s balance cache means a balance will not reflect a new payment for up to 10 minutes. This is masked now only because payments are failing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793456272.1243064,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: Clearing is 'down (not answering)', and its process exited 11 s ago with exit code 15 [C1, C2]. The backlog has first item 91 waiting after 0 attempts [B4], so this is not a poison message.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The bank system has recovered. One recovery check at 19 s ran the main journey once and found every component clean.",
+      "background": "The screening primary started timing out, with p95 at 1820 ms against a 15 ms baseline. The clearing process exited with code 15, and 8 s before the handover a pipeline config change on gateway raised balance_cache_ttl_s from 0.5 to 600.",
+      "assessment": "Screening was slow, so payments' calls to it failed 100% on a 1.0 s timeout. The incident commander failed screening over to its standby, which is now serving. Clearing was down with item 91 waiting at 0 attempts, not a poison message; the incident commander restarted it and it is back. The gateway TTL change would have shown stale balances for up to 10 minutes; the incident commander reverted it to 0.5.",
+      "recommendation": "Recovery rests on a single clean look, so watch payments, screening-standby and clearing for a while longer. Investigate the screening primary's slowness, why clearing exited, and why the pipeline set balance_cache_ttl_s to 600, and stop that change being reapplied. Operations should review payments that failed during the screening outage and confirm backlog item 91 cleared after the clearing restart."
+    },
+    "t_start": 1793456257.8318002,
+    "t_first_action": 1793456258.976071,
+    "t_declared": 1793456276.781453,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 37.5
+        }
+      },
+      {
+        "t": 0.13,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 92.4
+        }
+      },
+      {
+        "t": 1.14,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1014.1
+        }
+      },
+      {
+        "t": 1.14,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "13 fault findings, 16 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "86% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "98% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "p95 1045 ms (baseline 61 ms)"
+            },
+            {
+              "id": "B2",
+              "letter": "B",
+              "component": "payments",
+              "severity": "fault",
+              "text": "p95 1031 ms (baseline 46 ms)"
+            },
+            {
+              "id": "B3",
+              "letter": "B",
+              "component": "screening",
+              "severity": "fault",
+              "text": "p95 1820 ms (baseline 15 ms)"
+            },
+            {
+              "id": "B4",
+              "letter": "B",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "backlog: 18 items waiting, oldest 12 s; first item 91 waiting 12 s after 0 attempt(s)"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 11 s ago (exit code 15)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments fail: 98%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments are slow: p95 1046 ms (payments itself answered in 46 ms at baseline)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening fail: 100%"
+            },
+            {
+              "id": "D4",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening are slow: p95 1029 ms (screening itself answered in 15 ms at baseline)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "8 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: stop by operator"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "6 s ago: start by operator (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.15,
+        "phase": "survey",
+        "kind": "action",
+        "name": "containment",
+        "summary": "failover screening: done (screening now served by its standby)",
+        "data": {
+          "target": "screening",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 1.16,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 12.8
+        }
+      },
+      {
+        "t": 1.18,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "6 log records from payments",
+        "data": {
+          "ms": 15.4
+        }
+      },
+      {
+        "t": 1.2,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 21.2
+        }
+      },
+      {
+        "t": 1.23,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from clearing",
+        "data": {
+          "ms": 30.4
+        }
+      },
+      {
+        "t": 13.28,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 12.053 s"
+      },
+      {
+        "t": 13.29,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.91,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 18.01,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 102.8
+        }
+      },
+      {
+        "t": 18.95,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 934.4
+        }
+      },
+      {
+        "t": 18.95,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "single look: clean"
+      },
+      {
+        "t": 18.95,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 24.23,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 5.284 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 4096,
+        "output_tokens": 1180,
+        "latency_s": 12.053,
+        "estimated_cost_usd": 0.039984,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1129,
+        "output_tokens": 409,
+        "latency_s": 5.284,
+        "estimated_cost_usd": 0.012696,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 12,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793456258.976071,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793456271.115887,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: Event E1, 8 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0). A 600 s balance cache means a balance will not reflect a new payment for up to 10 minutes. This is masked now only because payments are failing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+      },
+      {
+        "event": "act",
+        "t": 1793456272.1243064,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: Clearing is 'down (not answering)', and its process exited 11 s ago with exit code 15 [C1, C2]. The backlog has first item 91 waiting after 0 attempts [B4], so this is not a poison message.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
+  },
+  "error": null
+}

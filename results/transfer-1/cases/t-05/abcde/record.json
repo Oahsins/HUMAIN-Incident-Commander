@@ -1,0 +1,428 @@
+{
+  "case": {
+    "id": "t-05",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310005,
+      "faults": [
+        {
+          "type": "sealed_7",
+          "at_s": 0,
+          "params": {
+            "target": "cad",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 2,
+          "params": {
+            "target": "call-handling",
+            "variant": "v3"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "cad",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "cad",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "cad",
+        "class": "bad_release",
+        "confidence": 0.75,
+        "evidence": "[D1] 'cad: data check failed: possible duplicate incidents = 4' appeared shortly after [E1] 'cad: 8 s ago: deploy by pipeline (from=3.4, to=3.5)'. CAD is the component that links repeat calls to their open incident."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793444136.9374816,
+        "action": "rollback",
+        "target": "cad",
+        "params": {},
+        "reason": "bad_release: [D1] 'cad: data check failed: possible duplicate incidents = 4' appeared shortly after [E1] 'cad: 8 s ago: deploy by pipeline (from=3.4, to=3.5)'. CAD is the component that links repeat calls to their open incident.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "cad 3.5 -> 3.4"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Dispatch has recovered after the incident commander rolled CAD back from release 3.5 to 3.4. Two recovery checks in a row came back clean, the last at 21 s.",
+      "background": "The pipeline deployed CAD release 3.5, replacing 3.4. Shortly afterwards, a CAD data check failed and reported 4 possible duplicate incidents.",
+      "assessment": "The likely root cause is the bad CAD release 3.5 (confidence 0.75), because CAD links repeat calls from the same number to their open incident. The incident commander rolled CAD back to 3.4 itself, the rollback completed, and both recovery checks passed. The call-handling rollover_s change was routine tuning and is not linked to the fault.",
+      "recommendation": "Keep CAD on 3.4 and hold release 3.5 until the duplicate-linking fault is found and fixed. Operations should review the 4 possible duplicate incidents for crews sent twice or updates missed, and merge or correct the records."
+    },
+    "t_start": 1793444129.2635546,
+    "t_first_action": 1793444136.9374816,
+    "t_declared": 1793444149.9227436,
+    "trace": [
+      {
+        "t": 0.05,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "dispatch: 9 components",
+        "data": {
+          "ms": 49.8
+        }
+      },
+      {
+        "t": 0.18,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 133.4
+        }
+      },
+      {
+        "t": 0.68,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 498.9
+        }
+      },
+      {
+        "t": 0.68,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "1 fault findings, 3 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "cad",
+              "severity": "fault",
+              "text": "data check failed: possible duplicate incidents = 4"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "cad",
+              "severity": "info",
+              "text": "8 s ago: deploy by pipeline (from=3.4, to=3.5)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "call-handling",
+              "severity": "info",
+              "text": "6 s ago: config by pipeline (key=rollover_s, from=2.5, to=3.0)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 0.7,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "45 log records from cad",
+        "data": {
+          "ms": 22.5
+        }
+      },
+      {
+        "t": 7.67,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 6.968 s"
+      },
+      {
+        "t": 8.41,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback cad: done (cad 3.5 -> 3.4)",
+        "data": {
+          "target": "cad",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.51,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 98.1
+        }
+      },
+      {
+        "t": 16.12,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 616.2
+        }
+      },
+      {
+        "t": 16.12,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 20.2,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 73.6
+        }
+      },
+      {
+        "t": 20.66,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 462.8
+        }
+      },
+      {
+        "t": 20.66,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 20.66,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 25.01,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.35 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 3504,
+        "output_tokens": 585,
+        "latency_s": 6.968,
+        "estimated_cost_usd": 0.025716,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 858,
+        "output_tokens": 334,
+        "latency_s": 4.35,
+        "estimated_cost_usd": 0.010112,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 9,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793444136.9374816,
+        "action": "rollback",
+        "target": "cad",
+        "params": {},
+        "reason": "bad_release: [D1] 'cad: data check failed: possible duplicate incidents = 4' appeared shortly after [E1] 'cad: 8 s ago: deploy by pipeline (from=3.4, to=3.5)'. CAD is the component that links repeat calls to their open incident.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "cad 3.5 -> 3.4"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "slo_ok": true,
+    "t": 1793444248.7934268,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793444218.793,
+      1793444238.793
+    ],
+    "journeys": {
+      "n": 51,
+      "ok": 51,
+      "success_rate": 1.0,
+      "p95_ms": 35.9,
+      "p90_ms": 25.9,
+      "p95_allowed_ms": 287.2,
+      "by_source": {
+        "normal": {
+          "n": 51,
+          "ok": 51
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 6,
+      "failures": {}
+    },
+    "integrity": {
+      "ok": true,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793444122.488215,
+      "until_t": 1793444238.7934268,
+      "breach_seconds": 0.0,
+      "failed_journeys": 0,
+      "time_to_mitigate_s": 0.0,
+      "mitigation_censored": false,
+      "told_without_incident": 0,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 0.0,
+      "calls_dropped": 0,
+      "duplicate_incidents": 14,
+      "incidents_double_sent": 0
+    },
+    "reasons": []
+  },
+  "manifest": [
+    {
+      "type": "sealed_7",
+      "target": "cad",
+      "class": "bad_release",
+      "detail": {
+        "release": "3.5"
+      },
+      "t": 1793444122.488215,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "call-handling",
+        "key": "rollover_s",
+        "value": 3.0
+      },
+      "t": 1793444123.7929647,
+      "at_s": 2
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793444137.6684706,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "cad",
+      "detail": "cad 3.5 -> 3.4"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793444136.9374816,
+      "action": "rollback",
+      "target": "cad",
+      "params": {},
+      "reason": "bad_release: [D1] 'cad: data check failed: possible duplicate incidents = 4' appeared shortly after [E1] 'cad: 8 s ago: deploy by pipeline (from=3.4, to=3.5)'. CAD is the component that links repeat calls to their open incident.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "cad 3.5 -> 3.4"
+    }
+  ],
+  "timing": {
+    "t0": 1793444122.488215,
+    "t_alert": 1793444128.7929647,
+    "horizon": 1793444238.7929647,
+    "verdict_t": 1793444248.8730826
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9200,
+  "error": null
+}

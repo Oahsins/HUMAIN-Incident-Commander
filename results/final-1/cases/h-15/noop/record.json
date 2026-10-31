@@ -1,0 +1,181 @@
+{
+  "case": {
+    "id": "h-15",
+    "input": {
+      "system": "bank",
+      "seed": 260015,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "crash",
+          "at_s": 0,
+          "params": {
+            "target": "clearing"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 2,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "clearing",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "noop",
+  "result": {
+    "arm": "noop",
+    "mode": "auto",
+    "outcome": "no_incident",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "No intervention control.",
+      "background": "No observations or actions.",
+      "assessment": "Recovery is decided by the independent checker.",
+      "recommendation": "Retain the checker verdict."
+    },
+    "t_start": 1793425368.5517027,
+    "t_first_action": null,
+    "t_declared": 1793425368.551703,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793425488.2753308,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793425458.275,
+      1793425478.275
+    ],
+    "journeys": {
+      "n": 68,
+      "ok": 17,
+      "success_rate": 0.25,
+      "p95_ms": null,
+      "payments": {
+        "n": 51,
+        "ok": 0
+      },
+      "balances": {
+        "n": 17,
+        "fresh": 17
+      },
+      "p95_allowed_ms": 319.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 20,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "51 of 68 customer journeys failed (51 payments, 0 balance reads)",
+      "20 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793425356.240706,
+      "until_t": 1793425478.2753308,
+      "breach_seconds": 125.0,
+      "failed_journeys": 318,
+      "time_to_mitigate_s": 122.0,
+      "mitigation_censored": true,
+      "late_clearings": 20,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "crash",
+      "target": "clearing",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793425356.240706,
+      "at_s": 0
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 6592,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793425363.2190337,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793425363.2747812,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793425356.240706,
+    "t_alert": 1793425368.2747812,
+    "horizon": 1793425478.2747812,
+    "verdict_t": 1793425488.316539
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

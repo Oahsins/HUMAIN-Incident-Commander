@@ -1,0 +1,944 @@
+{
+  "arm": "naive_verify",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.85,
+      "evidence": "Screening p95 is 1824 ms against a 15 ms baseline. Payments logs 'fraud screening timeout via primary ... timeout_s=1.0', and the probe fails with '503 screening unavailable (timeout)'."
+    },
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.85,
+      "evidence": "The clearing worker is down after 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The backlog is stuck behind item 93, which has 0 attempts."
+    },
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.6,
+      "evidence": "Payments was deployed from 1.3 to 1.5 11 s ago, and the ledger data check now fails with 'duplicate payments = 16'."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793455981.366186,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "calls to screening are slow (p95 1028 ms) and the main journey fails",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793455993.7418702,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: Payments was deployed from 1.3 to 1.5 11 s ago, and the ledger data check now fails with 'duplicate payments = 16'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "t": 1793455996.4553587,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 93
+      },
+      "reason": "poison_message: The clearing worker is down after 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The backlog is stuck behind item 93, which has 0 attempts.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 93 set aside for the operations team"
+    },
+    {
+      "t": 1793455997.4716377,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: The clearing worker is down after 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The backlog is stuck behind item 93, which has 0 attempts.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "clearing",
+      "ledger",
+      "payments"
+    ],
+    "class": null,
+    "reason": "[E1] 'deploy by operator (from=1.3, to=1.5)' 34 s ago, just before the symptoms, and [D3] 'data check failed: duplicate payments = 95'. After the rollback [E9] the probe shows payments=ok.; [E1] payments was deployed 1.3->1.5 by an operator 49 s ago, and [D3] reports 'duplicate payments = 95' in the ledger. The release has since been rolled back ([E9]) and the probe shows payments=ok.; item 93 was set aside from clearing's work queue",
+    "urgency": "soon",
+    "to": "the on-call engineer; the operations team",
+    "ask": "Rollback to 1.3 is already done, but the 95 duplicate payments posted by release 1.5 remain in the ledger. Payments operations and finance must review and reconcile them by hand. No money may be moved or postings edited automatically. Release 1.5 must be fixed before it is redeployed.; The rollback of payments to 1.3 is done. A person must review and reconcile the 95 duplicate payments posted while 1.5 was live, coordinating with clearing and the network about any duplicates already cleared. Do not edit postings or reverse money automatically.; review item 93 set aside from clearing: repair and resubmit it, or close it with its customer"
+  },
+  "sbar": {
+    "situation": "The bank is recovered: the main payment journey now passes end to end, and the last recovery check at 54 s was clean. One problem remains: the ledger data check reports 95 duplicate payments.",
+    "background": "Payments was deployed from 1.3 to 1.5 and was live for about 24 s, during which the ledger began showing duplicate payments. At the same time, screening slowed to 1824 ms p95 against a 15 ms baseline, and the clearing worker crashed on item 93 with a JSONDecodeError.",
+    "assessment": "The incident commander made each fix itself: it failed screening over to its standby (done), rolled payments back from 1.5 to 1.3 (done), set aside clearing item 93 (done) and restarted clearing (done). Screening slowness and the clearing poison message were each 0.85 confidence causes, and the payments 1.5 bad release was 0.6. The 95 duplicate payments most likely came from release 1.5, and no allowed action can correct ledger data.",
+    "recommendation": "Payments operations and finance must reconcile the 95 duplicate payments by hand, coordinating with clearing and the network on any already cleared, and must not move money or edit postings automatically; this is escalated (soon) to the on-call engineer and the operations team. The operations team must review clearing item 93 and either repair and resubmit it or close it with its customer. Release 1.5 must be fixed before it is redeployed."
+  },
+  "t_start": 1793455980.2332702,
+  "t_first_action": 1793455981.366186,
+  "t_declared": 1793456034.3458176,
+  "trace": [
+    {
+      "t": 0.02,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 24.9
+      }
+    },
+    {
+      "t": 0.1,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: clearing",
+      "data": {
+        "ms": 78.1
+      }
+    },
+    {
+      "t": 1.13,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at payments",
+      "data": {
+        "ms": 1029.5
+      }
+    },
+    {
+      "t": 1.13,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "14 fault findings, 21 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "88% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "88% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "p95 1040 ms (baseline 60 ms)"
+          },
+          {
+            "id": "B2",
+            "letter": "B",
+            "component": "payments",
+            "severity": "fault",
+            "text": "p95 1029 ms (baseline 47 ms)"
+          },
+          {
+            "id": "B3",
+            "letter": "B",
+            "component": "screening",
+            "severity": "fault",
+            "text": "p95 1824 ms (baseline 15 ms)"
+          },
+          {
+            "id": "B4",
+            "letter": "B",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "backlog: 53 items waiting, oldest 14 s; first item 93 waiting 14 s after 0 attempt(s)"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "down (not answering)"
+          },
+          {
+            "id": "C2",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "process exited 1 time(s) in 15 min, last 13 s ago (exit code 1)"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 88%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments are slow: p95 1040 ms (payments itself answered in 47 ms at baseline)"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening fail: 100%"
+          },
+          {
+            "id": "D4",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening are slow: p95 1028 ms (screening itself answered in 15 ms at baseline)"
+          },
+          {
+            "id": "D5",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 16"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "11 s ago: deploy by operator (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: stop by operator"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "6 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "5 s ago: stop by pipeline"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "5 s ago: start by pipeline (release=4.1)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 1.15,
+      "phase": "survey",
+      "kind": "action",
+      "name": "containment",
+      "summary": "failover screening: done (screening now served by its standby)",
+      "data": {
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 1.17,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 15.3
+      }
+    },
+    {
+      "t": 1.19,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "9 log records from payments",
+      "data": {
+        "ms": 22.7
+      }
+    },
+    {
+      "t": 1.22,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from screening",
+      "data": {
+        "ms": 29.8
+      }
+    },
+    {
+      "t": 1.25,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "2 log records from clearing",
+      "data": {
+        "ms": 29.1
+      }
+    },
+    {
+      "t": 13.51,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 12.258 s"
+    },
+    {
+      "t": 14.22,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 16.24,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "quarantine",
+      "summary": "quarantine clearing: done (clearing item 93 set aside for the operations team)",
+      "data": {
+        "target": "clearing",
+        "params": {
+          "item": 93
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 17.75,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 20.81,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 62.9
+      }
+    },
+    {
+      "t": 22.93,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 2116.3
+      }
+    },
+    {
+      "t": 22.93,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: clearing: backlog: 85 items waiting, oldest 9 s, 50.0 processed/s; first item 294 waiting 9 s after 0 attempt(s); ledger: data check failed: duplicate payments = 95"
+    },
+    {
+      "t": 22.99,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 58.9
+      }
+    },
+    {
+      "t": 23.9,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 914.5
+      }
+    },
+    {
+      "t": 23.9,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "1 fault findings, 16 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "screening",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 9.1/s): moved to its standby"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "info",
+            "text": "process exited 1 time(s) in 15 min, last 36 s ago (exit code 1); none since the action taken on it 7 s ago"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "screening",
+            "severity": "info",
+            "text": "served by its standby"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "clearing",
+            "severity": "info",
+            "text": "1 item(s) already set aside"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 95"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "34 s ago: deploy by operator (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "30 s ago: stop by operator"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "30 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "29 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "29 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "28 s ago: stop by pipeline"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "28 s ago: start by pipeline (release=4.1)"
+          },
+          {
+            "id": "E8",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "22 s ago: failover by incident-commander (from=primary, to=standby)"
+          },
+          {
+            "id": "E9",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "9 s ago: deploy by incident-commander (from=1.5, to=1.3, rollback=True)"
+          },
+          {
+            "id": "E10",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "7 s ago: quarantine by incident-commander (item=93)"
+          },
+          {
+            "id": "E11",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "6 s ago: restart by incident-commander (release=3.2)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 23.91,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 1.5
+      }
+    },
+    {
+      "t": 36.03,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 12.124 s"
+    },
+    {
+      "t": 36.03,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate payments (soon) to the on-call engineer"
+    },
+    {
+      "t": 37.11,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 80.8
+      }
+    },
+    {
+      "t": 38.0,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 891.7
+      }
+    },
+    {
+      "t": 38.0,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: ledger: data check failed: duplicate payments = 95"
+    },
+    {
+      "t": 38.11,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 110.0
+      }
+    },
+    {
+      "t": 39.22,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1108.1
+      }
+    },
+    {
+      "t": 39.22,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "1 fault findings, 16 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "screening",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 9.1/s): moved to its standby"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "info",
+            "text": "process exited 1 time(s) in 15 min, last 51 s ago (exit code 1); none since the action taken on it 22 s ago"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "screening",
+            "severity": "info",
+            "text": "served by its standby"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "clearing",
+            "severity": "info",
+            "text": "1 item(s) already set aside"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 95"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "49 s ago: deploy by operator (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "46 s ago: stop by operator"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "45 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "45 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "44 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "43 s ago: stop by pipeline"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "43 s ago: start by pipeline (release=4.1)"
+          },
+          {
+            "id": "E8",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "37 s ago: failover by incident-commander (from=primary, to=standby)"
+          },
+          {
+            "id": "E9",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "25 s ago: deploy by incident-commander (from=1.5, to=1.3, rollback=True)"
+          },
+          {
+            "id": "E10",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "22 s ago: quarantine by incident-commander (item=93)"
+          },
+          {
+            "id": "E11",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "21 s ago: restart by incident-commander (release=3.2)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 39.24,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 21.1
+      }
+    },
+    {
+      "t": 52.07,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 12.828 s"
+    },
+    {
+      "t": 52.07,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate ledger (soon) to the on-call engineer"
+    },
+    {
+      "t": 53.17,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 98.1
+      }
+    },
+    {
+      "t": 54.11,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 943.2
+      }
+    },
+    {
+      "t": 54.11,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: clean"
+    },
+    {
+      "t": 54.11,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 59.74,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 5.625 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 4390,
+      "output_tokens": 1203,
+      "latency_s": 12.258,
+      "estimated_cost_usd": 0.04162,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 4028,
+      "output_tokens": 1165,
+      "latency_s": 12.124,
+      "estimated_cost_usd": 0.039412,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 4028,
+      "output_tokens": 1168,
+      "latency_s": 12.828,
+      "estimated_cost_usd": 0.039472,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1368,
+      "output_tokens": 471,
+      "latency_s": 5.625,
+      "estimated_cost_usd": 0.014892,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 23,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793455981.366186,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "calls to screening are slow (p95 1028 ms) and the main journey fails",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793455993.7418702,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: Payments was deployed from 1.3 to 1.5 11 s ago, and the ledger data check now fails with 'duplicate payments = 16'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "event": "act",
+      "t": 1793455996.4553587,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 93
+      },
+      "reason": "poison_message: The clearing worker is down after 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The backlog is stuck behind item 93, which has 0 attempts.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 93 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793455997.4716377,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: The clearing worker is down after 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The backlog is stuck behind item 93, which has 0 attempts.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ]
+}

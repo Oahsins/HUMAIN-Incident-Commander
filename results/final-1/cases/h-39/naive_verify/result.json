@@ -1,0 +1,404 @@
+{
+  "arm": "naive_verify",
+  "mode": "auto",
+  "outcome": "escalated",
+  "root_causes": [
+    {
+      "target": "gateway",
+      "class": "process_down",
+      "confidence": 0.85,
+      "evidence": "Finding C1 shows 'gateway: down (not answering)' and the probe failed at step 'gateway' with 'timeout: no answer within 3.0s'. The gateway has no recent changes and no errors."
+    },
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.8,
+      "evidence": "Finding B2 shows 'lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)', which blocks ledger writes for payments and clearing."
+    },
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.6,
+      "evidence": "Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)' (finding C3: exited 1 time(s), exit code 1). It is now down with 20 items backed up (finding B1)."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793456579.402059,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: Finding B2 shows 'lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)', which blocks ledger writes for payments and clearing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793456580.4838412,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: Finding C1 shows 'gateway: down (not answering)' and the probe failed at step 'gateway' with 'timeout: no answer within 3.0s'. The gateway has no recent changes and no errors.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    },
+    {
+      "t": 1793456583.1723018,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)' (finding C3: exited 1 time(s), exit code 1). It is now down with 20 items backed up (finding B1).",
+      "sent": true,
+      "ok": false,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted, but it is not answering health checks"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "clearing"
+    ],
+    "class": "poison_message",
+    "reason": "Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)' (finding C3: exited 1 time(s), exit code 1). It is now down with 20 items backed up (finding B1).",
+    "urgency": "now",
+    "to": "the on-call engineer",
+    "ask": "The crashing item's id is not in the truncated log. An engineer must identify the malformed queued item from the full traceback so it can be quarantined."
+  },
+  "sbar": {
+    "situation": "The gateway is back and the ledger lock is cleared, and one recovery check at 30 s came back clean. The clearing worker is still down after a restart and is not answering health checks, so this incident is escalated.",
+    "background": "The gateway process stopped answering, so every payment timed out at the first step, with no recent changes or errors on the gateway. The reconciliation job held a write lock on the ledger for 11.4 s, and the clearing worker crashed on a malformed queue item with a JSONDecodeError in parse, leaving 20 items backed up.",
+    "assessment": "The incident commander itself ended the reconciliation session holding the ledger lock, which worked, and restarted the gateway, which also worked. It also restarted clearing, but that failed: clearing came up and is not answering health checks, most likely because the malformed item is still at the head of its queue.",
+    "recommendation": "The on-call engineer must find the malformed item's id in the full clearing traceback, because the truncated log does not show it. Then quarantine that item and restart clearing. Operations should review the payments that timed out while the gateway was down, the 20 backed-up clearing items, and the reconciliation batch that was ended before it finished."
+  },
+  "t_start": 1793456558.788515,
+  "t_first_action": 1793456579.402059,
+  "t_declared": 1793456588.5957425,
+  "trace": [
+    {
+      "t": 0.04,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 39.4
+      }
+    },
+    {
+      "t": 1.15,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: gateway, clearing",
+      "data": {
+        "ms": 1108.2
+      }
+    },
+    {
+      "t": 4.2,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at gateway",
+      "data": {
+        "ms": 3050.6
+      }
+    },
+    {
+      "t": 4.2,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "6 fault findings, 11 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "payments",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 11.7/s), less work from its callers"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "screening",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 9.3/s), less work from its callers"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "payment journey fails at step 'gateway': timeout: no answer within 3.0s"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "backlog: 20 items waiting, oldest 16 s; first item 94 waiting 16 s after 0 attempt(s)"
+          },
+          {
+            "id": "B2",
+            "letter": "B",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "down (not answering)"
+          },
+          {
+            "id": "C2",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "down (not answering)"
+          },
+          {
+            "id": "C3",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "process exited 1 time(s) in 15 min, last 15 s ago (exit code 1)"
+          },
+          {
+            "id": "C4",
+            "letter": "C",
+            "component": "reconciliation",
+            "severity": "info",
+            "text": "job running"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: start by ops-maintenance (release=4.1)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 4.22,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 24.3
+      }
+    },
+    {
+      "t": 4.24,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "2 log records from clearing",
+      "data": {
+        "ms": 12.6
+      }
+    },
+    {
+      "t": 4.24,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 1.3
+      }
+    },
+    {
+      "t": 20.61,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 16.376 s"
+    },
+    {
+      "t": 20.7,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 22.38,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart gateway: done (gateway restarted)",
+      "data": {
+        "target": "gateway",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 24.92,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: failed (clearing restarted, but it is not answering health checks)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": false,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 24.92,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate clearing (now) to the on-call engineer"
+    },
+    {
+      "t": 26.01,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: clearing",
+      "data": {
+        "ms": 89.0
+      }
+    },
+    {
+      "t": 29.81,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at clearing",
+      "data": {
+        "ms": 3795.0
+      }
+    },
+    {
+      "t": 29.81,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: clean"
+    },
+    {
+      "t": 29.81,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "escalated"
+    },
+    {
+      "t": 34.82,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 5.017 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 3729,
+      "output_tokens": 1692,
+      "latency_s": 16.376,
+      "estimated_cost_usd": 0.048756,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1152,
+      "output_tokens": 390,
+      "latency_s": 5.017,
+      "estimated_cost_usd": 0.012408,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 11,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793456579.402059,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: Finding B2 shows 'lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)', which blocks ledger writes for payments and clearing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793456580.4838412,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: Finding C1 shows 'gateway: down (not answering)' and the probe failed at step 'gateway' with 'timeout: no answer within 3.0s'. The gateway has no recent changes and no errors.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793456583.1723018,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)' (finding C3: exited 1 time(s), exit code 1). It is now down with 20 items backed up (finding B1).",
+      "sent": true,
+      "ok": false,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted, but it is not answering health checks"
+    }
+  ]
+}

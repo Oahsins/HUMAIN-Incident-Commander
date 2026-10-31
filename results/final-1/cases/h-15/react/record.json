@@ -1,0 +1,675 @@
+{
+  "case": {
+    "id": "h-15",
+    "input": {
+      "system": "bank",
+      "seed": 260015,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "crash",
+          "at_s": 0,
+          "params": {
+            "target": "clearing"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 2,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "clearing",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "react",
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.9,
+        "evidence": "Reconciliation session held a write lock on accounts for 13 s+, ledger write_errors 107 and payments error rate 42%; after release_lock write errors went to 0 and payments errors to 0."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "Clearing was down (exit code 15, no errors in its logs) and the queue was building with the head item at 0 attempts; after restart it processed 12.9/s and the queue drained to 1."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793454191.5232027,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "Reconciliation holds a write lock on the ledger, causing payment write errors; release it first, then look at clearing which is down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793454197.3404708,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Clearing exited with code 15 (terminated) and logs show no errors, so no poison item is indicated; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Payments have recovered and recovery was confirmed on two clean looks in a row, the last at 38 s. Payments error rate is 0, p95 is at baseline, and the probe journey passes end to end.",
+      "background": "A reconciliation session held a write lock on the accounts table in the ledger for over 13 s, causing 107 ledger write errors and a 42% payments error rate. At the same time clearing was down (exit code 15, no errors in its logs) and its queue was building, with the head item at 0 attempts.",
+      "assessment": "The incident commander itself ended the reconciliation session holding the ledger lock, and ledger write errors and payments errors dropped to 0 (confidence 0.9). It also restarted clearing itself, which then processed 12.9 items/s and drained the queue to 1 (confidence 0.8). The operator restart of screening-standby was benign.",
+      "recommendation": "Find out why reconciliation held a long write lock on accounts and why clearing exited with code 15, and prevent both from recurring. Ledger integrity is clean with no unbalanced or duplicate payments, so the operations team has no money or data effects to review."
+    },
+    "t_start": 1793454185.5020752,
+    "t_first_action": 1793454191.5232027,
+    "t_declared": 1793454223.7615645,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 37.5
+        }
+      },
+      {
+        "t": 2.68,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.637 s"
+      },
+      {
+        "t": 2.68,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all components to see symptoms and recent changes."
+      },
+      {
+        "t": 2.8,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 124.5
+        }
+      },
+      {
+        "t": 6.02,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.221 s"
+      },
+      {
+        "t": 6.02,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Reconciliation holds a write lock on the ledger, causing payment write errors; release it first, then look at clearing which is down."
+      },
+      {
+        "t": 6.11,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 9.04,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.934 s"
+      },
+      {
+        "t": 9.04,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Lock released; now check clearing logs to see why it exited (exit code 15 = SIGTERM, maybe killed)."
+      },
+      {
+        "t": 9.06,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from clearing",
+        "data": {
+          "ms": 20.8
+        }
+      },
+      {
+        "t": 11.84,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.775 s"
+      },
+      {
+        "t": 11.84,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Clearing exited with code 15 (terminated) and logs show no errors, so no poison item is indicated; restart it."
+      },
+      {
+        "t": 12.46,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.9,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.431 s"
+      },
+      {
+        "t": 14.9,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Observe to verify recovery after lock release and clearing restart."
+      },
+      {
+        "t": 14.97,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 70.5
+        }
+      },
+      {
+        "t": 18.45,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.481 s"
+      },
+      {
+        "t": 18.45,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Payments error rate over the window may still include pre-release failures; probe the journey to check its current state."
+      },
+      {
+        "t": 19.54,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1091.4
+        }
+      },
+      {
+        "t": 22.72,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.183 s"
+      },
+      {
+        "t": 22.72,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The probe passes, but the 30 s window still overlaps the lock period, so I'll observe a short recent window to confirm payments errors have cleared."
+      },
+      {
+        "t": 22.81,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 91.6
+        }
+      },
+      {
+        "t": 28.32,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.506 s"
+      },
+      {
+        "t": 28.32,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: All components are back at baseline: no errors, no write errors, and the clearing queue is draining. The two root causes were the reconciliation lock on the ledger and the clearing process that was down (exit 15, no errors in its logs)."
+      },
+      {
+        "t": 32.37,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 49.9
+        }
+      },
+      {
+        "t": 33.28,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 904.8
+        }
+      },
+      {
+        "t": 33.28,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 37.37,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 95.4
+        }
+      },
+      {
+        "t": 38.26,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 887.1
+        }
+      },
+      {
+        "t": 38.26,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 38.26,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 42.89,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.634 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 88,
+        "latency_s": 2.637,
+        "estimated_cost_usd": 0.01266,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4475,
+        "output_tokens": 166,
+        "latency_s": 3.221,
+        "estimated_cost_usd": 0.02122,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4641,
+        "output_tokens": 110,
+        "latency_s": 2.934,
+        "estimated_cost_usd": 0.020764,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4767,
+        "output_tokens": 109,
+        "latency_s": 2.775,
+        "estimated_cost_usd": 0.021248,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4919,
+        "output_tokens": 89,
+        "latency_s": 2.431,
+        "estimated_cost_usd": 0.021456,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6837,
+        "output_tokens": 167,
+        "latency_s": 3.481,
+        "estimated_cost_usd": 0.030688,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7178,
+        "output_tokens": 163,
+        "latency_s": 3.183,
+        "estimated_cost_usd": 0.031972,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 9117,
+        "output_tokens": 422,
+        "latency_s": 5.506,
+        "estimated_cost_usd": 0.044908,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 902,
+        "output_tokens": 377,
+        "latency_s": 4.634,
+        "estimated_cost_usd": 0.011148,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 12,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793454191.5232027,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "Reconciliation holds a write lock on the ledger, causing payment write errors; release it first, then look at clearing which is down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793454197.3404708,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Clearing exited with code 15 (terminated) and logs show no errors, so no poison item is indicated; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793454305.098123,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793454275.098,
+      1793454295.098
+    ],
+    "journeys": {
+      "n": 215,
+      "ok": 215,
+      "success_rate": 1.0,
+      "p95_ms": 71.0000991821289,
+      "payments": {
+        "n": 160,
+        "ok": 160
+      },
+      "balances": {
+        "n": 55,
+        "fresh": 55
+      },
+      "p95_allowed_ms": 326.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793454173.0162797,
+      "until_t": 1793454295.098123,
+      "breach_seconds": 20.0,
+      "failed_journeys": 40,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 37,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "crash",
+      "target": "clearing",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793454173.0162797,
+      "at_s": 0
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 89096,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793454180.034083,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793454180.097705,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793454191.6080537,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793454197.9643693,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793454191.5232027,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "Reconciliation holds a write lock on the ledger, causing payment write errors; release it first, then look at clearing which is down.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793454197.3404708,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Clearing exited with code 15 (terminated) and logs show no errors, so no poison item is indicated; restart it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793454173.0162797,
+    "t_alert": 1793454185.097705,
+    "horizon": 1793454295.097705,
+    "verdict_t": 1793454305.1811619
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

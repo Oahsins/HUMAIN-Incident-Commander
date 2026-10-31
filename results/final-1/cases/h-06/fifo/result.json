@@ -1,0 +1,213 @@
+{
+  "arm": "fifo",
+  "mode": "auto",
+  "outcome": "escalated",
+  "root_causes": [
+    {
+      "target": "network",
+      "class": "external_outage",
+      "confidence": 0.93,
+      "evidence": "[D3] network down (not answering), [D4] 100% of requests fail (run by another organisation); clearing log 'payment network timeout; item stays pending item_id=92'."
+    }
+  ],
+  "actions": [],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "network"
+    ],
+    "class": "external_outage",
+    "reason": "[D3] network down (not answering), [D4] 100% of requests fail (run by another organisation); clearing log 'payment network timeout; item stays pending item_id=92'.",
+    "urgency": "now",
+    "to": "the organisation that runs network",
+    "ask": "Contact the national payment network operator to restore their service. The clearing queue (116 items) will drain once the network answers again; do not quarantine item 92, because it is not poison."
+  },
+  "sbar": {
+    "situation": "Recovery is not confirmed: the national payment network is still down and 100% of calls from the clearing worker time out at about 2 s. The clearing queue holds 116 items and is growing.",
+    "background": "The national payment network, run by an outside organisation, stopped answering, so the clearing worker cannot send payments. The clearing log shows 'payment network timeout; item stays pending item_id=92'.",
+    "assessment": "The root cause is an outage of the external payment network (confidence 0.93), and no allowed action can fix it. Item 92 is waiting because of the network timeout, not because it is malformed, so it is not poison. The pipeline's restart of the screening standby is routine and caused no symptom.",
+    "recommendation": "The incident commander escalated this itself to the network operator and asked them to restore service, so follow up with them until the network answers. Do not quarantine item 92; the 116-item clearing queue should drain once the network is back, and the operations team should review the delayed payments."
+  },
+  "t_start": 1793457193.0249503,
+  "t_first_action": null,
+  "t_declared": 1793457203.4246418,
+  "trace": [
+    {
+      "t": 0.05,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 49.0
+      }
+    },
+    {
+      "t": 1.17,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components; down: network",
+      "data": {
+        "ms": 1117.0
+      }
+    },
+    {
+      "t": 4.92,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at clearing",
+      "data": {
+        "ms": 3753.2
+      }
+    },
+    {
+      "t": 4.92,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "7 fault findings, 10 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "payment journey fails at step 'clearing': not cleared within 3 s (still pending)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "backlog: 116 items waiting, oldest 13 s, 0.0 processed/s; first item 92 waiting 13 s after 5 attempt(s)"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "calls to network fail: 100%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "clearing",
+            "severity": "fault",
+            "text": "calls to network are slow: p95 2026 ms (network itself answered in 29 ms at baseline)"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "network",
+            "severity": "fault",
+            "text": "down (not answering)"
+          },
+          {
+            "id": "D4",
+            "letter": "D",
+            "component": "network",
+            "severity": "fault",
+            "text": "100% of requests fail (baseline 0%) (run by another organisation)"
+          },
+          {
+            "id": "D5",
+            "letter": "D",
+            "component": "network",
+            "severity": "info",
+            "text": "traffic 0.5/s (baseline 9.1/s), less work from its callers (run by another organisation)"
+          },
+          {
+            "id": "D6",
+            "letter": "D",
+            "component": "network",
+            "severity": "fault",
+            "text": "p95 2026 ms (baseline 29 ms) (run by another organisation)"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: stop by pipeline"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "7 s ago: start by pipeline (release=4.1)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 4.93,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "8 log records from clearing",
+      "data": {
+        "ms": 10.7
+      }
+    },
+    {
+      "t": 10.4,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 5.469 s"
+    },
+    {
+      "t": 10.4,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate network (now) to the organisation that runs network"
+    },
+    {
+      "t": 10.4,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "escalated"
+    },
+    {
+      "t": 14.51,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 4.105 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 3617,
+      "output_tokens": 474,
+      "latency_s": 5.469,
+      "estimated_cost_usd": 0.023948,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 799,
+      "output_tokens": 320,
+      "latency_s": 4.105,
+      "estimated_cost_usd": 0.009596,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 4,
+  "audit": []
+}

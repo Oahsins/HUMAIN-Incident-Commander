@@ -1,0 +1,552 @@
+{
+  "arm": "abcde",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.85,
+      "evidence": "Payments logs show 'fraud screening timeout via primary ... timeout_s=1.0'. D3/D4 report calls to screening fail 61% with p95 1023 ms against a 15 ms baseline, and the probe fails at 'payments': 503 screening unavailable (timeout)."
+    },
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.9,
+      "evidence": "B3 reports 'lock held by session reconciliation (write) for 10.5 s', with 36 failed writes, and payments logs show 'ledger write failed: database is locked'."
+    },
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.7,
+      "evidence": "E1 shows payments was deployed 1.3→1.5 15 s ago, followed by response_unavailable warnings, and D5 reports the data check failed with 'duplicate payments = 28'."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.6,
+      "evidence": "E2 shows balance_cache_ttl_s changed from 0.5 to 600.0 13 s ago. A 10-minute balance cache means a balance will not show a new payment, which is a hidden fault while payments are failing."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793450737.7198312,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "calls to screening are slow (p95 1023 ms) and the main journey fails",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793450752.1845784,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: B3 reports 'lock held by session reconciliation (write) for 10.5 s', with 36 failed writes, and payments logs show 'ledger write failed: database is locked'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793450753.268997,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: E1 shows payments was deployed 1.3→1.5 15 s ago, followed by response_unavailable warnings, and D5 reports the data check failed with 'duplicate payments = 28'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "t": 1793450755.9714665,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: E2 shows balance_cache_ttl_s changed from 0.5 to 600.0 13 s ago. A 10-minute balance cache means a balance will not show a new payment, which is a hidden fault while payments are failing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": {
+    "components": [
+      "ledger"
+    ],
+    "class": null,
+    "reason": "past damage, no longer growing: data check failed: duplicate payments = 38",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "find and put right the records behind 'data check failed: duplicate payments = 38'; the incident commander cannot change data"
+  },
+  "sbar": {
+    "situation": "The bank system has recovered: the last two recovery checks, ending at 36 s, ran the main journey cleanly. Ledger data still holds duplicate payments that need correcting.",
+    "background": "Payments was deployed from release 1.3 to 1.5, and the gateway balance_cache_ttl_s was changed by an operator from 0.5 to 600 s. Primary fraud screening began timing out, and a reconciliation session held a write lock on the ledger.",
+    "assessment": "Primary screening timed out (p95 1023 ms against 15 ms), so the incident commander failed screening over to its standby, and that worked. The commander also ended the reconciliation session holding the ledger lock, which cleared it, and rolled payments back from 1.5 to 1.3 to stop duplicate payments. It then restored gateway balance_cache_ttl_s from 600 to 0.5 so balances are no longer stale.",
+    "recommendation": "The operations team has been asked (soon priority) to find and correct the ledger records behind 'duplicate payments = 38', and to review any money effect on customers; the incident commander cannot change data. Find out why primary screening slowed before failing back, and fix payments 1.5 before redeploying it."
+  },
+  "t_start": 1793450736.51327,
+  "t_first_action": 1793450737.7198312,
+  "t_declared": 1793450772.8156114,
+  "trace": [
+    {
+      "t": 0.05,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "bank: 8 components",
+      "data": {
+        "ms": 54.6
+      }
+    },
+    {
+      "t": 0.18,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 120.5
+      }
+    },
+    {
+      "t": 1.21,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at payments",
+      "data": {
+        "ms": 1030.9
+      }
+    },
+    {
+      "t": 1.21,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "12 fault findings, 17 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "89% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "99% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "p95 1203 ms (baseline 59 ms)"
+          },
+          {
+            "id": "B2",
+            "letter": "B",
+            "component": "payments",
+            "severity": "fault",
+            "text": "p95 1196 ms (baseline 44 ms)"
+          },
+          {
+            "id": "B3",
+            "letter": "B",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "lock held by session reconciliation (write) for 10.5 s: UPDATE accounts SET ... (reconciliation batch)"
+          },
+          {
+            "id": "B4",
+            "letter": "B",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "36 failed writes in the window"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "reconciliation",
+            "severity": "info",
+            "text": "job running"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 99%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments are slow: p95 1203 ms (payments itself answered in 44 ms at baseline)"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening fail: 61%"
+          },
+          {
+            "id": "D4",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening are slow: p95 1023 ms (screening itself answered in 15 ms at baseline)"
+          },
+          {
+            "id": "D5",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 28"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "15 s ago: deploy by ops-maintenance (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "gateway",
+            "severity": "info",
+            "text": "13 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "6 s ago: stop by operator"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "6 s ago: start by operator (release=4.1)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 1.21,
+      "phase": "survey",
+      "kind": "action",
+      "name": "containment",
+      "summary": "failover screening: done (screening now served by its standby)",
+      "data": {
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 1.25,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 33.2
+      }
+    },
+    {
+      "t": 1.28,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "10 log records from payments",
+      "data": {
+        "ms": 33.0
+      }
+    },
+    {
+      "t": 1.3,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 19.0
+      }
+    },
+    {
+      "t": 15.67,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 14.371 s"
+    },
+    {
+      "t": 15.76,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 17.46,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 19.48,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 25.56,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 85.8
+      }
+    },
+    {
+      "t": 26.45,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 890.7
+      }
+    },
+    {
+      "t": 26.45,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: ledger: data check failed: duplicate payments = 38"
+    },
+    {
+      "t": 30.54,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 81.4
+      }
+    },
+    {
+      "t": 31.47,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 934.3
+      }
+    },
+    {
+      "t": 31.47,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 35.56,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 86.6
+      }
+    },
+    {
+      "t": 36.3,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 744.9
+      }
+    },
+    {
+      "t": 36.3,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 3: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 36.3,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 43.18,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 6.877 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 4187,
+      "output_tokens": 1504,
+      "latency_s": 14.371,
+      "estimated_cost_usd": 0.046828,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 1306,
+      "output_tokens": 403,
+      "latency_s": 6.877,
+      "estimated_cost_usd": 0.013284,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 16,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793450737.7198312,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "calls to screening are slow (p95 1023 ms) and the main journey fails",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793450752.1845784,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: B3 reports 'lock held by session reconciliation (write) for 10.5 s', with 36 failed writes, and payments logs show 'ledger write failed: database is locked'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793450753.268997,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: E1 shows payments was deployed 1.3→1.5 15 s ago, followed by response_unavailable warnings, and D5 reports the data check failed with 'duplicate payments = 28'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "event": "act",
+      "t": 1793450755.9714665,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: E2 shows balance_cache_ttl_s changed from 0.5 to 600.0 13 s ago. A 10-minute balance cache means a balance will not show a new payment, which is a hidden fault while payments are failing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ]
+}

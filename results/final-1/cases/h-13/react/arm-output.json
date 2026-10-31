@@ -1,0 +1,445 @@
+{
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.92,
+        "evidence": "Clearing exited with code 1 on a JSONDecodeError while parsing head item 91 (attempts 0), and the queue backed up to 144. After quarantining item 91 and restarting, it drains at about 6/s, the network answers normally and the probe clears."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793454196.3996778,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 91
+        },
+        "reason": "Clearing crashed with a JSON parse error on the queue head, so item 91 looks like a poison message. Quarantine it, then restart the worker.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 91 set aside for the operations team"
+      },
+      {
+        "t": 1793454198.9874644,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 91 is quarantined; now restart the clearing worker so it drains the queue.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 91 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 91 set aside from clearing: repair and resubmit it, or close it with its customer"
+    },
+    "sbar": {
+      "situation": "Clearing is running again and its queue is draining at about 6 items per second. Recovery was confirmed by two clean checks in a row, the last at 36 seconds.",
+      "background": "Clearing exited with code 1 on a JSONDecodeError while parsing head item 91, and its queue backed up to 144 items. Screening-standby had been restarted by the scheduler and an operator before the incident; it is healthy and unchanged.",
+      "assessment": "The root cause was a malformed message, item 91, on clearing (confidence 0.92). The incident commander quarantined item 91, which succeeded, then restarted clearing, which also succeeded; the network now answers normally and the probe passes.",
+      "recommendation": "The operations team has been asked (priority: soon) to review quarantined clearing item 91 and either repair and resubmit it or close it with its customer. Until then that payment has not cleared, so confirm the team follows up and watch that the clearing queue keeps draining."
+    },
+    "t_start": 1793454187.2115126,
+    "t_first_action": 1793454196.3996778,
+    "t_declared": 1793454223.3258128,
+    "trace": [
+      {
+        "t": 0.06,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 61.2
+        }
+      },
+      {
+        "t": 2.5,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.437 s"
+      },
+      {
+        "t": 2.5,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing metrics across all components."
+      },
+      {
+        "t": 2.6,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 95.9
+        }
+      },
+      {
+        "t": 5.34,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.746 s"
+      },
+      {
+        "t": 5.34,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Clearing is down with exit code 1 and the queue is backing up; check its logs to see if head item 91 is poison."
+      },
+      {
+        "t": 5.38,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 35.1
+        }
+      },
+      {
+        "t": 9.19,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.81 s"
+      },
+      {
+        "t": 9.19,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Clearing crashed with a JSON parse error on the queue head, so item 91 looks like a poison message. Quarantine it, then restart the worker."
+      },
+      {
+        "t": 9.22,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 91 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 91
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 11.78,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.56 s"
+      },
+      {
+        "t": 11.78,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Item 91 is quarantined; now restart the clearing worker so it drains the queue."
+      },
+      {
+        "t": 12.41,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.96,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.545 s"
+      },
+      {
+        "t": 14.96,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Observe again to confirm clearing is draining and to check for any hidden faults downstream (network) or elsewhere."
+      },
+      {
+        "t": 15.07,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 109.4
+        }
+      },
+      {
+        "t": 18.5,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.434 s"
+      },
+      {
+        "t": 18.5,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Clearing is draining and the network answers normally; run a probe to confirm the full payment journey, including the balance shown."
+      },
+      {
+        "t": 19.56,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1059.3
+        }
+      },
+      {
+        "t": 26.23,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.665 s"
+      },
+      {
+        "t": 26.23,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: The payment journey passes end to end, clearing is draining with no new crashes, and the screening-standby restarts left it healthy and unchanged. Declaring the system recovered."
+      },
+      {
+        "t": 30.31,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 80.7
+        }
+      },
+      {
+        "t": 31.25,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 940.9
+        }
+      },
+      {
+        "t": 31.25,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 35.35,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 103.4
+        }
+      },
+      {
+        "t": 36.11,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 763.1
+        }
+      },
+      {
+        "t": 36.11,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 36.11,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 40.67,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.559 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 81,
+        "latency_s": 2.437,
+        "estimated_cost_usd": 0.01252,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4525,
+        "output_tokens": 109,
+        "latency_s": 2.746,
+        "estimated_cost_usd": 0.02028,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4776,
+        "output_tokens": 228,
+        "latency_s": 3.81,
+        "estimated_cost_usd": 0.023664,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4976,
+        "output_tokens": 117,
+        "latency_s": 2.56,
+        "estimated_cost_usd": 0.022244,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5136,
+        "output_tokens": 106,
+        "latency_s": 2.545,
+        "estimated_cost_usd": 0.022664,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7180,
+        "output_tokens": 191,
+        "latency_s": 3.434,
+        "estimated_cost_usd": 0.03254,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7528,
+        "output_tokens": 459,
+        "latency_s": 6.665,
+        "estimated_cost_usd": 0.039292,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 864,
+        "output_tokens": 317,
+        "latency_s": 4.559,
+        "estimated_cost_usd": 0.009796,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 11,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793454196.3996778,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 91
+        },
+        "reason": "Clearing crashed with a JSON parse error on the queue head, so item 91 looks like a poison message. Quarantine it, then restart the worker.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 91 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793454198.9874644,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 91 is quarantined; now restart the clearing worker so it drains the queue.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
+  },
+  "error": null
+}

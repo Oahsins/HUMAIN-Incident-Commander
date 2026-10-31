@@ -1,0 +1,543 @@
+{
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "Screening primary was up=false with last exit code 15 (SIGTERM), and payments calls to screening failed at 100%. After restart, screening serves at a p95 of 15 ms with 0 errors and payments errors cleared. What sent the SIGTERM is unknown; the operator's stop/start was on screening-standby, not the primary."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.75,
+        "evidence": "Release 1.5 was deployed about 14 s before the incident. Ledger duplicate payments rose from 0 to 13 to 43 while 1.5 served traffic, and stopped at 43 after the rollback to 1.3. Payments p95 also returned to about 44 ms. Payments logs were not checked, so this rests on timing; the screening timeouts could have contributed to the duplicates."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793454787.7463818,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "Screening primary is down (exit code 15) and payments calls to it fail 100%; restart screening first, then check whether the new payments release 1.5 also causes errors.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "t": 1793454795.3062947,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Screening is healthy again, but the ledger now shows 13 duplicate payments since traffic resumed through payments 1.5, which was deployed just before the incident; roll back payments to stop further duplicates.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "ledger"
+      ],
+      "class": null,
+      "reason": "The journey passes and duplicates have stopped at 43, but those duplicate payments already in the ledger need a person to reconcile them, since money must not be moved or reversed by me. Escalate that cleanup before declaring done.",
+      "urgency": "now",
+      "to": "the on-call engineer",
+      "ask": "Payments release 1.5 (now rolled back to 1.3) created 43 duplicate payments in the ledger. They have probably also been cleared to the network. Count has held at 43 since the rollback; the ledger is balanced (0 unbalanced). Needed: a person runs reconciliation, identifies the duplicates, and handles customer and network reversals or refunds through the proper finance process. Also needed: fix release 1.5 before it is redeployed. Separately, screening primary exited with code 15 (SIGTERM) and was restarted. Please investigate who or what stopped it."
+    },
+    "sbar": {
+      "situation": "Payments and screening are working again after actions taken by the incident commander, and recovery is confirmed (two clean checks in a row, the last at 59 s). The incident is escalated because 43 duplicate payments remain in the ledger.",
+      "background": "Payments release 1.5 was deployed about 14 s before the incident. Around the same time the screening primary stopped with exit code 15 (SIGTERM), and payments calls to screening failed at 100%.",
+      "assessment": "The incident commander restarted the screening primary, which now serves at a p95 of 15 ms with 0 errors, and rolled payments back from 1.5 to 1.3, after which duplicates stopped at 43 and payments p95 returned to about 44 ms. Release 1.5 is the likely cause of the duplicates (confidence 0.75), but this rests on timing only, since payments logs were not checked and the screening failures may have contributed. Gateway errors are 0, the payment probe passes end to end, and the ledger is balanced.",
+      "recommendation": "The ledger on-call engineer must run reconciliation, identify the 43 duplicate payments, and handle customer and network reversals or refunds through the finance process, because they have probably been cleared to the network. This is for the operations team to review. Keep payments on 1.3 until 1.5 is fixed, check the payments logs, and find out what sent SIGTERM to the screening primary, since the operator's stop/start was on screening-standby."
+    },
+    "t_start": 1793454780.848842,
+    "t_first_action": 1793454787.7463818,
+    "t_declared": 1793454839.8065634,
+    "trace": [
+      {
+        "t": 0.04,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 40.4
+        }
+      },
+      {
+        "t": 2.69,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.65 s"
+      },
+      {
+        "t": 2.69,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing metrics across all components to see where symptoms are."
+      },
+      {
+        "t": 2.75,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 61.0
+        }
+      },
+      {
+        "t": 6.9,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.145 s"
+      },
+      {
+        "t": 6.9,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Screening primary is down (exit code 15) and payments calls to it fail 100%; restart screening first, then check whether the new payments release 1.5 also causes errors."
+      },
+      {
+        "t": 7.53,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart screening: done (screening restarted)",
+        "data": {
+          "target": "screening",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 10.24,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.713 s"
+      },
+      {
+        "t": 10.24,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Screening restarted; observe again to see whether payments errors persist, which would implicate the payments 1.5 release."
+      },
+      {
+        "t": 10.35,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 105.7
+        }
+      },
+      {
+        "t": 14.46,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.107 s"
+      },
+      {
+        "t": 14.46,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Screening is healthy again, but the ledger now shows 13 duplicate payments since traffic resumed through payments 1.5, which was deployed just before the incident; roll back payments to stop further duplicates."
+      },
+      {
+        "t": 15.16,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 17.72,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.556 s"
+      },
+      {
+        "t": 17.72,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Rollback done; observe again to confirm that errors have cleared and duplicates have stopped growing."
+      },
+      {
+        "t": 17.79,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 69.4
+        }
+      },
+      {
+        "t": 22.0,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.208 s"
+      },
+      {
+        "t": 22.0,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Payments 1.3 looks healthy, but the 15 s window still includes pre-rollback traffic and duplicates rose to 43. Observe a fresh window to confirm the gateway errors are gone and duplicates have stopped growing."
+      },
+      {
+        "t": 22.07,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 66.5
+        }
+      },
+      {
+        "t": 26.4,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.338 s"
+      },
+      {
+        "t": 26.4,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Duplicates have stopped at 43 and gateway errors are falling as the window clears pre-rollback traffic; probe the main journey end to end to confirm it is healthy."
+      },
+      {
+        "t": 27.33,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 922.5
+        }
+      },
+      {
+        "t": 33.55,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.224 s"
+      },
+      {
+        "t": 33.55,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "escalate: The journey passes and duplicates have stopped at 43, but those duplicate payments already in the ledger need a person to reconcile them, since money must not be moved or reversed by me. Escalate that cleanup before declaring done."
+      },
+      {
+        "t": 37.04,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.487 s"
+      },
+      {
+        "t": 37.04,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Before declaring done, check a fresh window to confirm the leftover gateway errors have cleared and nothing else is hidden."
+      },
+      {
+        "t": 37.15,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 107.0
+        }
+      },
+      {
+        "t": 47.96,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 10.812 s"
+      },
+      {
+        "t": 47.96,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: All components are back at baseline and duplicates are holding at 43. The payments diagnosis rests on timing and the duplicate trend rather than logs, so I will mark it with less confidence than the screening outage."
+      },
+      {
+        "t": 53.01,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 51.0
+        }
+      },
+      {
+        "t": 53.9,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 891.9
+        }
+      },
+      {
+        "t": 53.9,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 58.02,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 113.8
+        }
+      },
+      {
+        "t": 58.96,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 940.8
+        }
+      },
+      {
+        "t": 58.96,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 58.96,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "escalated"
+      },
+      {
+        "t": 64.53,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 5.576 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 89,
+        "latency_s": 2.65,
+        "estimated_cost_usd": 0.01268,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4547,
+        "output_tokens": 260,
+        "latency_s": 4.145,
+        "estimated_cost_usd": 0.023388,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4726,
+        "output_tokens": 105,
+        "latency_s": 2.713,
+        "estimated_cost_usd": 0.021004,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6659,
+        "output_tokens": 279,
+        "latency_s": 4.107,
+        "estimated_cost_usd": 0.032216,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6886,
+        "output_tokens": 101,
+        "latency_s": 2.556,
+        "estimated_cost_usd": 0.029564,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8887,
+        "output_tokens": 240,
+        "latency_s": 4.208,
+        "estimated_cost_usd": 0.040348,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 10912,
+        "output_tokens": 256,
+        "latency_s": 4.338,
+        "estimated_cost_usd": 0.048768,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 11278,
+        "output_tokens": 450,
+        "latency_s": 6.224,
+        "estimated_cost_usd": 0.054112,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 11646,
+        "output_tokens": 193,
+        "latency_s": 3.487,
+        "estimated_cost_usd": 0.050444,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 13633,
+        "output_tokens": 944,
+        "latency_s": 10.812,
+        "estimated_cost_usd": 0.073412,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 1295,
+        "output_tokens": 477,
+        "latency_s": 5.576,
+        "estimated_cost_usd": 0.01472,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 13,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793454787.7463818,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "Screening primary is down (exit code 15) and payments calls to it fail 100%; restart screening first, then check whether the new payments release 1.5 also causes errors.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793454795.3062947,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Screening is healthy again, but the ledger now shows 13 duplicate payments since traffic resumed through payments 1.5, which was deployed just before the incident; roll back payments to stop further duplicates.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ]
+  },
+  "error": null
+}
