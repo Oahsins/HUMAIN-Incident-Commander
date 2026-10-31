@@ -2,11 +2,24 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "[C1] screening: down (not answering) and [C2] process exited 1 time(s) in 15 min, last 13 s ago (exit code 15). Payments log still reports 'fraud screening timeout via primary' at 2 s ago, with target=primary."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.7,
+        "evidence": "Event E1 shows payments deployed 1.3 to 1.5 at 33 s ago, and gateway logged 'payments refused the connection' at 34 s ago. Payments still logs response_unavailable with rising occurrences (13 to 18) after screening was failed over at 21 s ago, so the screening timeouts are no longer the cause."
+      }
+    ],
     "actions": [
       {
-        "t": 1793439736.985911,
+        "t": 1793451801.2651744,
         "action": "failover",
         "target": "screening",
         "params": {
@@ -19,52 +32,88 @@
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793451841.64593,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: Survey C1 shows screening down (not answering), and C2 shows its process exited with code 15, 35 s ago, with no exits since the failover at 21 s ago. The standby is carrying traffic, so the primary can be restarted without touching payments.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "t": 1793451844.283883,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "bad_release: Event E1 shows payments deployed 1.3 to 1.5 at 33 s ago, and gateway logged 'payments refused the connection' at 34 s ago. Payments still logs response_unavailable with rising occurrences (13 to 18) after screening was failed over at 21 s ago, so the screening timeouts are no longer the",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
       }
     ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "failover on screening: done",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "ledger",
+        "screening"
+      ],
+      "class": null,
+      "reason": "[C1] screening: down (not answering) and [C2] process exited 1 time(s) in 15 min, last 13 s ago (exit code 15). Payments log still reports 'fraud screening timeout via primary' at 2 s ago, with target=primary.; Event E1 shows payments deployed 1.3 to 1.5 at 33 s ago, and gateway logged 'payments refused the connection' at 34 s ago. Payments still logs response_unavailable with rising occurrences (13 to 18) after screening was failed over at 21 s ago, so the screening timeouts are no longer the cause.; Survey C1 shows screening down (not answering), and C2 shows its process exited with code 15, 35 s ago, with no exits since the failover at 21 s ago. The standby is carrying traffic, so the primary can be restarted without touching payments.",
+      "urgency": "now",
+      "to": "the on-call engineer",
+      "ask": "The primary fraud screening process exits repeatedly with code 15. A restart only buys time, so a person must find the cause of the crash on the primary and fix it before failing back. Fraud screening must stay on, and must not be switched off.; 144 duplicate payments are recorded in the ledger. A person must review and correct them through the bank's own process, since no allowed action may reverse money or edit postings.; The cause of the exit with code 15 is unknown. If the primary exits again, a person must investigate the crash before it is used again."
     },
-    "t_start": 1793439735.8522513,
-    "t_first_action": 1793439736.985911,
-    "t_declared": 1793439737.0856466,
+    "sbar": {
+      "situation": "Recovery is not confirmed: the last check at 58 s was clean for 2 of 2 looks in a row, but the screening primary is still down and the 144 duplicate payments in the ledger are unresolved. The on-call engineer has been escalated for the screening crash and the duplicate payments.",
+      "background": "The payments service was deployed from 1.3 to 1.5 about 33 s before the incident and the gateway then refused its connections. Screening's primary process exited with code 15 once in the last 15 minutes, last 13 s ago. The incident commander itself failed screening over to its standby, restarted screening, and rolled payments back from 1.5 to 1.3.",
+      "assessment": "Root cause on screening is a process_down, with confidence 0.85, because the primary is not answering and exited with code 15. Root cause on payments is a bad_release, with confidence 0.7, because payments returned 503s after the 1.5 deploy and its response_unavailable count kept rising (13 to 18) after screening was failed over. The 144 duplicate payments most likely came from client retries of failed responses, and no allowed action can reverse them.",
+      "recommendation": "Find out why the screening primary exits with code 15 and fix it before failing back. Keep fraud screening on and do not switch it off. A person must review and correct the 144 duplicate payments in the ledger through the bank's own process, because no allowed action may reverse money or edit postings. Check the payments 1.5 release before it is redeployed. If the primary exits again, investigate the crash before using it again."
+    },
+    "t_start": 1793451800.0540655,
+    "t_first_action": 1793451801.2651744,
+    "t_declared": 1793451857.7978902,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 27.9
+          "ms": 41.8
         }
       },
       {
-        "t": 0.1,
+        "t": 0.13,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: screening",
         "data": {
-          "ms": 76.0
+          "ms": 89.1
         }
       },
       {
-        "t": 1.13,
+        "t": 1.21,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 1029.5
+          "ms": 1079.9
         }
       },
       {
-        "t": 1.13,
+        "t": 1.21,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -76,14 +125,14 @@
               "letter": "A",
               "component": "gateway",
               "severity": "fault",
-              "text": "85% of requests fail (baseline 0%)"
+              "text": "86% of requests fail (baseline 0%)"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "payments",
               "severity": "fault",
-              "text": "85% of requests fail (baseline 0%)"
+              "text": "86% of requests fail (baseline 0%)"
             },
             {
               "id": "A3",
@@ -97,14 +146,14 @@
               "letter": "B",
               "component": "gateway",
               "severity": "fault",
-              "text": "p95 1038 ms (baseline 60 ms)"
+              "text": "p95 1044 ms (baseline 60 ms)"
             },
             {
               "id": "B2",
               "letter": "B",
               "component": "payments",
               "severity": "fault",
-              "text": "p95 1028 ms (baseline 46 ms)"
+              "text": "p95 1030 ms (baseline 46 ms)"
             },
             {
               "id": "C1",
@@ -125,14 +174,14 @@
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments fail: 85%"
+              "text": "calls to payments fail: 86%"
             },
             {
               "id": "D2",
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments are slow: p95 1038 ms (payments itself answered in 46 ms at baseline)"
+              "text": "calls to payments are slow: p95 1043 ms (payments itself answered in 46 ms at baseline)"
             },
             {
               "id": "D3",
@@ -153,27 +202,27 @@
               "letter": "E",
               "component": "payments",
               "severity": "info",
-              "text": "11 s ago: deploy by pipeline (from=1.3, to=1.5)"
+              "text": "12 s ago: deploy by pipeline (from=1.3, to=1.5)"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by operator"
+              "text": "6 s ago: stop by operator"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by operator (release=4.1)"
+              "text": "6 s ago: start by operator (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 1.15,
+        "t": 1.23,
         "phase": "survey",
         "kind": "action",
         "name": "containment",
@@ -189,62 +238,374 @@
         }
       },
       {
-        "t": 1.19,
+        "t": 1.25,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "2 log records from gateway",
         "data": {
-          "ms": 35.8
+          "ms": 19.0
         }
       },
       {
-        "t": 1.21,
+        "t": 1.26,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "8 log records from payments",
         "data": {
-          "ms": 16.3
+          "ms": 13.5
         }
       },
       {
-        "t": 1.23,
+        "t": 1.28,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from screening",
         "data": {
-          "ms": 27.6
+          "ms": 15.1
         }
       },
       {
-        "t": 1.23,
+        "t": 15.76,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-haiku-5-5 answered in 14.483 s"
       },
       {
-        "t": 1.23,
+        "t": 15.76,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate screening (now) to the on-call engineer"
+      },
+      {
+        "t": 17.84,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 78.1
+        }
+      },
+      {
+        "t": 17.9,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 64.0
+        }
+      },
+      {
+        "t": 17.9,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: gateway: 41% of requests fail (baseline 0%); payments: 41% of requests fail (baseline 0%); payments: payment journey fails at step 'payments': 503 response temporarily unavailable (+2 more)"
+      },
+      {
+        "t": 22.0,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 96.8
+        }
+      },
+      {
+        "t": 22.04,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 41.0
+        }
+      },
+      {
+        "t": 22.04,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: gateway: 44% of requests fail (baseline 0%); payments: 44% of requests fail (baseline 0%); payments: payment journey fails at step 'payments': 503 response temporarily unavailable (+2 more)"
+      },
+      {
+        "t": 22.12,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: screening",
+        "data": {
+          "ms": 79.3
+        }
+      },
+      {
+        "t": 22.19,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 69.2
+        }
+      },
+      {
+        "t": 22.19,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "7 fault findings, 12 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "44% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "44% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "payment journey fails at step 'payments': 503 response temporarily unavailable"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "screening",
+              "severity": "fault",
+              "text": "process exited 1 time(s) in 15 min, last 35 s ago (exit code 15); none since the action taken on it 21 s ago"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments fail: 44%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "screening",
+              "severity": "info",
+              "text": "served by its standby"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "ledger",
+              "severity": "fault",
+              "text": "data check failed: duplicate payments = 144"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "33 s ago: deploy by pipeline (from=1.3, to=1.5)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "28 s ago: stop by operator"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "28 s ago: start by operator (release=4.1)"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening",
+              "severity": "info",
+              "text": "21 s ago: failover by incident-commander (from=primary, to=standby)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 22.2,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from gateway",
+        "data": {
+          "ms": 12.0
+        }
+      },
+      {
+        "t": 22.23,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "19 log records from payments",
+        "data": {
+          "ms": 23.5
+        }
+      },
+      {
+        "t": 22.23,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 2.0
+        }
+      },
+      {
+        "t": 22.25,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "0 log records from ledger",
+        "data": {
+          "ms": 20.4
+        }
+      },
+      {
+        "t": 41.59,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-haiku-5-5 answered in 19.342 s"
+      },
+      {
+        "t": 42.23,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart screening: done (screening restarted)",
+        "data": {
+          "target": "screening",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 44.93,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 46.93,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate ledger (now) to the on-call engineer"
+      },
+      {
+        "t": 46.93,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate screening (now) to the on-call engineer"
+      },
+      {
+        "t": 52.03,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 100.1
+        }
+      },
+      {
+        "t": 52.77,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 738.7
+        }
+      },
+      {
+        "t": 52.77,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 56.87,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 92.0
+        }
+      },
+      {
+        "t": 57.74,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 878.2
+        }
+      },
+      {
+        "t": 57.74,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 57.74,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "escalated"
       },
       {
-        "t": 1.23,
+        "t": 60.82,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 1.23,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-haiku-5-5 answered in 3.074 s"
       }
     ],
     "calls": [
@@ -252,11 +613,23 @@
         "provider": "anthropic",
         "model": "claude-haiku-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4048,
+        "output_tokens": 2799,
+        "latency_s": 14.483,
+        "estimated_cost_usd": 0.001804,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "purpose": "reassess",
+        "input_tokens": 4468,
+        "output_tokens": 3778,
+        "latency_s": 19.342,
+        "estimated_cost_usd": 0.002336,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -264,20 +637,20 @@
         "provider": "anthropic",
         "model": "claude-haiku-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1207,
+        "output_tokens": 506,
+        "latency_s": 3.074,
+        "estimated_cost_usd": 0.000374,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 7,
+    "steps": 23,
     "audit": [
       {
         "event": "act",
-        "t": 1793439736.985911,
+        "t": 1793451801.2651744,
         "action": "failover",
         "target": "screening",
         "params": {
@@ -290,6 +663,34 @@
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793451841.64593,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: Survey C1 shows screening down (not answering), and C2 shows its process exited with code 15, 35 s ago, with no exits since the failover at 21 s ago. The standby is carrying traffic, so the primary can be restarted without touching payments.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793451844.283883,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "bad_release: Event E1 shows payments deployed 1.3 to 1.5 at 33 s ago, and gateway logged 'payments refused the connection' at 34 s ago. Payments still logs response_unavailable with rising occurrences (13 to 18) after screening was failed over at 21 s ago, so the screening timeouts are no longer the",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
       }
     ]
   },

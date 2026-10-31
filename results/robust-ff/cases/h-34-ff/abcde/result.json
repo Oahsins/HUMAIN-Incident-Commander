@@ -1,69 +1,159 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.85,
+      "evidence": "Payments logs 'fraud screening timeout via primary ... timeout_s=1.0', and calls to screening fail 51% with p95 1025 ms (baseline 15 ms). Payments itself is otherwise healthy."
+    },
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.9,
+      "evidence": "'lock held by session reconciliation (write) for 10.4 s', and payments logs 'ledger write failed: database is locked', with 42 failed writes."
+    },
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.85,
+      "evidence": "Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). It is down, and the first queue item is 91."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.75,
+      "evidence": "13 s ago the scheduler changed balance_cache_ttl_s from 0.5 to 600.0. Balances would stay cached for 10 minutes and would not show posted payments."
+    }
+  ],
   "actions": [
     {
-      "t": 1793438831.4694026,
+      "t": 1793451490.274841,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1020 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1025 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793451503.7838266,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: 'lock held by session reconciliation (write) for 10.4 s', and payments logs 'ledger write failed: database is locked', with 42 failed writes.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793451504.852319,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: 13 s ago the scheduler changed balance_cache_ttl_s from 0.5 to 600.0. Balances would stay cached for 10 minutes and would not show posted payments.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+    },
+    {
+      "t": 1793451505.8589146,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 91
+      },
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). It is down, and the first queue item is 91.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 91 set aside for the operations team"
+    },
+    {
+      "t": 1793451506.9007597,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). It is down, and the first queue item is 91.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
     }
   ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "failover on screening: done",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "clearing"
+    ],
+    "class": null,
+    "reason": "item 91 was set aside from clearing's work queue",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "review item 91 set aside from clearing: repair and resubmit it, or close it with its customer"
   },
-  "t_start": 1793438830.2473595,
-  "t_first_action": 1793438831.4694026,
-  "t_declared": 1793438831.5933292,
+  "sbar": {
+    "situation": "The bank's payment journey has recovered. Two recovery checks in a row ran clean, the last at 31 s.",
+    "background": "The screening primary began timing out, so payments failed screening. The reconciliation session held the ledger write lock, malformed queue item 91 kept crashing the clearing worker, and 13 s before the check the scheduler raised the gateway's balance_cache_ttl_s from 0.5 to 600.0.",
+    "assessment": "The incident commander failed screening over to its standby, ended the reconciliation session holding the ledger lock, and restored balance_cache_ttl_s to 0.5; all three succeeded. It also set aside clearing item 91 and restarted clearing, which came back up. Screening calls had failed 51% at p95 1025 ms, and 42 ledger writes failed with 'database is locked'.",
+    "recommendation": "The operations team must review clearing item 91: repair and resubmit it, or close it with its customer. They should also review the 42 payments whose ledger writes failed. Find out why the screening primary slowed and why the scheduler changed balance_cache_ttl_s before moving screening back to the primary."
+  },
+  "t_start": 1793451489.0871394,
+  "t_first_action": 1793451490.274841,
+  "t_declared": 1793451519.7212853,
   "trace": [
     {
-      "t": 0.06,
+      "t": 0.03,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 56.0
+        "ms": 27.9
       }
     },
     {
-      "t": 0.17,
+      "t": 0.14,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: clearing",
       "data": {
-        "ms": 110.2
+        "ms": 107.3
       }
     },
     {
-      "t": 1.22,
+      "t": 1.19,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 1055.5
+        "ms": 1052.2
       }
     },
     {
-      "t": 1.22,
+      "t": 1.19,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -96,28 +186,28 @@
             "letter": "B",
             "component": "gateway",
             "severity": "fault",
-            "text": "p95 1211 ms (baseline 59 ms)"
+            "text": "p95 1214 ms (baseline 61 ms)"
           },
           {
             "id": "B2",
             "letter": "B",
             "component": "payments",
             "severity": "fault",
-            "text": "p95 1200 ms (baseline 44 ms)"
+            "text": "p95 1202 ms (baseline 46 ms)"
           },
           {
             "id": "B3",
             "letter": "B",
             "component": "clearing",
             "severity": "fault",
-            "text": "backlog: 39 items waiting, oldest 15 s; first item 92 waiting 15 s after 0 attempt(s)"
+            "text": "backlog: 40 items waiting, oldest 15 s; first item 91 waiting 15 s after 0 attempt(s)"
           },
           {
             "id": "B4",
             "letter": "B",
             "component": "ledger",
             "severity": "fault",
-            "text": "lock held by session reconciliation (write) for 10.5 s: UPDATE accounts SET ... (reconciliation batch)"
+            "text": "lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)"
           },
           {
             "id": "B5",
@@ -159,21 +249,21 @@
             "letter": "D",
             "component": "gateway",
             "severity": "fault",
-            "text": "calls to payments are slow: p95 1210 ms (payments itself answered in 44 ms at baseline)"
+            "text": "calls to payments are slow: p95 1216 ms (payments itself answered in 46 ms at baseline)"
           },
           {
             "id": "D3",
             "letter": "D",
             "component": "payments",
             "severity": "fault",
-            "text": "calls to screening fail: 53%"
+            "text": "calls to screening fail: 51%"
           },
           {
             "id": "D4",
             "letter": "D",
             "component": "payments",
             "severity": "fault",
-            "text": "calls to screening are slow: p95 1020 ms (screening itself answered in 14 ms at baseline)"
+            "text": "calls to screening are slow: p95 1025 ms (screening itself answered in 15 ms at baseline)"
           },
           {
             "id": "E1",
@@ -201,7 +291,7 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by operator"
+            "text": "5 s ago: stop by operator"
           },
           {
             "id": "E5",
@@ -214,7 +304,7 @@
       }
     },
     {
-      "t": 1.24,
+      "t": 1.19,
       "phase": "survey",
       "kind": "action",
       "name": "containment",
@@ -230,72 +320,179 @@
       }
     },
     {
-      "t": 1.26,
+      "t": 1.21,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 19.5
+        "ms": 13.8
       }
     },
     {
-      "t": 1.29,
+      "t": 1.22,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "7 log records from payments",
       "data": {
-        "ms": 32.8
+        "ms": 12.9
       }
     },
     {
-      "t": 1.32,
+      "t": 1.24,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "2 log records from clearing",
       "data": {
-        "ms": 30.3
+        "ms": 21.7
       }
     },
     {
-      "t": 1.35,
+      "t": 1.26,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "0 log records from ledger",
       "data": {
-        "ms": 22.4
+        "ms": 22.7
       }
     },
     {
-      "t": 1.35,
+      "t": 14.7,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 13.432 s"
     },
     {
-      "t": 1.35,
+      "t": 14.76,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.77,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 16.81,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "quarantine",
+      "summary": "quarantine clearing: done (clearing item 91 set aside for the operations team)",
+      "data": {
+        "target": "clearing",
+        "params": {
+          "item": 91
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 18.44,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 24.54,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 92.6
+      }
+    },
+    {
+      "t": 25.64,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1104.1
+      }
+    },
+    {
+      "t": 25.64,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 29.72,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 75.9
+      }
+    },
+    {
+      "t": 30.63,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 918.0
+      }
+    },
+    {
+      "t": 30.63,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 30.63,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 1.35,
+      "t": 35.71,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 1.35,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 5.071 s"
     }
   ],
   "calls": [
@@ -303,11 +500,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 4376,
+      "output_tokens": 1441,
+      "latency_s": 13.432,
+      "estimated_cost_usd": 0.046324,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -315,32 +512,92 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1287,
+      "output_tokens": 379,
+      "latency_s": 5.071,
+      "estimated_cost_usd": 0.012728,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 8,
+  "steps": 16,
   "audit": [
     {
       "event": "act",
-      "t": 1793438831.4694026,
+      "t": 1793451490.274841,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1020 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1025 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793451503.7838266,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: 'lock held by session reconciliation (write) for 10.4 s', and payments logs 'ledger write failed: database is locked', with 42 failed writes.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793451504.852319,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: 13 s ago the scheduler changed balance_cache_ttl_s from 0.5 to 600.0. Balances would stay cached for 10 minutes and would not show posted payments.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+    },
+    {
+      "event": "act",
+      "t": 1793451505.8589146,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 91
+      },
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). It is down, and the first queue item is 91.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 91 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793451506.9007597,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). It is down, and the first queue item is 91.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
     }
   ]
 }

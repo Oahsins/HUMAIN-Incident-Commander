@@ -2,53 +2,97 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.97,
+        "evidence": "E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 14 s ago, followed by payments logs 'limit_reject ... limit_minor=1 amount_minor=44419'. The probe fails at 'payments' with '422 amount exceeds transfer limit'."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "E2: 'config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)' 12 s ago. A 600 s balance cache means a balance would not show a posted payment for up to 10 minutes. This is hidden while payments are refused."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793449389.230438,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 14 s ago, followed by payments logs 'limit_reject ... limit_minor=1 amount_minor=44419'. The probe fails at 'payments' with '422 amount exceeds transfer limit'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793449390.2499263,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E2: 'config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)' 12 s ago. A 600 s balance cache means a balance would not show a posted payment for up to 10 minutes. This is hidden while payments are refused.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank payment journey has recovered. Two recovery checks in a row ran the main journey cleanly, the last at 21 s.",
+      "background": "The pipeline changed payments max_transfer_minor from 1000000 to 1 about 14 s before diagnosis. It changed gateway balance_cache_ttl_s from 0.5 to 600.0 about 12 s before diagnosis.",
+      "assessment": "The payments limit change made payments refuse nearly every transfer with '422 amount exceeds transfer limit' (confidence 0.97). The gateway cache change was a hidden second fault that would have shown stale balances for up to 10 minutes once payments worked (confidence 0.8). The incident commander reverted both settings itself, max_transfer_minor to 1000000 and balance_cache_ttl_s to 0.5, and both reverts succeeded.",
+      "recommendation": "Find out why the pipeline pushed these two config values and block it from repeating them. Operations should review the payments refused with 422 during the incident, since customers may need to retry them."
     },
-    "t_start": 1793426282.8785048,
-    "t_first_action": null,
-    "t_declared": 1793426283.050943,
+    "t_start": 1793449378.717164,
+    "t_first_action": 1793449389.230438,
+    "t_declared": 1793449399.259879,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 31.9
+          "ms": 37.6
+        }
+      },
+      {
+        "t": 0.1,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 58.3
         }
       },
       {
         "t": 0.13,
         "phase": "survey",
         "kind": "tool",
-        "name": "observe",
-        "summary": "8 components",
-        "data": {
-          "ms": 95.0
-        }
-      },
-      {
-        "t": 0.14,
-        "phase": "survey",
-        "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 11.0
+          "ms": 35.8
         }
       },
       {
-        "t": 0.14,
+        "t": 0.13,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -74,7 +118,7 @@
               "letter": "A",
               "component": "screening",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 9.1/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 9.2/s), less work from its callers"
             },
             {
               "id": "A4",
@@ -88,14 +132,14 @@
               "letter": "E",
               "component": "payments",
               "severity": "info",
-              "text": "13 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+              "text": "14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "gateway",
               "severity": "info",
-              "text": "11 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+              "text": "12 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
             },
             {
               "id": "E3",
@@ -143,13 +187,13 @@
         }
       },
       {
-        "t": 0.16,
+        "t": 0.15,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 21.7
+          "ms": 22.1
         }
       },
       {
@@ -159,36 +203,115 @@
         "name": "logs",
         "summary": "8 log records from payments",
         "data": {
-          "ms": 12.1
+          "ms": 15.4
         }
       },
       {
-        "t": 0.17,
+        "t": 10.51,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 10.343 s"
       },
       {
-        "t": 0.17,
+        "t": 10.53,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+        "data": {
+          "target": "payments",
+          "params": {
+            "key": "max_transfer_minor"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 11.55,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.6,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 50.4
+        }
+      },
+      {
+        "t": 15.55,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 952.0
+        }
+      },
+      {
+        "t": 15.55,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 19.65,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 96.8
+        }
+      },
+      {
+        "t": 20.54,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 894.8
+        }
+      },
+      {
+        "t": 20.54,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 20.54,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 0.17,
+        "t": 25.2,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.17,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.66 s"
       }
     ],
     "calls": [
@@ -196,11 +319,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4063,
+        "output_tokens": 1047,
+        "latency_s": 10.343,
+        "estimated_cost_usd": 0.037192,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -208,17 +331,50 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1116,
+        "output_tokens": 348,
+        "latency_s": 4.66,
+        "estimated_cost_usd": 0.011424,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 5,
-    "audit": []
+    "steps": 11,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793449389.230438,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 14 s ago, followed by payments logs 'limit_reject ... limit_minor=1 amount_minor=44419'. The probe fails at 'payments' with '422 amount exceeds transfer limit'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "event": "act",
+        "t": 1793449390.2499263,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E2: 'config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)' 12 s ago. A 600 s balance cache means a balance would not show a posted payment for up to 10 minutes. This is hidden while payments are refused.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+      }
+    ]
   },
   "error": null
 }

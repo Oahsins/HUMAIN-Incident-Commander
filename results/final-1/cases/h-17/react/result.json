@@ -1,58 +1,336 @@
 {
   "arm": "react",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_config",
+      "confidence": 0.95,
+      "evidence": "The pipeline changed max_transfer_minor from 1000000 to 1, and logs then showed limit_reject with limit_minor=1. The reject rate was about 52-67%, and after revert_config it fell to 0."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.85,
+      "evidence": "The pipeline changed balance_cache_ttl_s from 0.5 to 600, which would show stale balances. After the revert, the probe shows the app balance matches the ledger."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793454344.7842522,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "Payments max_transfer_minor changed to 1 coincides with 52% rejects; revert it first. Gateway cache TTL 600s is also a bad config to revert after.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793454347.5344734,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Now revert the gateway balance cache TTL raised from 0.5s to 600s, which would show stale balances.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+    }
+  ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The bank system has recovered. All components are back at baseline, and the end-to-end probe passed on two checks in a row, the last at 38 seconds.",
+    "background": "The pipeline changed payments max_transfer_minor from 1000000 to 1. It also changed gateway balance_cache_ttl_s from 0.5 to 600.",
+    "assessment": "The payments limit change caused limit_reject errors with limit_minor=1 on about 52-67% of transfers (confidence 0.95), and the gateway cache change would have shown stale balances (confidence 0.85). The incident commander itself reverted max_transfer_minor to 1000000, which dropped rejects to 0, and reverted balance_cache_ttl_s to 0.5, after which app balances matched the ledger.",
+    "recommendation": "Find out why the pipeline pushed these two config values, and stop it from reapplying them. Operations should review the transfers rejected by the 1-minor-unit limit and any decisions made on stale balances while the 600-second cache TTL was live. The screening-standby stop/start events were routine and need no action."
   },
-  "t_start": 1793426581.304183,
-  "t_first_action": null,
-  "t_declared": 1793426581.3356981,
+  "t_start": 1793454339.1255245,
+  "t_first_action": 1793454344.7842522,
+  "t_declared": 1793454376.8330057,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.05,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 31.4
+        "ms": 50.0
       }
     },
     {
-      "t": 0.03,
+      "t": 2.47,
       "phase": "triage",
       "kind": "model",
       "name": "react",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 2.421 s"
     },
     {
-      "t": 0.03,
+      "t": 2.47,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Start by observing all component metrics to see where symptoms are."
+    },
+    {
+      "t": 2.55,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 73.5
+      }
+    },
+    {
+      "t": 5.66,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.113 s"
+    },
+    {
+      "t": 5.66,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Payments max_transfer_minor changed to 1 coincides with 52% rejects; revert it first. Gateway cache TTL 600s is also a bad config to revert after."
+    },
+    {
+      "t": 5.66,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+      "data": {
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 8.41,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.744 s"
+    },
+    {
+      "t": 8.41,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Now revert the gateway balance cache TTL raised from 0.5s to 600s, which would show stale balances."
+    },
+    {
+      "t": 8.43,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 11.17,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.744 s"
+    },
+    {
+      "t": 11.17,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Both bad configs reverted; observe again to confirm recovery and check for hidden faults downstream now that traffic flows."
+    },
+    {
+      "t": 11.22,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 43.7
+      }
+    },
+    {
+      "t": 14.57,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.35 s"
+    },
+    {
+      "t": 14.57,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "logs: Payments still rejects about 67% of requests even after the limit revert, though the 20 s window overlaps the pre-revert period. Check the payments logs for the current reject reason."
+    },
+    {
+      "t": 14.6,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "10 log records from payments",
+      "data": {
+        "ms": 36.2
+      }
+    },
+    {
+      "t": 18.46,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.86 s"
+    },
+    {
+      "t": 18.46,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "probe: The last limit reject was logged about 11 s ago, roughly when the revert landed, so rejects have likely stopped. Run a probe to confirm the payment journey works end to end."
+    },
+    {
+      "t": 19.18,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 719.5
+      }
+    },
+    {
+      "t": 23.84,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 4.66 s"
+    },
+    {
+      "t": 23.84,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: The probe passed. Confirm with a short observe window that payment rejects have dropped to baseline now that the limit is restored."
+    },
+    {
+      "t": 23.89,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 51.4
+      }
+    },
+    {
+      "t": 29.74,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 5.846 s"
+    },
+    {
+      "t": 29.74,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "done: Rejects are at 0, latency and throughput are at baseline, clearing is flowing and ledger integrity is clean. The screening-standby restarts kept the same release and it is up, so it is healthy and needs no action; declare done."
+    },
+    {
+      "t": 31.82,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 83.8
+      }
+    },
+    {
+      "t": 32.74,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 911.1
+      }
+    },
+    {
+      "t": 32.74,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 36.78,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 40.1
+      }
+    },
+    {
+      "t": 37.71,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 930.8
+      }
+    },
+    {
+      "t": 37.71,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 37.71,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.03,
+      "t": 46.26,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.03,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 8.549 s"
     }
   ],
   "calls": [
@@ -60,11 +338,95 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "react",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 2725,
+      "output_tokens": 94,
+      "latency_s": 2.421,
+      "estimated_cost_usd": 0.01278,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4857,
+      "output_tokens": 155,
+      "latency_s": 3.113,
+      "estimated_cost_usd": 0.022528,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5083,
+      "output_tokens": 142,
+      "latency_s": 2.744,
+      "estimated_cost_usd": 0.023172,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5302,
+      "output_tokens": 120,
+      "latency_s": 2.744,
+      "estimated_cost_usd": 0.023608,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7629,
+      "output_tokens": 194,
+      "latency_s": 3.35,
+      "estimated_cost_usd": 0.034396,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 8352,
+      "output_tokens": 221,
+      "latency_s": 3.86,
+      "estimated_cost_usd": 0.037828,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 8732,
+      "output_tokens": 277,
+      "latency_s": 4.66,
+      "estimated_cost_usd": 0.040468,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 11079,
+      "output_tokens": 453,
+      "latency_s": 5.846,
+      "estimated_cost_usd": 0.053376,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -72,15 +434,48 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 972,
+      "output_tokens": 361,
+      "latency_s": 8.549,
+      "estimated_cost_usd": 0.011108,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 1,
-  "audit": []
+  "steps": 12,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793454344.7842522,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "Payments max_transfer_minor changed to 1 coincides with 52% rejects; revert it first. Gateway cache TTL 600s is also a bad config to revert after.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793454347.5344734,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Now revert the gateway balance cache TTL raised from 0.5s to 600s, which would show stale balances.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+    }
+  ]
 }

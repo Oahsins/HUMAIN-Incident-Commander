@@ -1,53 +1,76 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.9,
+      "evidence": "[E1] gateway: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0) 16 s ago, and [A1] app shows 99999900 but the ledger holds 99999800."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793452404.0090501,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: [E1] gateway: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0) 16 s ago, and [A1] app shows 99999900 but the ledger holds 99999800.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+    }
+  ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The payment journey is recovered: two consecutive clean checks, the last at 18 seconds after the revert. The incident commander reverted the gateway setting balance_cache_ttl_s from 600.0 back to 0.5 itself.",
+    "background": "A pipeline raised balance_cache_ttl_s on the gateway from 0.5 to 600 seconds about 16 seconds before the revert. The payment journey then failed at the balance step because the gateway served a stale cached balance. The app showed 99999900 while the ledger held 99999800.",
+    "assessment": "Root cause: bad configuration on the gateway, with confidence 0.9, from the pipeline change to balance_cache_ttl_s. The incident commander reverted that key itself, and the journey passed both checks afterward. The screening-standby restarts are routine and not linked to this symptom.",
+    "recommendation": "Confirm the pipeline that changed balance_cache_ttl_s is reviewed before it runs again, and keep the value at 0.5 until then. Watch the app balance against the ledger for any mismatch from the stale window, and have operations review any balances or payments affected during the 600-second cache period."
   },
-  "t_start": 1793440330.2066529,
-  "t_first_action": null,
-  "t_declared": 1793440334.0978596,
+  "t_start": 1793452395.3978794,
+  "t_first_action": 1793452404.0090501,
+  "t_declared": 1793452412.9995406,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.05,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 26.8
+        "ms": 50.4
       }
     },
     {
-      "t": 0.08,
+      "t": 0.13,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components",
       "data": {
-        "ms": 54.7
+        "ms": 79.7
       }
     },
     {
-      "t": 0.97,
+      "t": 1.04,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey ok",
       "data": {
-        "ms": 884.2
+        "ms": 914.4
       }
     },
     {
-      "t": 0.97,
+      "t": 1.04,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -59,86 +82,149 @@
             "letter": "E",
             "component": "gateway",
             "severity": "info",
-            "text": "12 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            "text": "13 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by scheduler"
+            "text": "7 s ago: stop by scheduler"
           },
           {
             "id": "E3",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: start by scheduler (release=4.1)"
+            "text": "7 s ago: start by scheduler (release=4.1)"
           },
           {
             "id": "E4",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by ops-maintenance"
+            "text": "6 s ago: stop by ops-maintenance"
           },
           {
             "id": "E5",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by ops-maintenance (release=4.1)"
+            "text": "6 s ago: start by ops-maintenance (release=4.1)"
           }
         ]
       }
     },
     {
-      "t": 3.03,
+      "t": 3.11,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components",
       "data": {
-        "ms": 66.3
+        "ms": 62.7
       }
     },
     {
-      "t": 3.89,
+      "t": 3.98,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at balance",
       "data": {
-        "ms": 858.5
+        "ms": 870.3
       }
     },
     {
-      "t": 3.89,
+      "t": 8.61,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-haiku-5-5 answered in 4.632 s"
     },
     {
-      "t": 3.89,
+      "t": 8.63,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 11.74,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 113.3
+      }
+    },
+    {
+      "t": 12.63,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 883.6
+      }
+    },
+    {
+      "t": 12.63,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 16.71,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 82.1
+      }
+    },
+    {
+      "t": 17.6,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 893.4
+      }
+    },
+    {
+      "t": 17.6,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 17.6,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 3.89,
+      "t": 20.46,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 3.89,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-haiku-5-5 answered in 2.862 s"
     }
   ],
   "calls": [
@@ -146,11 +232,11 @@
       "provider": "anthropic",
       "model": "claude-haiku-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3412,
+      "output_tokens": 829,
+      "latency_s": 4.632,
+      "estimated_cost_usd": 0.000756,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -158,15 +244,32 @@
       "provider": "anthropic",
       "model": "claude-haiku-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 851,
+      "output_tokens": 384,
+      "latency_s": 2.862,
+      "estimated_cost_usd": 0.000277,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 5,
-  "audit": []
+  "steps": 10,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793452404.0090501,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: [E1] gateway: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0) 16 s ago, and [A1] app shows 99999900 but the ledger holds 99999800.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+    }
+  ]
 }

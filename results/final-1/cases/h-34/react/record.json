@@ -106,18 +106,84 @@
     "mode": "auto",
     "outcome": "gave_up",
     "root_causes": [],
-    "actions": [],
+    "actions": [
+      {
+        "t": 1793456130.0439656,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "The reconciliation session has held a write lock on the ledger for about 13 s while write errors pile up, which explains the payment failures. Releasing that lock comes first; the gateway cache TTL change and the clearing crash still need handling.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793456134.2597113,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "The gateway's balance_cache_ttl_s went from 0.5 to 600 s just before the incident, so balances would be stale for 10 minutes. That is a bad config, so revert it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      },
+      {
+        "t": 1793456140.240956,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 90
+        },
+        "reason": "Clearing crashed with a JSONDecodeError while parsing a queued item, which points to a poison message. The head item is 90, so quarantine it, then restart clearing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 90 set aside for the operations team"
+      },
+      {
+        "t": 1793456142.6086466,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 90 is quarantined; now restart clearing so it can work through the queue.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 90 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 90 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793432829.4515884,
-    "t_first_action": null,
-    "t_declared": 1793432829.4957821,
+    "sbar": {
+      "situation": "Recovery was not confirmed: the incident commander gave up before the bank system was shown to be healthy. Clearing item 90 is set aside and waiting for the operations team.",
+      "background": "The scheduler had changed the gateway setting balance_cache_ttl_s from 0.5 to 600 seconds. A reconciliation session was holding a lock on the ledger.",
+      "assessment": "The incident commander did each step itself: it released the ledger lock by ending the reconciliation session, and it restored the gateway balance_cache_ttl_s to 0.5. It then quarantined clearing item 90 and restarted clearing; all four actions completed, but no recovery was confirmed.",
+      "recommendation": "Check now whether the ledger, gateway and clearing are healthy, and find out why the scheduler changed balance_cache_ttl_s so it does not happen again. The operations team has been asked (soon priority) to review clearing item 90: either repair and resubmit it, or close it with its customer, and check for any money or balance effects from the 600-second balance cache."
+    },
+    "t_start": 1793456123.7413402,
+    "t_first_action": 1793456130.0439656,
+    "t_declared": 1793456158.1428506,
     "trace": [
       {
         "t": 0.04,
@@ -126,36 +192,265 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 44.1
+          "ms": 35.5
         }
       },
       {
-        "t": 0.04,
+        "t": 2.33,
         "phase": "triage",
         "kind": "model",
         "name": "react",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 2.289 s"
       },
       {
-        "t": 0.04,
+        "t": 2.33,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all components to see metrics and recent changes."
+      },
+      {
+        "t": 2.41,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 81.3
+        }
+      },
+      {
+        "t": 6.3,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.895 s"
+      },
+      {
+        "t": 6.3,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: The reconciliation session has held a write lock on the ledger for about 13 s while write errors pile up, which explains the payment failures. Releasing that lock comes first; the gateway cache TTL change and the clearing crash still need handling."
+      },
+      {
+        "t": 6.38,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 10.52,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.137 s"
+      },
+      {
+        "t": 10.52,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: The gateway's balance_cache_ttl_s went from 0.5 to 600 s just before the incident, so balances would be stale for 10 minutes. That is a bad config, so revert it."
+      },
+      {
+        "t": 10.53,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.17,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.646 s"
+      },
+      {
+        "t": 13.17,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Clearing exited with code 1 while head item 90 has 0 attempts, so the crash could be from the lock or from a poison item. Check clearing logs before acting."
+      },
+      {
+        "t": 13.21,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 34.1
+        }
+      },
+      {
+        "t": 16.5,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.292 s"
+      },
+      {
+        "t": 16.5,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Clearing crashed with a JSONDecodeError while parsing a queued item, which points to a poison message. The head item is 90, so quarantine it, then restart clearing."
+      },
+      {
+        "t": 16.51,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 90 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 90
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 18.87,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.358 s"
+      },
+      {
+        "t": 18.87,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Item 90 is quarantined; now restart clearing so it can work through the queue."
+      },
+      {
+        "t": 19.53,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 22.18,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.647 s"
+      },
+      {
+        "t": 22.18,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Observe again to confirm recovery and check for hidden faults downstream, such as the network or another poison item."
+      },
+      {
+        "t": 22.3,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 124.1
+        }
+      },
+      {
+        "t": 26.25,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.948 s"
+      },
+      {
+        "t": 26.25,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Payments error rates are still elevated, but the 30 s window mostly predates the lock release, and ledger write errors rose only from 100 to 115. A probe will show whether the payment journey works end to end now."
+      },
+      {
+        "t": 27.18,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 927.8
+        }
+      },
+      {
+        "t": 30.79,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.609 s"
+      },
+      {
+        "t": 30.79,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The probe passes end to end. A short observation window will confirm that error rates and p95 are back to baseline now that the old lock-period data has rolled out."
+      },
+      {
+        "t": 30.85,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 63.8
+        }
+      },
+      {
+        "t": 34.4,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "model call failed: The model declined this request (refusal)."
+      },
+      {
+        "t": 34.4,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
         "summary": "gave_up"
       },
       {
-        "t": 0.04,
+        "t": 38.68,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.04,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.282 s"
       }
     ],
     "calls": [
@@ -163,9 +458,117 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 87,
+        "latency_s": 2.289,
+        "estimated_cost_usd": 0.01264,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4681,
+        "output_tokens": 236,
+        "latency_s": 3.895,
+        "estimated_cost_usd": 0.023444,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4881,
+        "output_tokens": 198,
+        "latency_s": 4.137,
+        "estimated_cost_usd": 0.023484,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5104,
+        "output_tokens": 124,
+        "latency_s": 2.646,
+        "estimated_cost_usd": 0.022896,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5370,
+        "output_tokens": 182,
+        "latency_s": 3.292,
+        "estimated_cost_usd": 0.02512,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5550,
+        "output_tokens": 97,
+        "latency_s": 2.358,
+        "estimated_cost_usd": 0.02414,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5690,
+        "output_tokens": 102,
+        "latency_s": 2.647,
+        "estimated_cost_usd": 0.0248,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7980,
+        "output_tokens": 217,
+        "latency_s": 3.948,
+        "estimated_cost_usd": 0.03626,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8355,
+        "output_tokens": 174,
+        "latency_s": 3.609,
+        "estimated_cost_usd": 0.0369,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
         "input_tokens": null,
         "output_tokens": null,
-        "latency_s": 0.0,
+        "latency_s": 3.55,
         "estimated_cost_usd": null,
         "status": "failed",
         "error": null,
@@ -175,43 +578,104 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 724,
+        "output_tokens": 347,
+        "latency_s": 4.282,
+        "estimated_cost_usd": 0.009836,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 1,
-    "audit": []
+    "steps": 10,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793456130.0439656,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "The reconciliation session has held a write lock on the ledger for about 13 s while write errors pile up, which explains the payment failures. Releasing that lock comes first; the gateway cache TTL change and the clearing crash still need handling.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793456134.2597113,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "The gateway's balance_cache_ttl_s went from 0.5 to 600 s just before the incident, so balances would be stale for 10 minutes. That is a bad config, so revert it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      },
+      {
+        "event": "act",
+        "t": 1793456140.240956,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 90
+        },
+        "reason": "Clearing crashed with a JSONDecodeError while parsing a queued item, which points to a poison message. The head item is 90, so quarantine it, then restart clearing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 90 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793456142.6086466,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 90 is quarantined; now restart clearing so it can work through the queue.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793432949.1525156,
+    "recovered": true,
+    "t": 1793456243.3672967,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793432919.153,
-      1793432939.153
+      1793456213.367,
+      1793456233.367
     ],
     "journeys": {
-      "n": 69,
-      "ok": 0,
-      "success_rate": 0.0,
-      "p95_ms": null,
+      "n": 223,
+      "ok": 223,
+      "success_rate": 1.0,
+      "p95_ms": 75.99997520446777,
       "payments": {
-        "n": 52,
-        "ok": 0
+        "n": 167,
+        "ok": 167
       },
       "balances": {
-        "n": 17,
-        "fresh": 0
+        "n": 56,
+        "fresh": 56
       },
-      "p95_allowed_ms": 321.0
+      "p95_allowed_ms": 331.0
     },
-    "slo_ok": false,
+    "slo_ok": true,
     "integrity": {
       "money_conserved": true,
       "balances_match_postings": true,
@@ -219,25 +683,28 @@
       "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
-      "stuck_items": 40,
+      "stuck_items": 0,
       "wrongly_quarantined": 0,
-      "stale_reads": 17,
-      "for_operations": [],
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "set_aside",
+          "item": 90,
+          "payment_id": "batch-017"
+        }
+      ],
       "harmful_quarantines": 0,
-      "ok": false
+      "ok": true
     },
-    "reasons": [
-      "69 of 69 customer journeys failed (52 payments, 17 balance reads)",
-      "40 payments waiting more than 5 s to clear"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793432814.948308,
-      "until_t": 1793432939.1525156,
-      "breach_seconds": 125.0,
-      "failed_journeys": 406,
-      "time_to_mitigate_s": 124.2,
-      "mitigation_censored": true,
-      "late_clearings": 40,
+      "since_t": 1793456109.1773183,
+      "until_t": 1793456233.3672967,
+      "breach_seconds": 30.0,
+      "failed_journeys": 68,
+      "time_to_mitigate_s": 30.0,
+      "mitigation_censored": false,
+      "late_clearings": 132,
       "double_postings": 0,
       "unbalanced_payments": 0
     }
@@ -248,9 +715,9 @@
       "target": "clearing",
       "class": "poison_message",
       "detail": {
-        "item": 91
+        "item": 90
       },
-      "t": 1793432814.948308,
+      "t": 1793456109.1773183,
       "at_s": 0
     },
     {
@@ -260,7 +727,7 @@
       "detail": {
         "key": "balance_cache_ttl_s"
       },
-      "t": 1793432816.974092,
+      "t": 1793456111.1883214,
       "at_s": 2
     },
     {
@@ -268,11 +735,11 @@
       "target": "ledger",
       "class": "lock_held",
       "detail": {
-        "holder_pid": 39008,
+        "holder_pid": 43752,
         "hold_s": 420.0,
         "holding": true
       },
-      "t": 1793432824.0199997,
+      "t": 1793456118.2331653,
       "at_s": 4
     },
     {
@@ -280,7 +747,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793432824.081487,
+      "t": 1793456118.3050396,
       "at_s": 6
     },
     {
@@ -288,19 +755,121 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793432824.1521544,
+      "t": 1793456118.366766,
       "at_s": 7
     }
   ],
   "injection_complete": true,
   "telemetry_complete": true,
-  "actions": [],
-  "audit": [],
+  "actions": [
+    {
+      "t": 1793456130.1197858,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793456134.2653923,
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "gateway",
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+    },
+    {
+      "t": 1793456140.247231,
+      "params": {
+        "item": 90
+      },
+      "ok": true,
+      "refused": false,
+      "action": "quarantine",
+      "target": "clearing",
+      "detail": "clearing item 90 set aside for the operations team"
+    },
+    {
+      "t": 1793456143.2680678,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793456130.0439656,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "The reconciliation session has held a write lock on the ledger for about 13 s while write errors pile up, which explains the payment failures. Releasing that lock comes first; the gateway cache TTL change and the clearing crash still need handling.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793456134.2597113,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "The gateway's balance_cache_ttl_s went from 0.5 to 600 s just before the incident, so balances would be stale for 10 minutes. That is a bad config, so revert it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+    },
+    {
+      "event": "act",
+      "t": 1793456140.240956,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 90
+      },
+      "reason": "Clearing crashed with a JSONDecodeError while parsing a queued item, which points to a poison message. The head item is 90, so quarantine it, then restart clearing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 90 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793456142.6086466,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Item 90 is quarantined; now restart clearing so it can work through the queue.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
   "timing": {
-    "t0": 1793432814.948308,
-    "t_alert": 1793432829.1521544,
-    "horizon": 1793432939.1521544,
-    "verdict_t": 1793432949.1859922
+    "t0": 1793456109.1773183,
+    "t_alert": 1793456123.366766,
+    "horizon": 1793456233.366766,
+    "verdict_t": 1793456243.4200902
   },
   "attempt": 1,
   "purpose": "main",

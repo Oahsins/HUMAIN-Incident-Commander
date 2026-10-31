@@ -1,0 +1,247 @@
+{
+  "case": {
+    "id": "h-15",
+    "input": {
+      "system": "bank",
+      "seed": 260015,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "crash",
+          "at_s": 0,
+          "params": {
+            "target": "clearing"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 2,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "clearing",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "react",
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "gave_up",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
+      "background": "No cause identified.",
+      "assessment": "No action was taken.",
+      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    },
+    "t_start": 1793425516.316912,
+    "t_first_action": null,
+    "t_declared": 1793425516.348487,
+    "trace": [
+      {
+        "t": 0.03,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 31.5
+        }
+      },
+      {
+        "t": 0.03,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 0.03,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "gave_up"
+      },
+      {
+        "t": 0.03,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 0.03,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "handover written from the template"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 1,
+    "audit": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793425636.0342782,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793425606.034,
+      1793425626.034
+    ],
+    "journeys": {
+      "n": 68,
+      "ok": 17,
+      "success_rate": 0.25,
+      "p95_ms": null,
+      "payments": {
+        "n": 51,
+        "ok": 0
+      },
+      "balances": {
+        "n": 17,
+        "fresh": 17
+      },
+      "p95_allowed_ms": 314.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 20,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "51 of 68 customer journeys failed (51 payments, 0 balance reads)",
+      "20 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793425503.9711223,
+      "until_t": 1793425626.0342782,
+      "breach_seconds": 125.0,
+      "failed_journeys": 318,
+      "time_to_mitigate_s": 122.1,
+      "mitigation_censored": true,
+      "late_clearings": 20,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "crash",
+      "target": "clearing",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793425503.9711223,
+      "at_s": 0
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 65044,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793425510.9769127,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793425511.0337005,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793425503.9711223,
+    "t_alert": 1793425516.0337005,
+    "horizon": 1793425626.0337005,
+    "verdict_t": 1793425636.082812
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

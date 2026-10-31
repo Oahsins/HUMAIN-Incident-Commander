@@ -38,7 +38,7 @@ Arms are compared only on identical cases. Rows marked descriptive (or with no f
 | descriptive | ABCDE vs ReAct | case success | 0 | 0 | 0 | unavailable [unavailable] | unavailable | unavailable | Paired bootstrap |
 | descriptive | ABCDE vs naive verification | false all-clear | 0 | 0 | 0 | unavailable [unavailable] | unavailable | unavailable | Paired bootstrap |
 | descriptive | ABCDE vs runbook | user-impact seconds | 0 | unavailable | unavailable | unavailable [unavailable] | unavailable | unavailable | Paired bootstrap |
-| descriptive | abcde: condition vs main | case success | 20 | 0 | 0 | +0 pts [+0 pts to +0 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
+| descriptive | abcde: condition vs main | case success | 20 | 0 | 5 | -25 pts [-45 pts to -5 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
 
 b: pairs where the endpoint is present for the first-named arm and absent for the second; c: the reverse. For case success, b counts pairs only the first arm succeeded on. For false all-clear (lower is better), b counts pairs where only the first arm made the false claim, so a larger b is worse for the first arm. Difference is first minus second: percentage points for rates, seconds for user impact. Rows without b, c or an interval (such as the Wilcoxon test on user-impact seconds) show unavailable.
 
@@ -58,35 +58,35 @@ Dot = estimate; line = 95% interval. The tables below hold every number in the c
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 3/20 | 15% | 5%–36% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/15 | 0% | 0%–20% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/3 | 0% | 0%–56% |
-| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/18 | 0% | 0%–18% |
-| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/20 | 0% | 0%–16% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 17/20 | 85% | 64%–95% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 15/20 | 75% | 53%–89% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 12/15 | 80% | 55%–93% |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 2/15 | 13% | 4%–38% |
+| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 3/18 | 17% | 6%–39% |
+| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 2/20 | 10% | 3%–30% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 16/20 | 80% | 58%–92% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/3 | 0% | 0%–56% |
-| Correct escalation | ABCDE agent | valid must-escalate cases | 0/2 | 0% | 0%–66% |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/37 | 0% | 0%–9% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/5 | 0% | 0%–43% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 11/20 | 55% | 34%–74% |
+| Correct escalation | ABCDE agent | valid must-escalate cases | 2/2 | 100% | 34%–100% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 34/36 | 94% | 82%–98% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 34/37 | 92% | 79%–97% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/47 | 0% | 0%–8% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 1/20 | 5% | 1%–24% |
 
 **Means** (mean per case, 95% bootstrap interval)
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 20 | 71.5 s | 45.8 s–95.8 s |
-| Time to mitigate (lower is better) | ABCDE agent | 20 | 70.5 s; censored 11/20 (55%; Wilson 95% 34%–74%) | 45.2 s–94.5 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 20 | 258.0 | 131.4–409.5 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
-| Model calls per case | ABCDE agent | 20 | 1.9 | 1.7–2.0 |
-| Root-cause F1 | ABCDE agent | 17 | 0.00 | 0.00–0.00 |
-| Successful actions per case | ABCDE agent | 20 | 0.2 | 0.1–0.5 |
+| User-impact seconds (lower is better) | ABCDE agent | 20 | 31.0 s | 18.8 s–45.2 s |
+| Time to mitigate (lower is better) | ABCDE agent | 20 | 31.2 s; censored 1/20 (5%; Wilson 95% 1%–24%) | 18.9 s–45.1 s |
+| Failed user journeys per case (lower is better) | ABCDE agent | 20 | 87.9 | 46.9–134.8 |
+| Model tokens per case | ABCDE agent | 20 | 10,736 | 7,889–13,598 |
+| Model input tokens per case | ABCDE agent | 20 | 7,044 | 5,228–8,873 |
+| Model output tokens per case | ABCDE agent | 20 | 3,692 | 2,631–4,783 |
+| Model cost per case (USD) | ABCDE agent | 20 | $0.0026 | $0.0018–$0.0033 |
+| Model calls per case | ABCDE agent | 20 | 2.5 | 2.0–2.9 |
+| Root-cause F1 | ABCDE agent | 17 | 0.93 | 0.84–1.00 |
+| Successful actions per case | ABCDE agent | 20 | 2.4 | 1.6–3.0 |
 | Wasted actions per case (lower is better) | ABCDE agent | 20 | 0.0 | 0.0–0.0 |
-| Harmful quarantines per case (lower is better) | ABCDE agent | 20 | 0.0 | 0.0–0.0 |
+| Harmful quarantines per case (lower is better) | ABCDE agent | 20 | 0.1 | 0.0–0.2 |
 
 ## Results by stratum (descriptive)
 
@@ -120,10 +120,10 @@ Cases: ABCDE agent n = 3.
 | User-impact seconds (lower is better) | ABCDE agent | 3 | 0.0 s | 0.0 s–0.0 s |
 | Time to mitigate (lower is better) | ABCDE agent | 3 | 0.0 s; censored 0/3 (0%; Wilson 95% 0%–56%) | 0.0 s–0.0 s |
 | Failed user journeys per case (lower is better) | ABCDE agent | 3 | 0.0 | 0.0–0.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 3 | 937 | 901–988 |
+| Model input tokens per case | ABCDE agent | 3 | 670 | 636–689 |
+| Model output tokens per case | ABCDE agent | 3 | 266 | 235–299 |
+| Model cost per case (USD) | ABCDE agent | 3 | $0.0002 | $0.0002–$0.0002 |
 | Model calls per case | ABCDE agent | 3 | 1.0 | 1.0–1.0 |
 | Root-cause F1 | ABCDE agent | 0 | unavailable | unavailable |
 | Successful actions per case | ABCDE agent | 3 | 0.0 | 0.0–0.0 |
@@ -138,16 +138,16 @@ Cases: ABCDE agent n = 2.
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/2 | 0% | 0%–66% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 2/2 | 100% | 34%–100% |
 | Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/0 (not estimable) | — | — |
 | False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
 | Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/0 (not estimable) | — | — |
 | Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/2 | 0% | 0%–66% |
 | Handover complete | ABCDE agent | valid cases with operations handover evidence | 2/2 | 100% | 34%–100% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/0 (not estimable) | — | — |
-| Correct escalation | ABCDE agent | valid must-escalate cases | 0/2 | 0% | 0%–66% |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/2 | 0% | 0%–66% |
+| Correct escalation | ABCDE agent | valid must-escalate cases | 2/2 | 100% | 34%–100% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 2/2 | 100% | 34%–100% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 2/2 | 100% | 34%–100% |
 | Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/0 (not estimable) | — | — |
 | Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/2 | 0% | 0%–66% |
 
@@ -158,12 +158,12 @@ Cases: ABCDE agent n = 2.
 | User-impact seconds (lower is better) | ABCDE agent | 2 | 0.0 s | 0.0 s–0.0 s |
 | Time to mitigate (lower is better) | ABCDE agent | 2 | 0.0 s; censored 0/2 (0%; Wilson 95% 0%–66%) | 0.0 s–0.0 s |
 | Failed user journeys per case (lower is better) | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 2 | 6,231 | 6,152–6,310 |
+| Model input tokens per case | ABCDE agent | 2 | 4,544 | 4,532–4,556 |
+| Model output tokens per case | ABCDE agent | 2 | 1,687 | 1,620–1,754 |
+| Model cost per case (USD) | ABCDE agent | 2 | $0.0013 | $0.0013–$0.0013 |
 | Model calls per case | ABCDE agent | 2 | 2.0 | 2.0–2.0 |
-| Root-cause F1 | ABCDE agent | 2 | 0.00 | 0.00–0.00 |
+| Root-cause F1 | ABCDE agent | 2 | 1.00 | 1.00–1.00 |
 | Successful actions per case | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
 | Wasted actions per case (lower is better) | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
 | Harmful quarantines per case (lower is better) | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
@@ -176,35 +176,35 @@ Cases: ABCDE agent n = 2.
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/2 | 0% | 0%–66% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/2 | 0% | 0%–66% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 1/2 | 50% | 9%–91% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 1/2 | 50% | 9%–91% |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 1/2 | 50% | 9%–91% |
 | Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/2 | 0% | 0%–66% |
-| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/2 | 0% | 0%–66% |
+| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 1/2 | 50% | 9%–91% |
 | Handover complete | ABCDE agent | valid cases with operations handover evidence | 2/2 | 100% | 34%–100% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/0 (not estimable) | — | — |
 | Correct escalation | ABCDE agent | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/4 | 0% | 0%–49% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/1 | 0% | 0%–79% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 1/2 | 50% | 9%–91% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 3/4 | 75% | 30%–95% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 3/4 | 75% | 30%–95% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/5 | 0% | 0%–43% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/2 | 0% | 0%–66% |
 
 **Means** (mean per case, 95% bootstrap interval)
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 2 | 70.0 s | 15.0 s–125.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 2 | 68.5 s; censored 1/2 (50%; Wilson 95% 9%–91%) | 15.0 s–122.1 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 2 | 178.0 | 38.0–318.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| User-impact seconds (lower is better) | ABCDE agent | 2 | 20.0 s | 15.0 s–25.0 s |
+| Time to mitigate (lower is better) | ABCDE agent | 2 | 20.0 s; censored 0/2 (0%; Wilson 95% 0%–66%) | 15.0 s–25.0 s |
+| Failed user journeys per case (lower is better) | ABCDE agent | 2 | 47.0 | 38.0–56.0 |
+| Model tokens per case | ABCDE agent | 2 | 7,812 | 7,505–8,120 |
+| Model input tokens per case | ABCDE agent | 2 | 5,060 | 4,899–5,220 |
+| Model output tokens per case | ABCDE agent | 2 | 2,753 | 2,606–2,900 |
+| Model cost per case (USD) | ABCDE agent | 2 | $0.0019 | $0.0018–$0.0020 |
 | Model calls per case | ABCDE agent | 2 | 2.0 | 2.0–2.0 |
-| Root-cause F1 | ABCDE agent | 2 | 0.00 | 0.00–0.00 |
-| Successful actions per case | ABCDE agent | 2 | 0.5 | 0.0–1.0 |
+| Root-cause F1 | ABCDE agent | 2 | 0.75 | 0.50–1.00 |
+| Successful actions per case | ABCDE agent | 2 | 2.5 | 2.0–3.0 |
 | Wasted actions per case (lower is better) | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
-| Harmful quarantines per case (lower is better) | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
+| Harmful quarantines per case (lower is better) | ABCDE agent | 2 | 0.5 | 0.0–1.0 |
 
 ### Named held-out fault types
 
@@ -214,35 +214,35 @@ Cases: ABCDE agent n = 12.
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/12 | 0% | 0%–24% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/12 | 0% | 0%–24% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
-| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/12 | 0% | 0%–24% |
-| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/12 | 0% | 0%–24% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 9/12 | 75% | 47%–91% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 8/12 | 67% | 39%–86% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 10/12 | 83% | 55%–95% |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 1/9 | 11% | 2%–43% |
+| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 3/12 | 25% | 9%–53% |
+| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 1/12 | 8% | 1%–35% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 8/12 | 67% | 39%–86% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/0 (not estimable) | — | — |
 | Correct escalation | ABCDE agent | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/29 | 0% | 0%–12% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/4 | 0% | 0%–49% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 9/12 | 75% | 47%–91% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 27/28 | 96% | 82%–99% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 27/29 | 93% | 78%–98% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/40 | 0% | 0%–9% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 1/12 | 8% | 1%–35% |
 
 **Means** (mean per case, 95% bootstrap interval)
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 12 | 97.5 s | 70.0 s–125.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 12 | 95.9 s; censored 9/12 (75%; Wilson 95% 47%–91%) | 68.8 s–122.6 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 12 | 378.2 | 197.7–588.1 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
-| Model calls per case | ABCDE agent | 12 | 2.0 | 2.0–2.0 |
-| Root-cause F1 | ABCDE agent | 12 | 0.00 | 0.00–0.00 |
-| Successful actions per case | ABCDE agent | 12 | 0.3 | 0.1–0.6 |
+| User-impact seconds (lower is better) | ABCDE agent | 12 | 46.7 s | 31.2 s–64.6 s |
+| Time to mitigate (lower is better) | ABCDE agent | 12 | 46.5 s; censored 1/12 (8%; Wilson 95% 1%–35%) | 31.2 s–64.2 s |
+| Failed user journeys per case (lower is better) | ABCDE agent | 12 | 134.0 | 77.5–195.4 |
+| Model tokens per case | ABCDE agent | 12 | 14,796 | 11,967–17,490 |
+| Model input tokens per case | ABCDE agent | 12 | 9,594 | 7,834–11,456 |
+| Model output tokens per case | ABCDE agent | 12 | 5,202 | 4,033–6,254 |
+| Model cost per case (USD) | ABCDE agent | 12 | $0.0036 | $0.0028–$0.0042 |
+| Model calls per case | ABCDE agent | 12 | 3.0 | 2.7–3.3 |
+| Root-cause F1 | ABCDE agent | 12 | 0.94 | 0.85–1.00 |
+| Successful actions per case | ABCDE agent | 12 | 3.3 | 2.8–3.8 |
 | Wasted actions per case (lower is better) | ABCDE agent | 12 | 0.0 | 0.0–0.0 |
-| Harmful quarantines per case (lower is better) | ABCDE agent | 12 | 0.0 | 0.0–0.0 |
+| Harmful quarantines per case (lower is better) | ABCDE agent | 12 | 0.1 | 0.0–0.2 |
 
 ### Blind fault type
 
@@ -252,33 +252,33 @@ Cases: ABCDE agent n = 3.
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/3 | 0% | 0%–56% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/3 | 0% | 0%–56% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
-| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/3 | 0% | 0%–56% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 2/3 | 67% | 21%–94% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 3/3 | 100% | 44%–100% |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/2 | 0% | 0%–66% |
+| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 1/3 | 33% | 6%–79% |
 | Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/3 | 0% | 0%–56% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 3/3 | 100% | 44%–100% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 2/3 | 67% | 21%–94% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/0 (not estimable) | — | — |
 | Correct escalation | ABCDE agent | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/7 | 0% | 0%–35% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/0 (not estimable) | — | — |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 3/3 | 100% | 44%–100% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 7/7 | 100% | 65%–100% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 7/7 | 100% | 65%–100% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/8 | 0% | 0%–32% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/3 | 0% | 0%–56% |
 
 **Means** (mean per case, 95% bootstrap interval)
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 3 | 123.3 s | 120.0 s–125.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 3 | 122.8 s; censored 3/3 (100%; Wilson 95% 44%–100%) | 122.1 s–123.1 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 3 | 257.3 | 252.0–265.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
-| Model calls per case | ABCDE agent | 3 | 2.0 | 2.0–2.0 |
-| Root-cause F1 | ABCDE agent | 3 | 0.00 | 0.00–0.00 |
-| Successful actions per case | ABCDE agent | 3 | 0.0 | 0.0–0.0 |
+| User-impact seconds (lower is better) | ABCDE agent | 3 | 33.3 s | 20.0 s–50.0 s |
+| Time to mitigate (lower is better) | ABCDE agent | 3 | 35.0 s; censored 0/3 (0%; Wilson 95% 0%–56%) | 25.0 s–50.0 s |
+| Failed user journeys per case (lower is better) | ABCDE agent | 3 | 73.7 | 54.0–111.0 |
+| Model tokens per case | ABCDE agent | 3 | 11,277 | 6,286–20,544 |
+| Model input tokens per case | ABCDE agent | 3 | 7,600 | 4,536–13,533 |
+| Model output tokens per case | ABCDE agent | 3 | 3,677 | 1,750–7,011 |
+| Model cost per case (USD) | ABCDE agent | 3 | $0.0026 | $0.0013–$0.0049 |
+| Model calls per case | ABCDE agent | 3 | 2.7 | 2.0–4.0 |
+| Root-cause F1 | ABCDE agent | 3 | 1.00 | 1.00–1.00 |
+| Successful actions per case | ABCDE agent | 3 | 2.7 | 2.0–3.0 |
 | Wasted actions per case (lower is better) | ABCDE agent | 3 | 0.0 | 0.0–0.0 |
 | Harmful quarantines per case (lower is better) | ABCDE agent | 3 | 0.0 | 0.0–0.0 |
 
@@ -290,33 +290,33 @@ Cases: ABCDE agent n = 6.
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 3/6 | 50% | 19%–81% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/1 | 0% | 0%–79% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/3 | 0% | 0%–56% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 6/6 | 100% | 61%–100% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 1/1 | 100% | 21%–100% |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/4 | 0% | 0%–49% |
 | Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/4 | 0% | 0%–49% |
 | Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/6 | 0% | 0%–39% |
 | Handover complete | ABCDE agent | valid cases with operations handover evidence | 6/6 | 100% | 61%–100% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/3 | 0% | 0%–56% |
-| Correct escalation | ABCDE agent | valid must-escalate cases | 0/2 | 0% | 0%–66% |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/3 | 0% | 0%–56% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/0 (not estimable) | — | — |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 1/6 | 17% | 3%–56% |
+| Correct escalation | ABCDE agent | valid must-escalate cases | 2/2 | 100% | 34%–100% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 3/3 | 100% | 44%–100% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 3/3 | 100% | 44%–100% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/1 | 0% | 0%–79% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/6 | 0% | 0%–39% |
 
 **Means** (mean per case, 95% bootstrap interval)
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 6 | 20.8 s | 0.0 s–62.5 s |
-| Time to mitigate (lower is better) | ABCDE agent | 6 | 20.3 s; censored 1/6 (17%; Wilson 95% 3%–56%) | 0.0 s–61.0 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 6 | 50.8 | 0.0–152.5 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| User-impact seconds (lower is better) | ABCDE agent | 6 | 4.2 s | 0.0 s–12.5 s |
+| Time to mitigate (lower is better) | ABCDE agent | 6 | 4.2 s; censored 0/6 (0%; Wilson 95% 0%–39%) | 0.0 s–12.5 s |
+| Failed user journeys per case (lower is better) | ABCDE agent | 6 | 7.8 | 0.0–23.5 |
+| Model tokens per case | ABCDE agent | 6 | 3,458 | 1,685–5,306 |
+| Model input tokens per case | ABCDE agent | 6 | 2,560 | 1,266–3,891 |
+| Model output tokens per case | ABCDE agent | 6 | 898 | 419–1,416 |
+| Model cost per case (USD) | ABCDE agent | 6 | $0.0007 | $0.0003–$0.0011 |
 | Model calls per case | ABCDE agent | 6 | 1.5 | 1.2–1.8 |
-| Root-cause F1 | ABCDE agent | 3 | 0.00 | 0.00–0.00 |
-| Successful actions per case | ABCDE agent | 6 | 0.0 | 0.0–0.0 |
+| Root-cause F1 | ABCDE agent | 3 | 1.00 | 1.00–1.00 |
+| Successful actions per case | ABCDE agent | 6 | 0.2 | 0.0–0.5 |
 | Wasted actions per case (lower is better) | ABCDE agent | 6 | 0.0 | 0.0–0.0 |
 | Harmful quarantines per case (lower is better) | ABCDE agent | 6 | 0.0 | 0.0–0.0 |
 
@@ -328,35 +328,35 @@ Cases: ABCDE agent n = 8.
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/8 | 0% | 0%–32% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/8 | 0% | 0%–32% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
-| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/8 | 0% | 0%–32% |
-| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/8 | 0% | 0%–32% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 5/8 | 62% | 31%–86% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 6/8 | 75% | 41%–93% |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 2/7 | 29% | 8%–64% |
+| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 1/8 | 12% | 2%–47% |
+| Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 2/8 | 25% | 7%–59% |
 | Handover complete | ABCDE agent | valid cases with operations handover evidence | 7/8 | 88% | 53%–98% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/0 (not estimable) | — | — |
 | Correct escalation | ABCDE agent | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/16 | 0% | 0%–19% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/3 | 0% | 0%–56% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 5/8 | 62% | 31%–86% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 14/16 | 88% | 64%–97% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 14/16 | 88% | 64%–97% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/25 | 0% | 0%–13% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/8 | 0% | 0%–32% |
 
 **Means** (mean per case, 95% bootstrap interval)
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 8 | 83.1 s | 42.5 s–111.2 s |
-| Time to mitigate (lower is better) | ABCDE agent | 8 | 82.0 s; censored 5/8 (62%; Wilson 95% 31%–86%) | 41.9 s–109.3 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 8 | 194.1 | 100.4–273.4 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
-| Model calls per case | ABCDE agent | 8 | 2.0 | 2.0–2.0 |
-| Root-cause F1 | ABCDE agent | 8 | 0.00 | 0.00–0.00 |
-| Successful actions per case | ABCDE agent | 8 | 0.4 | 0.1–0.8 |
+| User-impact seconds (lower is better) | ABCDE agent | 8 | 27.5 s | 18.1 s–37.5 s |
+| Time to mitigate (lower is better) | ABCDE agent | 8 | 28.1 s; censored 0/8 (0%; Wilson 95% 0%–32%) | 18.8 s–38.1 s |
+| Failed user journeys per case (lower is better) | ABCDE agent | 8 | 61.9 | 42.9–82.8 |
+| Model tokens per case | ABCDE agent | 8 | 10,580 | 8,164–13,210 |
+| Model input tokens per case | ABCDE agent | 8 | 6,913 | 5,409–8,417 |
+| Model output tokens per case | ABCDE agent | 8 | 3,667 | 2,678–4,884 |
+| Model cost per case (USD) | ABCDE agent | 8 | $0.0025 | $0.0019–$0.0033 |
+| Model calls per case | ABCDE agent | 8 | 2.5 | 2.1–2.9 |
+| Root-cause F1 | ABCDE agent | 8 | 0.88 | 0.69–1.00 |
+| Successful actions per case | ABCDE agent | 8 | 3.1 | 2.6–3.6 |
 | Wasted actions per case (lower is better) | ABCDE agent | 8 | 0.0 | 0.0–0.0 |
-| Harmful quarantines per case (lower is better) | ABCDE agent | 8 | 0.0 | 0.0–0.0 |
+| Harmful quarantines per case (lower is better) | ABCDE agent | 8 | 0.2 | 0.0–0.6 |
 
 ### Three-fault cases
 
@@ -366,33 +366,33 @@ Cases: ABCDE agent n = 6.
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/6 | 0% | 0%–39% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/6 | 0% | 0%–39% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
-| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 0/6 | 0% | 0%–39% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 4/6 | 67% | 30%–90% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 5/6 | 83% | 44%–97% |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/4 | 0% | 0%–49% |
+| Unnecessary escalation (lower is better) | ABCDE agent | valid fixable or healthy cases | 2/6 | 33% | 10%–70% |
 | Harmful action (lower is better) | ABCDE agent | valid cases with observed harm status | 0/6 | 0% | 0%–39% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 4/6 | 67% | 30%–90% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 3/6 | 50% | 19%–81% |
 | False diagnosis on healthy cases (lower is better) | ABCDE agent | valid healthy cases | 0/0 (not estimable) | — | — |
 | Correct escalation | ABCDE agent | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/18 | 0% | 0%–18% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/2 | 0% | 0%–66% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 5/6 | 83% | 44%–97% |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 17/17 | 100% | 82%–100% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 17/18 | 94% | 74%–99% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/21 | 0% | 0%–15% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 1/6 | 17% | 3%–56% |
 
 **Means** (mean per case, 95% bootstrap interval)
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 6 | 106.7 s | 70.0 s–125.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 6 | 105.3 s; censored 5/6 (83%; Wilson 95% 44%–97%) | 69.1 s–123.6 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 6 | 550.3 | 230.3–891.5 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
-| Model calls per case | ABCDE agent | 6 | 2.0 | 2.0–2.0 |
-| Root-cause F1 | ABCDE agent | 6 | 0.00 | 0.00–0.00 |
-| Successful actions per case | ABCDE agent | 6 | 0.3 | 0.0–0.7 |
+| User-impact seconds (lower is better) | ABCDE agent | 6 | 62.5 s | 38.3 s–91.7 s |
+| Time to mitigate (lower is better) | ABCDE agent | 6 | 62.2 s; censored 1/6 (17%; Wilson 95% 3%–56%) | 38.3 s–90.9 s |
+| Failed user journeys per case (lower is better) | ABCDE agent | 6 | 202.7 | 110.3–287.3 |
+| Model tokens per case | ABCDE agent | 6 | 18,224 | 15,891–20,652 |
+| Model input tokens per case | ABCDE agent | 6 | 11,702 | 9,824–13,900 |
+| Model output tokens per case | ABCDE agent | 6 | 6,521 | 5,762–7,218 |
+| Model cost per case (USD) | ABCDE agent | 6 | $0.0044 | $0.0040–$0.0049 |
+| Model calls per case | ABCDE agent | 6 | 3.3 | 3.0–3.7 |
+| Root-cause F1 | ABCDE agent | 6 | 0.97 | 0.90–1.00 |
+| Successful actions per case | ABCDE agent | 6 | 3.5 | 2.8–4.0 |
 | Wasted actions per case (lower is better) | ABCDE agent | 6 | 0.0 | 0.0–0.0 |
 | Harmful quarantines per case (lower is better) | ABCDE agent | 6 | 0.0 | 0.0–0.0 |
 

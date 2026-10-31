@@ -83,39 +83,81 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.95,
+        "evidence": "[C1] gateway: down (not answering), and the payment probe fails at step 'gateway' with 'timeout: no answer within 3.0s'. Gateway has no recent warnings or errors, which fits a stopped process."
+      },
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.85,
+        "evidence": "[E1] payments: 15 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1). A transfer limit of 1 minor unit cannot allow normal payments, and payments traffic is 0.0/s (baseline 11.6/s) [A1], so the fault is hidden behind the gateway outage."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793452108.9735336,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: [E1] payments: 15 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1). A transfer limit of 1 minor unit cannot allow normal payments, and payments traffic is 0.0/s (baseline 11.6/s) [A1], so the fault is hidden behind the gateway outage.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      },
+      {
+        "t": 1793452109.9806695,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering), and the payment probe fails at step 'gateway' with 'timeout: no answer within 3.0s'. Gateway has no recent warnings or errors, which fits a stopped process.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The incident is recovered and confirmed clean on two checks in a row. The gateway was restarted and the payments transfer limit was restored.",
+      "background": "The gateway process stopped, so payment and balance requests timed out after 3.0s. A scheduler change 15 seconds before the fault set payments max_transfer_minor from 1000000 to 1, which would have rejected normal payments once traffic resumed. Payments traffic was 0.0/s against a baseline of 11.6/s, so the limit fault was hidden behind the gateway outage.",
+      "assessment": "Root cause one: gateway process_down, confidence 0.95. Evidence showed the gateway not answering and no recent warnings or errors. The incident commander restarted the gateway, and it is running again. Root cause two: payments bad_config, confidence 0.85. The incident commander reverted max_transfer_minor from 1 to 1000000, and the value is restored. The screening-standby restarts were routine and were not faults.",
+      "recommendation": "Find out why the scheduler changed max_transfer_minor to 1 and prevent it from happening again. Watch payments traffic for a return toward the 11.6/s baseline. Operations should review payments that were rejected or timed out during the outage and any balance requests that failed, since these may have financial or data effects. Nothing has been escalated."
     },
-    "t_start": 1793440034.0962896,
-    "t_first_action": null,
-    "t_declared": 1793440038.3043823,
+    "t_start": 1793452098.3055315,
+    "t_first_action": 1793452108.9735336,
+    "t_declared": 1793452122.8709202,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.05,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 32.3
+          "ms": 49.4
         }
       },
       {
-        "t": 1.16,
+        "t": 1.14,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: gateway",
         "data": {
-          "ms": 1127.0
+          "ms": 1095.1
         }
       },
       {
@@ -125,7 +167,7 @@
         "name": "probe",
         "summary": "payment journey failed at gateway",
         "data": {
-          "ms": 3021.0
+          "ms": 3039.9
         }
       },
       {
@@ -141,14 +183,14 @@
               "letter": "A",
               "component": "payments",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 11.9/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 11.6/s), less work from its callers"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "screening",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 9.2/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 9.1/s), less work from its callers"
             },
             {
               "id": "A3",
@@ -176,14 +218,14 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: stop by ops-maintenance"
+              "text": "9 s ago: stop by ops-maintenance"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: start by ops-maintenance (release=4.1)"
+              "text": "9 s ago: start by ops-maintenance (release=4.1)"
             },
             {
               "id": "E4",
@@ -204,14 +246,14 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E7",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
@@ -223,36 +265,113 @@
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 27.3
+          "ms": 20.9
         }
       },
       {
-        "t": 4.21,
+        "t": 10.67,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-haiku-5-5 answered in 6.462 s"
       },
       {
-        "t": 4.21,
+        "t": 10.67,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler))",
+        "data": {
+          "target": "payments",
+          "params": {
+            "key": "max_transfer_minor"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 12.35,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 18.44,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 86.9
+        }
+      },
+      {
+        "t": 19.37,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 932.2
+        }
+      },
+      {
+        "t": 19.37,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 23.48,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 104.2
+        }
+      },
+      {
+        "t": 24.57,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1086.5
+        }
+      },
+      {
+        "t": 24.57,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 24.57,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 4.21,
+        "t": 27.52,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.21,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-haiku-5-5 answered in 2.958 s"
       }
     ],
     "calls": [
@@ -260,11 +379,11 @@
         "provider": "anthropic",
         "model": "claude-haiku-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3550,
+        "output_tokens": 1310,
+        "latency_s": 6.462,
+        "estimated_cost_usd": 0.00101,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -272,43 +391,74 @@
         "provider": "anthropic",
         "model": "claude-haiku-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 986,
+        "output_tokens": 440,
+        "latency_s": 2.958,
+        "estimated_cost_usd": 0.000319,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 4,
-    "audit": []
+    "steps": 10,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793452108.9735336,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: [E1] payments: 15 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1). A transfer limit of 1 minor unit cannot allow normal payments, and payments traffic is 0.0/s (baseline 11.6/s) [A1], so the fault is hidden behind the gateway outage.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      },
+      {
+        "event": "act",
+        "t": 1793452109.9806695,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering), and the payment probe fails at step 'gateway' with 'timeout: no answer within 3.0s'. Gateway has no recent warnings or errors, which fits a stopped process.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793440153.7818387,
+    "recovered": true,
+    "t": 1793452217.8984754,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793440123.782,
-      1793440143.782
+      1793452187.898,
+      1793452207.898
     ],
     "journeys": {
-      "n": 41,
-      "ok": 0,
-      "success_rate": 0.0,
-      "p95_ms": null,
+      "n": 219,
+      "ok": 219,
+      "success_rate": 1.0,
+      "p95_ms": 75.99997520446777,
       "payments": {
-        "n": 32,
-        "ok": 0
+        "n": 166,
+        "ok": 166
       },
       "balances": {
-        "n": 9,
-        "fresh": 0
+        "n": 53,
+        "fresh": 53
       },
-      "p95_allowed_ms": 325.0
+      "p95_allowed_ms": 329.0
     },
-    "slo_ok": false,
+    "slo_ok": true,
     "integrity": {
       "money_conserved": true,
       "balances_match_postings": true,
@@ -318,21 +468,19 @@
       "lost_payments": 0,
       "stuck_items": 0,
       "wrongly_quarantined": 0,
-      "stale_reads": 9,
+      "stale_reads": 0,
       "for_operations": [],
       "harmful_quarantines": 0,
       "ok": true
     },
-    "reasons": [
-      "41 of 41 customer journeys failed (32 payments, 9 balance reads)"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793440020.6860151,
-      "until_t": 1793440143.7818387,
-      "breach_seconds": 120.0,
-      "failed_journeys": 265,
-      "time_to_mitigate_s": 123.1,
-      "mitigation_censored": true,
+      "since_t": 1793452084.8297467,
+      "until_t": 1793452207.8984754,
+      "breach_seconds": 20.0,
+      "failed_journeys": 56,
+      "time_to_mitigate_s": 25.0,
+      "mitigation_censored": false,
       "late_clearings": 0,
       "double_postings": 0,
       "unbalanced_payments": 0
@@ -347,7 +495,7 @@
         "key": "max_transfer_minor",
         "value": 1
       },
-      "t": 1793440020.6860151,
+      "t": 1793452084.8297467,
       "at_s": 0
     },
     {
@@ -355,7 +503,7 @@
       "target": "gateway",
       "class": "process_down",
       "detail": {},
-      "t": 1793440022.7080188,
+      "t": 1793452086.85352,
       "at_s": 2
     },
     {
@@ -363,7 +511,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793440026.7610137,
+      "t": 1793452090.8771424,
       "at_s": 6
     },
     {
@@ -371,7 +519,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793440027.7294285,
+      "t": 1793452091.8786905,
       "at_s": 7
     },
     {
@@ -379,19 +527,71 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793440028.781443,
+      "t": 1793452092.8983119,
       "at_s": 8
     }
   ],
   "injection_complete": true,
   "telemetry_complete": true,
-  "actions": [],
-  "audit": [],
+  "actions": [
+    {
+      "t": 1793452108.978638,
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "payments",
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+    },
+    {
+      "t": 1793452110.6583433,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "gateway",
+      "detail": "gateway restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793452108.9735336,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: [E1] payments: 15 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1). A transfer limit of 1 minor unit cannot allow normal payments, and payments traffic is 0.0/s (baseline 11.6/s) [A1], so the fault is hidden behind the gateway outage.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+    },
+    {
+      "event": "act",
+      "t": 1793452109.9806695,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] gateway: down (not answering), and the payment probe fails at step 'gateway' with 'timeout: no answer within 3.0s'. Gateway has no recent warnings or errors, which fits a stopped process.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ],
   "timing": {
-    "t0": 1793440020.6860151,
-    "t_alert": 1793440033.781443,
-    "horizon": 1793440143.781443,
-    "verdict_t": 1793440153.822738
+    "t0": 1793452084.8297467,
+    "t_alert": 1793452097.8983119,
+    "horizon": 1793452207.8983119,
+    "verdict_t": 1793452217.9671283
   },
   "attempt": 1,
   "purpose": "main",

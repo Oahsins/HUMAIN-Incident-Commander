@@ -77,11 +77,24 @@
   "result": {
     "arm": "fifo",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "[C1] screening down (not answering), [C2] process exited 9 s ago (exit code 15). The payments log shows 'fraud screening timeout via primary', and the probe fails with '503 screening unavailable (timeout)'."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.75,
+        "evidence": "The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and the worker is down ([C3], [C4], exit code 1). [B3] says first item 94 has been waiting 12 s."
+      }
+    ],
     "actions": [
       {
-        "t": 1793429818.147861,
+        "t": 1793458232.5523098,
         "action": "failover",
         "target": "screening",
         "params": {
@@ -94,52 +107,102 @@
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793458243.149753,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: [C1] screening down (not answering), [C2] process exited 9 s ago (exit code 15). The payments log shows 'fraud screening timeout via primary', and the probe fails with '503 screening unavailable (timeout)'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "t": 1793458245.8013659,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and the worker is down ([C3], [C4], exit code 1). [B3] says first item 94 has been waiting 12 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 94 set aside for the operations team"
+      },
+      {
+        "t": 1793458246.8298068,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and the worker is down ([C3], [C4], exit code 1). [B3] says first item 94 has been waiting 12 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
       }
     ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "failover on screening: done",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 94 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 94 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793429817.0377116,
-    "t_first_action": 1793429818.147861,
-    "t_declared": 1793429818.2789369,
+    "sbar": {
+      "situation": "The bank payment journey has recovered. The last two recovery checks, ending at 28 s, ran the main journey cleanly with all component metrics normal.",
+      "background": "The screening primary process exited with code 15, so payments timed out calling screening and 92% of requests failed. Separately, the clearing worker crashed with exit code 1 on a JSONDecodeError while parsing queue item 94, which had been waiting 12 s.",
+      "assessment": "The incident commander failed screening over to its standby and restarted the primary, and both steps succeeded. It then quarantined clearing item 94 as the likely poison message and restarted clearing, and both steps succeeded.",
+      "recommendation": "Confirm the screening primary is serving again and the clearing backlog has drained. Clearing item 94 has been escalated to the operations team as soon priority. They must repair and resubmit that payment, or close it with its customer."
+    },
+    "t_start": 1793458231.3605857,
+    "t_first_action": 1793458232.5523098,
+    "t_declared": 1793458259.542015,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 31.2
+          "ms": 41.8
         }
       },
       {
-        "t": 0.09,
+        "t": 0.13,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: screening, clearing",
         "data": {
-          "ms": 62.2
+          "ms": 90.9
         }
       },
       {
-        "t": 1.11,
+        "t": 1.19,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 1016.6
+          "ms": 1058.7
         }
       },
       {
-        "t": 1.11,
+        "t": 1.19,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -151,14 +214,14 @@
               "letter": "A",
               "component": "gateway",
               "severity": "fault",
-              "text": "93% of requests fail (baseline 0%)"
+              "text": "92% of requests fail (baseline 0%)"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "payments",
               "severity": "fault",
-              "text": "93% of requests fail (baseline 0%)"
+              "text": "92% of requests fail (baseline 0%)"
             },
             {
               "id": "A3",
@@ -172,21 +235,21 @@
               "letter": "B",
               "component": "gateway",
               "severity": "fault",
-              "text": "p95 1041 ms (baseline 61 ms)"
+              "text": "p95 1043 ms (baseline 60 ms)"
             },
             {
               "id": "B2",
               "letter": "B",
               "component": "payments",
               "severity": "fault",
-              "text": "p95 1027 ms (baseline 46 ms)"
+              "text": "p95 1035 ms (baseline 46 ms)"
             },
             {
               "id": "B3",
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 17 items waiting, oldest 11 s; first item 95 waiting 11 s after 0 attempt(s)"
+              "text": "backlog: 17 items waiting, oldest 12 s; first item 94 waiting 12 s after 0 attempt(s)"
             },
             {
               "id": "C1",
@@ -221,14 +284,14 @@
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments fail: 93%"
+              "text": "calls to payments fail: 92%"
             },
             {
               "id": "D2",
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments are slow: p95 1041 ms (payments itself answered in 46 ms at baseline)"
+              "text": "calls to payments are slow: p95 1042 ms (payments itself answered in 46 ms at baseline)"
             },
             {
               "id": "D3",
@@ -242,27 +305,27 @@
               "letter": "D",
               "component": "payments",
               "severity": "fault",
-              "text": "calls to screening are slow: p95 1025 ms (screening itself answered in 15 ms at baseline)"
+              "text": "calls to screening are slow: p95 1033 ms (screening itself answered in 15 ms at baseline)"
             },
             {
               "id": "E1",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by operator"
+              "text": "6 s ago: stop by operator"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by operator (release=4.1)"
+              "text": "6 s ago: start by operator (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 1.13,
+        "t": 1.21,
         "phase": "survey",
         "kind": "action",
         "name": "containment",
@@ -278,72 +341,163 @@
         }
       },
       {
-        "t": 1.14,
+        "t": 1.22,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 16.1
+          "ms": 9.7
         }
       },
       {
-        "t": 1.18,
+        "t": 1.25,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "6 log records from payments",
         "data": {
-          "ms": 32.8
+          "ms": 26.4
         }
       },
       {
-        "t": 1.21,
+        "t": 1.26,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "2 log records from clearing",
         "data": {
-          "ms": 31.4
+          "ms": 13.7
         }
       },
       {
-        "t": 1.24,
+        "t": 1.29,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from screening",
         "data": {
-          "ms": 32.2
+          "ms": 30.6
         }
       },
       {
-        "t": 1.24,
+        "t": 11.79,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 10.497 s"
       },
       {
-        "t": 1.24,
+        "t": 12.44,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart screening: done (screening restarted)",
+        "data": {
+          "target": "screening",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.47,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 94 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 94
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 16.1,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 22.16,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 53.7
+        }
+      },
+      {
+        "t": 23.19,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1036.7
+        }
+      },
+      {
+        "t": 23.19,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 27.3,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 103.9
+        }
+      },
+      {
+        "t": 28.18,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 884.8
+        }
+      },
+      {
+        "t": 28.18,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 28.18,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 1.24,
+        "t": 32.49,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 1.24,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.311 s"
       }
     ],
     "calls": [
@@ -351,11 +505,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4204,
+        "output_tokens": 992,
+        "latency_s": 10.497,
+        "estimated_cost_usd": 0.036656,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -363,20 +517,20 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1079,
+        "output_tokens": 296,
+        "latency_s": 4.311,
+        "estimated_cost_usd": 0.010236,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 8,
+    "steps": 15,
     "audit": [
       {
         "event": "act",
-        "t": 1793429818.147861,
+        "t": 1793458232.5523098,
         "action": "failover",
         "target": "screening",
         "params": {
@@ -389,32 +543,76 @@
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793458243.149753,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "process_down: [C1] screening down (not answering), [C2] process exited 9 s ago (exit code 15). The payments log shows 'fraud screening timeout via primary', and the probe fails with '503 screening unavailable (timeout)'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793458245.8013659,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 94
+        },
+        "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and the worker is down ([C3], [C4], exit code 1). [B3] says first item 94 has been waiting 12 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 94 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793458246.8298068,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and the worker is down ([C3], [C4], exit code 1). [B3] says first item 94 has been waiting 12 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
       }
     ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793429936.744038,
+    "recovered": true,
+    "t": 1793458350.9594667,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793429906.744,
-      1793429926.744
+      1793458320.959,
+      1793458340.959
     ],
     "journeys": {
-      "n": 225,
-      "ok": 225,
+      "n": 226,
+      "ok": 226,
       "success_rate": 1.0,
-      "p95_ms": 65.00005722045898,
+      "p95_ms": 75.00004768371582,
       "payments": {
-        "n": 170,
-        "ok": 170
+        "n": 169,
+        "ok": 169
       },
       "balances": {
-        "n": 55,
-        "fresh": 55
+        "n": 57,
+        "fresh": 57
       },
-      "p95_allowed_ms": 328.0
+      "p95_allowed_ms": 325.0
     },
     "slo_ok": true,
     "integrity": {
@@ -424,24 +622,28 @@
       "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
-      "stuck_items": 980,
+      "stuck_items": 0,
       "wrongly_quarantined": 0,
       "stale_reads": 0,
-      "for_operations": [],
+      "for_operations": [
+        {
+          "kind": "set_aside",
+          "item": 94,
+          "payment_id": "batch-017"
+        }
+      ],
       "harmful_quarantines": 0,
-      "ok": false
+      "ok": true
     },
-    "reasons": [
-      "980 payments waiting more than 5 s to clear"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793429805.678365,
-      "until_t": 1793429926.744038,
+      "since_t": 1793458219.8691537,
+      "until_t": 1793458340.9594667,
       "breach_seconds": 15.0,
       "failed_journeys": 28,
       "time_to_mitigate_s": 15.0,
       "mitigation_censored": false,
-      "late_clearings": 900,
+      "late_clearings": 107,
       "double_postings": 0,
       "unbalanced_payments": 0
     }
@@ -452,9 +654,9 @@
       "target": "clearing",
       "class": "poison_message",
       "detail": {
-        "item": 95
+        "item": 94
       },
-      "t": 1793429805.678365,
+      "t": 1793458219.8691537,
       "at_s": 0
     },
     {
@@ -462,7 +664,7 @@
       "target": "screening",
       "class": "process_down",
       "detail": {},
-      "t": 1793429807.719768,
+      "t": 1793458221.9131718,
       "at_s": 2
     },
     {
@@ -470,7 +672,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793429811.7436218,
+      "t": 1793458225.959079,
       "at_s": 6
     }
   ],
@@ -478,7 +680,7 @@
   "telemetry_complete": true,
   "actions": [
     {
-      "t": 1793429818.1648786,
+      "t": 1793458232.5693445,
       "params": {
         "to": "standby"
       },
@@ -487,12 +689,41 @@
       "action": "failover",
       "target": "screening",
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793458243.7990878,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "screening",
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793458245.828013,
+      "params": {
+        "item": 94
+      },
+      "ok": true,
+      "refused": false,
+      "action": "quarantine",
+      "target": "clearing",
+      "detail": "clearing item 94 set aside for the operations team"
+    },
+    {
+      "t": 1793458247.4598029,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
     }
   ],
   "audit": [
     {
       "event": "act",
-      "t": 1793429818.147861,
+      "t": 1793458232.5523098,
       "action": "failover",
       "target": "screening",
       "params": {
@@ -505,13 +736,57 @@
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793458243.149753,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: [C1] screening down (not answering), [C2] process exited 9 s ago (exit code 15). The payments log shows 'fraud screening timeout via primary', and the probe fails with '503 screening unavailable (timeout)'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793458245.8013659,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 94
+      },
+      "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and the worker is down ([C3], [C4], exit code 1). [B3] says first item 94 has been waiting 12 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 94 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793458246.8298068,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in 'message = self.parse(item)', and the worker is down ([C3], [C4], exit code 1). [B3] says first item 94 has been waiting 12 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
     }
   ],
   "timing": {
-    "t0": 1793429805.678365,
-    "t_alert": 1793429816.7436218,
-    "horizon": 1793429926.7436218,
-    "verdict_t": 1793429936.7981167
+    "t0": 1793458219.8691537,
+    "t_alert": 1793458230.959079,
+    "horizon": 1793458340.959079,
+    "verdict_t": 1793458351.0105221
   },
   "attempt": 1,
   "purpose": "main",

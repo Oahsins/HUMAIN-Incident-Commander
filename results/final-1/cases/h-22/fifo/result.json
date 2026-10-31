@@ -1,53 +1,117 @@
 {
   "arm": "fifo",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "gateway",
+      "class": "process_down",
+      "confidence": 0.85,
+      "evidence": "[C1] gateway: down (not answering) and [A3] the payment journey fails at step 'gateway': timeout: no answer within 3.0s. No release or config change is recorded for gateway, and downstream traffic is 0.0/s."
+    },
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.8,
+      "evidence": "clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item) and is now down ([C2], [C3]). [B1] shows the backlog headed by item 91, waiting 14 s."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793458098.7301872,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] gateway: down (not answering) and [A3] the payment journey fails at step 'gateway': timeout: no answer within 3.0s. No release or config change is recorded for gateway, and downstream traffic is 0.0/s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    },
+    {
+      "t": 1793458101.3901575,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 91
+      },
+      "reason": "poison_message: clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item) and is now down ([C2], [C3]). [B1] shows the backlog headed by item 91, waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 91 set aside for the operations team"
+    },
+    {
+      "t": 1793458102.4179065,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item) and is now down ([C2], [C3]). [B1] shows the backlog headed by item 91, waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "clearing"
+    ],
+    "class": null,
+    "reason": "item 91 was set aside from clearing's work queue",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "review item 91 set aside from clearing: repair and resubmit it, or close it with its customer"
   },
-  "t_start": 1793428657.3333213,
-  "t_first_action": null,
-  "t_declared": 1793428661.4936295,
+  "sbar": {
+    "situation": "The bank payment system has recovered. Two recovery checks in a row were clean, the last at 29 s, with the main payment journey completing and all components reporting metrics.",
+    "background": "The gateway process went down with no release or config change recorded, so every payment journey timed out at the gateway step after 3.0 s. Separately, the clearing worker crashed on item 91 with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item), and its queue backed up behind that item.",
+    "assessment": "There were two independent root causes: gateway process down (confidence 0.85) and a poison message on clearing (confidence 0.8). The incident commander itself restarted the gateway, which succeeded. It then quarantined clearing item 91 and restarted clearing, and both steps succeeded.",
+    "recommendation": "The operations team has been escalated (soon) to review item 91, set aside from clearing, and either repair and resubmit it or close it with its customer. This payment has not been processed, so its money effect needs their review. Also find out why the gateway process went down, since no change was recorded."
+  },
+  "t_start": 1793458086.560594,
+  "t_first_action": 1793458098.7301872,
+  "t_declared": 1793458115.0656228,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.07,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 33.0
+        "ms": 65.8
       }
     },
     {
-      "t": 1.09,
+      "t": 1.19,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: gateway, clearing",
       "data": {
-        "ms": 1056.3
+        "ms": 1119.4
       }
     },
     {
-      "t": 4.12,
+      "t": 4.2,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at gateway",
       "data": {
-        "ms": 3026.5
+        "ms": 3015.4
       }
     },
     {
-      "t": 4.12,
+      "t": 4.2,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -59,14 +123,14 @@
             "letter": "A",
             "component": "payments",
             "severity": "info",
-            "text": "traffic 0.0/s (baseline 11.4/s), less work from its callers"
+            "text": "traffic 0.0/s (baseline 11.1/s), less work from its callers"
           },
           {
             "id": "A2",
             "letter": "A",
             "component": "screening",
             "severity": "info",
-            "text": "traffic 0.0/s (baseline 9.3/s), less work from its callers"
+            "text": "traffic 0.0/s (baseline 8.9/s), less work from its callers"
           },
           {
             "id": "A3",
@@ -80,7 +144,7 @@
             "letter": "B",
             "component": "clearing",
             "severity": "fault",
-            "text": "backlog: 13 items waiting, oldest 14 s; first item 96 waiting 14 s after 0 attempt(s)"
+            "text": "backlog: 18 items waiting, oldest 14 s; first item 91 waiting 14 s after 0 attempt(s)"
           },
           {
             "id": "C1",
@@ -108,79 +172,170 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "7 s ago: stop by pipeline"
+            "text": "8 s ago: stop by pipeline"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "7 s ago: start by pipeline (release=4.1)"
+            "text": "8 s ago: start by pipeline (release=4.1)"
           },
           {
             "id": "E3",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by ops-maintenance"
+            "text": "7 s ago: stop by ops-maintenance"
           },
           {
             "id": "E4",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: start by ops-maintenance (release=4.1)"
+            "text": "7 s ago: start by ops-maintenance (release=4.1)"
           }
         ]
       }
     },
     {
-      "t": 4.13,
+      "t": 4.21,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 15.4
+        "ms": 12.2
       }
     },
     {
-      "t": 4.16,
+      "t": 4.24,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "2 log records from clearing",
       "data": {
-        "ms": 28.4
+        "ms": 27.4
       }
     },
     {
-      "t": 4.16,
+      "t": 12.17,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 7.928 s"
     },
     {
-      "t": 4.16,
+      "t": 12.83,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart gateway: done (gateway restarted)",
+      "data": {
+        "target": "gateway",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 14.86,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "quarantine",
+      "summary": "quarantine clearing: done (clearing item 91 set aside for the operations team)",
+      "data": {
+        "target": "clearing",
+        "params": {
+          "item": 91
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 16.49,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 22.54,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 49.5
+      }
+    },
+    {
+      "t": 23.44,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 894.9
+      }
+    },
+    {
+      "t": 23.44,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 27.56,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 120.4
+      }
+    },
+    {
+      "t": 28.5,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 945.1
+      }
+    },
+    {
+      "t": 28.51,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 28.51,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 4.16,
+      "t": 33.76,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 4.16,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 5.255 s"
     }
   ],
   "calls": [
@@ -188,11 +343,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3699,
+      "output_tokens": 752,
+      "latency_s": 7.928,
+      "estimated_cost_usd": 0.029836,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -200,15 +355,60 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1016,
+      "output_tokens": 361,
+      "latency_s": 5.255,
+      "estimated_cost_usd": 0.011284,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 5,
-  "audit": []
+  "steps": 12,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793458098.7301872,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] gateway: down (not answering) and [A3] the payment journey fails at step 'gateway': timeout: no answer within 3.0s. No release or config change is recorded for gateway, and downstream traffic is 0.0/s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793458101.3901575,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 91
+      },
+      "reason": "poison_message: clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item) and is now down ([C2], [C3]). [B1] shows the backlog headed by item 91, waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 91 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793458102.4179065,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item) and is now down ([C2], [C3]). [B1] shows the backlog headed by item 91, waiting 14 s.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ]
 }

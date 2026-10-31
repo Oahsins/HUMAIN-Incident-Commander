@@ -61,53 +61,98 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.85,
+        "evidence": "Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). The finding 'first item 93 waiting 14 s' shows that item at the head of the queue, and clearing is 'down (not answering)'."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793448941.6445258,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 93
+        },
+        "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). The finding 'first item 93 waiting 14 s' shows that item at the head of the queue, and clearing is 'down (not answering)'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 93 set aside for the operations team"
+      },
+      {
+        "t": 1793448942.6743116,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). The finding 'first item 93 waiting 14 s' shows that item at the head of the queue, and clearing is 'down (not answering)'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 93 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 93 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793423135.1667998,
-    "t_first_action": null,
-    "t_declared": 1793423139.1955538,
+    "sbar": {
+      "situation": "Clearing is back up and payments are being cleared again. Recovery was confirmed by two clean checks in a row, the last at 25 s.",
+      "background": "The clearing worker crashed on item 93, a malformed item at the head of its queue. It failed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item), and the backlog grew to 120 items.",
+      "assessment": "The root cause was a poison message on clearing (confidence 0.85). The incident commander itself quarantined item 93, which set it aside for the operations team, and then restarted clearing, which came back up.",
+      "recommendation": "Confirm the clearing backlog of 120 items drains. Item 93 has been escalated (soon) to the operations team, who must repair and resubmit it or close it with its customer, because that payment has not been cleared."
+    },
+    "t_start": 1793448930.204591,
+    "t_first_action": 1793448941.6445258,
+    "t_declared": 1793448955.3006723,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.06,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 34.8
+          "ms": 58.8
         }
       },
       {
-        "t": 0.14,
+        "t": 0.13,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: clearing",
         "data": {
-          "ms": 105.6
+          "ms": 73.8
         }
       },
       {
-        "t": 4.01,
+        "t": 4.03,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at clearing",
         "data": {
-          "ms": 3866.6
+          "ms": 3901.9
         }
       },
       {
-        "t": 4.01,
+        "t": 4.03,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -126,7 +171,7 @@
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 119 items waiting, oldest 14 s; first item 93 waiting 14 s after 0 attempt(s)"
+              "text": "backlog: 120 items waiting, oldest 14 s; first item 93 waiting 14 s after 0 attempt(s)"
             },
             {
               "id": "C1",
@@ -147,55 +192,132 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by ops-maintenance"
+              "text": "6 s ago: stop by ops-maintenance"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by ops-maintenance (release=4.1)"
+              "text": "6 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 4.03,
+        "t": 4.06,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "2 log records from clearing",
         "data": {
-          "ms": 21.2
+          "ms": 24.6
         }
       },
       {
-        "t": 4.03,
+        "t": 11.44,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 7.38 s"
       },
       {
-        "t": 4.03,
+        "t": 11.47,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 93 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 93
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.12,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 19.19,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 76.5
+        }
+      },
+      {
+        "t": 20.11,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 920.4
+        }
+      },
+      {
+        "t": 20.11,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 24.19,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 73.5
+        }
+      },
+      {
+        "t": 25.1,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 908.2
+        }
+      },
+      {
+        "t": 25.1,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 25.1,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 4.03,
+        "t": 29.54,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.03,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.439 s"
       }
     ],
     "calls": [
@@ -203,11 +325,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3551,
+        "output_tokens": 651,
+        "latency_s": 7.38,
+        "estimated_cost_usd": 0.027224,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -215,41 +337,72 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 931,
+        "output_tokens": 284,
+        "latency_s": 4.439,
+        "estimated_cost_usd": 0.009404,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 4,
-    "audit": []
+    "steps": 10,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793448941.6445258,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 93
+        },
+        "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). The finding 'first item 93 waiting 14 s' shows that item at the head of the queue, and clearing is 'down (not answering)'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 93 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793448942.6743116,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). The finding 'first item 93 waiting 14 s' shows that item at the head of the queue, and clearing is 'down (not answering)'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793423254.8640563,
+    "recovered": true,
+    "t": 1793449049.8289423,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793423224.864,
-      1793423244.864
+      1793449019.829,
+      1793449039.829
     ],
     "journeys": {
-      "n": 222,
-      "ok": 222,
+      "n": 223,
+      "ok": 223,
       "success_rate": 1.0,
-      "p95_ms": 65.99998474121094,
+      "p95_ms": 70.9998607635498,
       "payments": {
-        "n": 172,
-        "ok": 172
+        "n": 175,
+        "ok": 175
       },
       "balances": {
-        "n": 50,
-        "fresh": 50
+        "n": 48,
+        "fresh": 48
       },
-      "p95_allowed_ms": 321.0
+      "p95_allowed_ms": 319.0
     },
     "slo_ok": true,
     "integrity": {
@@ -259,24 +412,28 @@
       "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
-      "stuck_items": 1101,
+      "stuck_items": 0,
       "wrongly_quarantined": 0,
       "stale_reads": 0,
-      "for_operations": [],
+      "for_operations": [
+        {
+          "kind": "set_aside",
+          "item": 93,
+          "payment_id": "batch-017"
+        }
+      ],
       "harmful_quarantines": 0,
-      "ok": false
+      "ok": true
     },
-    "reasons": [
-      "1101 payments waiting more than 5 s to clear"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793423121.8066158,
-      "until_t": 1793423244.8640563,
+      "since_t": 1793448916.7420132,
+      "until_t": 1793449039.8289423,
       "breach_seconds": 0.0,
       "failed_journeys": 0,
       "time_to_mitigate_s": 0.0,
       "mitigation_censored": false,
-      "late_clearings": 1010,
+      "late_clearings": 211,
       "double_postings": 0,
       "unbalanced_payments": 0
     }
@@ -289,7 +446,7 @@
       "detail": {
         "item": 93
       },
-      "t": 1793423121.8066158,
+      "t": 1793448916.7420132,
       "at_s": 0
     },
     {
@@ -297,19 +454,71 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793423129.8638542,
+      "t": 1793448924.828436,
       "at_s": 8
     }
   ],
   "injection_complete": true,
   "telemetry_complete": true,
-  "actions": [],
-  "audit": [],
+  "actions": [
+    {
+      "t": 1793448941.6722791,
+      "params": {
+        "item": 93
+      },
+      "ok": true,
+      "refused": false,
+      "action": "quarantine",
+      "target": "clearing",
+      "detail": "clearing item 93 set aside for the operations team"
+    },
+    {
+      "t": 1793448943.3181405,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793448941.6445258,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 93
+      },
+      "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). The finding 'first item 93 waiting 14 s' shows that item at the head of the queue, and clearing is 'down (not answering)'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 93 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793448942.6743116,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed 17 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). The finding 'first item 93 waiting 14 s' shows that item at the head of the queue, and clearing is 'down (not answering)'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
   "timing": {
-    "t0": 1793423121.8066158,
-    "t_alert": 1793423134.8638542,
-    "horizon": 1793423244.8638542,
-    "verdict_t": 1793423254.924579
+    "t0": 1793448916.7420132,
+    "t_alert": 1793448929.828436,
+    "horizon": 1793449039.828436,
+    "verdict_t": 1793449049.921625
   },
   "attempt": 1,
   "purpose": "main",

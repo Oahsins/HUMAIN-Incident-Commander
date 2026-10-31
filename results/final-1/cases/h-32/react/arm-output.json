@@ -4,56 +4,262 @@
     "mode": "auto",
     "outcome": "gave_up",
     "root_causes": [],
-    "actions": [],
+    "actions": [
+      {
+        "t": 1793455841.7088082,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Payments times out on the slow screening primary (p95 1812 ms vs 15 ms baseline) while payments itself is otherwise working, so fail over to the standby.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793455846.724242,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 92
+        },
+        "reason": "Clearing crashed parsing a malformed item; the head item 92 is likely the poison message, so quarantine it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 92 set aside for the operations team"
+      },
+      {
+        "t": 1793455849.48618,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 92 is now quarantined, so restart clearing to bring it back up.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 92 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 92 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793431508.7532518,
-    "t_first_action": null,
-    "t_declared": 1793431508.7875776,
+    "sbar": {
+      "situation": "Recovery was not confirmed: the incident commander gave up before the bank system was shown to be healthy. Screening is running on its standby, and clearing has been restarted with item 92 set aside.",
+      "background": "The facts given do not show what changed or when. The incident commander acted on two components, screening and clearing.",
+      "assessment": "No root cause was confirmed. The incident commander itself failed screening over to its standby (done), quarantined clearing item 92 for the operations team (done), and restarted clearing (done), but none of these was shown to restore service.",
+      "recommendation": "Check now whether screening on standby and the restarted clearing are processing correctly, and find the root cause before failing screening back. The operations team has been asked (soon priority) to review clearing item 92: repair and resubmit it, or close it with its customer, as its payment is held until then."
+    },
+    "t_start": 1793455831.3833647,
+    "t_first_action": 1793455841.7088082,
+    "t_declared": 1793455852.426627,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 34.2
+          "ms": 37.1
         }
       },
       {
-        "t": 0.03,
+        "t": 2.31,
         "phase": "triage",
         "kind": "model",
         "name": "react",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 2.273 s"
       },
       {
-        "t": 0.03,
+        "t": 2.31,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all components to see metrics and recent changes."
+      },
+      {
+        "t": 2.38,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 70.9
+        }
+      },
+      {
+        "t": 6.2,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.818 s"
+      },
+      {
+        "t": 6.2,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Payments was deployed 1.3→1.5 just before symptoms, screening is slow, clearing is down, and the ledger shows duplicate payments; check payments logs first."
+      },
+      {
+        "t": 6.23,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "10 log records from payments",
+        "data": {
+          "ms": 26.8
+        }
+      },
+      {
+        "t": 10.33,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.097 s"
+      },
+      {
+        "t": 10.33,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Payments times out on the slow screening primary (p95 1812 ms vs 15 ms baseline) while payments itself is otherwise working, so fail over to the standby."
+      },
+      {
+        "t": 10.35,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "failover",
+        "summary": "failover screening: done (screening now served by its standby)",
+        "data": {
+          "target": "screening",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 12.65,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.299 s"
+      },
+      {
+        "t": 12.65,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Now check clearing, which is down with exit code 1; look at its logs."
+      },
+      {
+        "t": 12.68,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from clearing",
+        "data": {
+          "ms": 27.6
+        }
+      },
+      {
+        "t": 15.34,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.661 s"
+      },
+      {
+        "t": 15.34,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Clearing crashed parsing a malformed item; the head item 92 is likely the poison message, so quarantine it."
+      },
+      {
+        "t": 15.36,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 92 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 92
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 18.1,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.746 s"
+      },
+      {
+        "t": 18.1,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Item 92 is now quarantined, so restart clearing to bring it back up."
+      },
+      {
+        "t": 18.75,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 21.04,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "model call failed: The model declined this request (refusal)."
+      },
+      {
+        "t": 21.04,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
         "summary": "gave_up"
       },
       {
-        "t": 0.03,
+        "t": 25.52,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.03,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.474 s"
       }
     ],
     "calls": [
@@ -61,9 +267,81 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "react",
+        "input_tokens": 2725,
+        "output_tokens": 87,
+        "latency_s": 2.273,
+        "estimated_cost_usd": 0.01264,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4727,
+        "output_tokens": 232,
+        "latency_s": 3.818,
+        "estimated_cost_usd": 0.023548,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5290,
+        "output_tokens": 269,
+        "latency_s": 4.097,
+        "estimated_cost_usd": 0.02654,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5460,
+        "output_tokens": 94,
+        "latency_s": 2.299,
+        "estimated_cost_usd": 0.02372,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5696,
+        "output_tokens": 110,
+        "latency_s": 2.661,
+        "estimated_cost_usd": 0.024984,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5858,
+        "output_tokens": 96,
+        "latency_s": 2.746,
+        "estimated_cost_usd": 0.025352,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
         "input_tokens": null,
         "output_tokens": null,
-        "latency_s": 0.0,
+        "latency_s": 2.296,
         "estimated_cost_usd": null,
         "status": "failed",
         "error": null,
@@ -73,17 +351,64 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 649,
+        "output_tokens": 275,
+        "latency_s": 4.474,
+        "estimated_cost_usd": 0.008096,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 1,
-    "audit": []
+    "steps": 7,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793455841.7088082,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Payments times out on the slow screening primary (p95 1812 ms vs 15 ms baseline) while payments itself is otherwise working, so fail over to the standby.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793455846.724242,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 92
+        },
+        "reason": "Clearing crashed parsing a malformed item; the head item 92 is likely the poison message, so quarantine it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 92 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793455849.48618,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Item 92 is now quarantined, so restart clearing to bring it back up.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
   },
   "error": null
 }

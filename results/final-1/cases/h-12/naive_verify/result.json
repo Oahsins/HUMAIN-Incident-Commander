@@ -1,53 +1,74 @@
 {
   "arm": "naive_verify",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "gateway",
+      "class": "process_down",
+      "confidence": 0.9,
+      "evidence": "[C1] \"gateway: down (not answering)\" and [A3] \"payment journey fails at step 'gateway': timeout: no answer within 3.0s\". There is no recent change to the gateway and it logged no errors."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793453748.682534,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] \"gateway: down (not answering)\" and [A3] \"payment journey fails at step 'gateway': timeout: no answer within 3.0s\". There is no recent change to the gateway and it logged no errors.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The bank payment service has recovered after the gateway process went down. One recovery check at 14 seconds ran the main payment journey cleanly.",
+    "background": "The gateway stopped answering, so payment journeys timed out at the first step after 3.0s and downstream traffic fell to zero. There was no recent change to the gateway and it logged no errors.",
+    "assessment": "The root cause was the gateway process being down (confidence 0.9). The incident commander restarted the gateway itself, and the restart completed. The maintenance restart of screening-standby was routine and unrelated.",
+    "recommendation": "Watch the gateway for a repeat failure and find out why it stopped, since it logged no errors and had no recent change. Operations should review the payments that timed out while the gateway was down."
   },
-  "t_start": 1793424327.1358368,
-  "t_first_action": null,
-  "t_declared": 1793424331.3061378,
+  "t_start": 1793453739.0649397,
+  "t_first_action": 1793453748.682534,
+  "t_declared": 1793453753.3894587,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.04,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 34.3
+        "ms": 38.9
       }
     },
     {
-      "t": 1.12,
+      "t": 1.1,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: gateway",
       "data": {
-        "ms": 1084.7
+        "ms": 1057.0
       }
     },
     {
-      "t": 4.15,
+      "t": 4.13,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at gateway",
       "data": {
-        "ms": 3032.8
+        "ms": 3031.9
       }
     },
     {
-      "t": 4.15,
+      "t": 4.13,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -59,14 +80,14 @@
             "letter": "A",
             "component": "payments",
             "severity": "info",
-            "text": "traffic 0.0/s (baseline 11.4/s), less work from its callers"
+            "text": "traffic 0.0/s (baseline 11.3/s), less work from its callers"
           },
           {
             "id": "A2",
             "letter": "A",
             "component": "screening",
             "severity": "info",
-            "text": "traffic 0.0/s (baseline 8.8/s), less work from its callers"
+            "text": "traffic 0.0/s (baseline 8.7/s), less work from its callers"
           },
           {
             "id": "A3",
@@ -87,7 +108,7 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by ops-maintenance"
+            "text": "7 s ago: stop by ops-maintenance"
           },
           {
             "id": "E2",
@@ -100,42 +121,76 @@
       }
     },
     {
-      "t": 4.17,
+      "t": 4.15,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 18.0
+        "ms": 25.8
       }
     },
     {
-      "t": 4.17,
+      "t": 9.62,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 5.463 s"
     },
     {
-      "t": 4.17,
+      "t": 10.3,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart gateway: done (gateway restarted)",
+      "data": {
+        "target": "gateway",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 13.41,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 108.2
+      }
+    },
+    {
+      "t": 14.32,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 918.6
+      }
+    },
+    {
+      "t": 14.32,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: clean"
+    },
+    {
+      "t": 14.32,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 4.17,
+      "t": 18.76,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 4.17,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 4.433 s"
     }
   ],
   "calls": [
@@ -143,11 +198,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3374,
+      "output_tokens": 432,
+      "latency_s": 5.463,
+      "estimated_cost_usd": 0.022136,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -155,15 +210,30 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 748,
+      "output_tokens": 253,
+      "latency_s": 4.433,
+      "estimated_cost_usd": 0.008052,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 4,
-  "audit": []
+  "steps": 7,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793453748.682534,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] \"gateway: down (not answering)\" and [A3] \"payment journey fails at step 'gateway': timeout: no answer within 3.0s\". There is no recent change to the gateway and it logged no errors.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ]
 }

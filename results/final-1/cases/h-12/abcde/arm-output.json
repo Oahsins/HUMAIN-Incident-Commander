@@ -2,20 +2,41 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.88,
+        "evidence": "[C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'; downstream payments and screening traffic is 0.0/s."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793449087.659766,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'; downstream payments and screening traffic is 0.0/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "Payments are flowing again after the gateway process went down. Two recovery checks in a row came back clean, the last at 21 seconds.",
+      "background": "The gateway process stopped answering, so every payment journey timed out at the gateway after 3.0 seconds. Payments and screening received no traffic (0.0/s); no recent change to the gateway was reported.",
+      "assessment": "The root cause was the gateway process being down (confidence 0.88). The incident commander restarted the gateway itself, and the restart completed; a rollback was not warranted, and the screening-standby restart was routine maintenance that caused no symptom.",
+      "recommendation": "Find out why the gateway process went down, since the restart cleared the symptom but not the cause. Operations should review payments that timed out at the gateway during the outage, as those were not processed or screened."
     },
-    "t_start": 1793424625.6520412,
-    "t_first_action": null,
-    "t_declared": 1793424629.8834057,
+    "t_start": 1793449079.1787884,
+    "t_first_action": 1793449087.659766,
+    "t_declared": 1793449100.255699,
     "trace": [
       {
         "t": 0.04,
@@ -24,31 +45,31 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 35.3
+          "ms": 38.0
         }
       },
       {
-        "t": 1.17,
+        "t": 1.12,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: gateway",
         "data": {
-          "ms": 1136.7
+          "ms": 1077.4
         }
       },
       {
-        "t": 4.21,
+        "t": 4.13,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at gateway",
         "data": {
-          "ms": 3035.4
+          "ms": 3018.6
         }
       },
       {
-        "t": 4.21,
+        "t": 4.13,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -60,14 +81,14 @@
               "letter": "A",
               "component": "payments",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 11.2/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 11.3/s), less work from its callers"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "screening",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 8.6/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 8.7/s), less work from its callers"
             },
             {
               "id": "A3",
@@ -95,48 +116,109 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 4.23,
+        "t": 4.16,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 23.6
+          "ms": 22.5
         }
       },
       {
-        "t": 4.23,
+        "t": 8.48,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 4.323 s"
       },
       {
-        "t": 4.23,
+        "t": 9.15,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.25,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 106.1
+        }
+      },
+      {
+        "t": 16.18,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 923.4
+        }
+      },
+      {
+        "t": 16.18,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 20.24,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 58.0
+        }
+      },
+      {
+        "t": 21.08,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 840.7
+        }
+      },
+      {
+        "t": 21.08,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 21.08,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 4.23,
+        "t": 24.77,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.23,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 3.69 s"
       }
     ],
     "calls": [
@@ -144,11 +226,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3374,
+        "output_tokens": 308,
+        "latency_s": 4.323,
+        "estimated_cost_usd": 0.019656,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -156,17 +238,32 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 791,
+        "output_tokens": 271,
+        "latency_s": 3.69,
+        "estimated_cost_usd": 0.008584,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 4,
-    "audit": []
+    "steps": 9,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793449087.659766,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'; downstream payments and screening traffic is 0.0/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
   },
   "error": null
 }

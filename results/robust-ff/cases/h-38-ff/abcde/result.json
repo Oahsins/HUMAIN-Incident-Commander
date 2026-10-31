@@ -1,11 +1,36 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_config",
+      "confidence": 0.97,
+      "evidence": "E1: config by pipeline changed max_transfer_minor from 1000000 to 1, 16 s ago. Since then the logs show 'limit_reject ... limit_minor=1', and the probe fails with '422 amount exceeds transfer limit'."
+    },
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.8,
+      "evidence": "B1: 'lock held by session reconciliation (write) for 10.7 s: UPDATE accounts SET ... (reconciliation batch)'. This blocks ledger writes, so payments cannot post once the limit is fixed."
+    },
+    {
+      "target": "screening",
+      "class": "process_down",
+      "confidence": 0.85,
+      "evidence": "C1: 'screening: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 14 s ago (exit code 15)'. Payments is already failed over to screening-standby."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.75,
+      "evidence": "E2: ops-maintenance changed balance_cache_ttl_s from 0.5 to 600.0, 12 s ago. With a 600 s cache, balances will not show new payments, which breaks the journey's 'balance shows it' step. The fault is hidden while payments fail."
+    }
+  ],
   "actions": [
     {
-      "t": 1793436269.9696872,
+      "t": 1793450888.2861161,
       "action": "failover",
       "target": "screening",
       "params": {
@@ -18,52 +43,108 @@
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793450902.0039012,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: B1: 'lock held by session reconciliation (write) for 10.7 s: UPDATE accounts SET ... (reconciliation batch)'. This blocks ledger writes, so payments cannot post once the limit is fixed.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793450903.0768166,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: C1: 'screening: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 14 s ago (exit code 15)'. Payments is already failed over to screening-standby.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793450905.7234797,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: config by pipeline changed max_transfer_minor from 1000000 to 1, 16 s ago. Since then the logs show 'limit_reject ... limit_minor=1', and the probe fails with '422 amount exceeds transfer limit'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793450906.7483292,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: E2: ops-maintenance changed balance_cache_ttl_s from 0.5 to 600.0, 12 s ago. With a 600 s cache, balances will not show new payments, which breaks the journey's 'balance shows it' step. The fault is hidden while payments fail.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
     }
   ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "failover on screening: done",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The bank is recovered. Two recovery checks in a row ran the main journey cleanly, the last at 30 s.",
+    "background": "A pipeline change set payments max_transfer_minor from 1000000 to 1, so payments rejected nearly all transfers. Separately, the reconciliation batch held a write lock on the ledger, the screening primary went down (exit code 15), and ops-maintenance raised gateway balance_cache_ttl_s from 0.5 to 600.",
+    "assessment": "The incident commander itself reverted max_transfer_minor to 1000000, ended the reconciliation session holding the ledger lock, failed screening over to its standby and restarted it, and reverted balance_cache_ttl_s to 0.5. Every action completed, and the journey now passes.",
+    "recommendation": "Find out why the pipeline and ops-maintenance pushed those config values, and why screening exited, then decide when to move traffic back from screening-standby. The reconciliation batch was ended mid-update on accounts, so operations should check it for partial writes and rerun it, and should review transfers rejected by the limit for customer impact."
   },
-  "t_start": 1793436269.829034,
-  "t_first_action": 1793436269.9696872,
-  "t_declared": 1793436270.0562396,
+  "t_start": 1793450888.1359076,
+  "t_first_action": 1793450888.2861161,
+  "t_declared": 1793450917.797533,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.04,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 34.1
+        "ms": 37.3
       }
     },
     {
-      "t": 0.09,
+      "t": 0.12,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: screening",
       "data": {
-        "ms": 60.4
+        "ms": 84.2
       }
     },
     {
-      "t": 0.14,
+      "t": 0.15,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 45.8
+        "ms": 28.4
       }
     },
     {
-      "t": 0.14,
+      "t": 0.15,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -96,7 +177,7 @@
             "letter": "B",
             "component": "ledger",
             "severity": "fault",
-            "text": "lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)"
+            "text": "lock held by session reconciliation (write) for 10.7 s: UPDATE accounts SET ... (reconciliation batch)"
           },
           {
             "id": "C1",
@@ -152,34 +233,34 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by pipeline"
+            "text": "6 s ago: stop by pipeline"
           },
           {
             "id": "E6",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by pipeline (release=4.1)"
+            "text": "6 s ago: start by pipeline (release=4.1)"
           },
           {
             "id": "E7",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by ops-maintenance"
+            "text": "6 s ago: stop by ops-maintenance"
           },
           {
             "id": "E8",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by ops-maintenance (release=4.1)"
+            "text": "6 s ago: start by ops-maintenance (release=4.1)"
           }
         ]
       }
     },
     {
-      "t": 0.16,
+      "t": 0.15,
       "phase": "survey",
       "kind": "action",
       "name": "containment",
@@ -195,72 +276,179 @@
       }
     },
     {
-      "t": 0.18,
+      "t": 0.19,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 17.6
+        "ms": 36.1
       }
     },
     {
-      "t": 0.19,
+      "t": 0.21,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "9 log records from payments",
       "data": {
-        "ms": 14.5
+        "ms": 24.0
       }
     },
     {
-      "t": 0.19,
+      "t": 0.22,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "0 log records from ledger",
       "data": {
-        "ms": 1.8
+        "ms": 1.9
       }
     },
     {
-      "t": 0.23,
+      "t": 0.25,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from screening",
       "data": {
-        "ms": 33.9
+        "ms": 34.4
       }
     },
     {
-      "t": 0.23,
+      "t": 13.87,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 13.616 s"
     },
     {
-      "t": 0.23,
+      "t": 13.94,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.59,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart screening: done (screening restarted)",
+      "data": {
+        "target": "screening",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 17.61,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+      "data": {
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 18.63,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 23.74,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 105.2
+      }
+    },
+    {
+      "t": 24.69,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 953.9
+      }
+    },
+    {
+      "t": 24.69,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 28.74,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 47.0
+      }
+    },
+    {
+      "t": 29.66,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 921.8
+      }
+    },
+    {
+      "t": 29.66,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 29.66,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.23,
+      "t": 35.54,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.23,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 5.875 s"
     }
   ],
   "calls": [
@@ -268,11 +456,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 4299,
+      "output_tokens": 1420,
+      "latency_s": 13.616,
+      "estimated_cost_usd": 0.045596,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -280,20 +468,20 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1347,
+      "output_tokens": 371,
+      "latency_s": 5.875,
+      "estimated_cost_usd": 0.012808,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 8,
+  "steps": 16,
   "audit": [
     {
       "event": "act",
-      "t": 1793436269.9696872,
+      "t": 1793450888.2861161,
       "action": "failover",
       "target": "screening",
       "params": {
@@ -306,6 +494,66 @@
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793450902.0039012,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: B1: 'lock held by session reconciliation (write) for 10.7 s: UPDATE accounts SET ... (reconciliation batch)'. This blocks ledger writes, so payments cannot post once the limit is fixed.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793450903.0768166,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: C1: 'screening: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 14 s ago (exit code 15)'. Payments is already failed over to screening-standby.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793450905.7234797,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: config by pipeline changed max_transfer_minor from 1000000 to 1, 16 s ago. Since then the logs show 'limit_reject ... limit_minor=1', and the probe fails with '422 amount exceeds transfer limit'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793450906.7483292,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: E2: ops-maintenance changed balance_cache_ttl_s from 0.5 to 600.0, 12 s ago. With a 600 s cache, balances will not show new payments, which breaks the journey's 'balance shows it' step. The fault is hidden while payments fail.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
     }
   ]
 }

@@ -1,58 +1,356 @@
 {
   "arm": "react",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.95,
+      "evidence": "Reconciliation session held a ledger write lock (UPDATE accounts batch). Payments logged 'database is locked' errors and the error rate was about 40-64%. After release_lock, write errors dropped to 0 and payments returned to baseline."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.85,
+      "evidence": "An operator changed gateway balance_cache_ttl_s from 0.5 to 600 s shortly before the incident. That would serve stale balances for 10 minutes. After revert_config to 0.5, the probe shows the app balance matches the ledger."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793455240.5173101,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "The reconciliation session holds a ledger write lock and is blocking writes (110 write errors), which explains the payment errors. Release it first; the gateway cache TTL change to 600 s also needs reverting afterwards.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793455243.3230474,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Now revert the gateway balance_cache_ttl_s change from 0.5 to 600 s, which will show stale balances.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The bank has recovered. All components are at baseline, and the payment probe passed end to end on two clean checks in a row, the last at 43 s.",
+    "background": "An operator changed the gateway setting balance_cache_ttl_s from 0.5 to 600 seconds shortly before the incident. A reconciliation session then held a write lock on the ledger (an UPDATE accounts batch), and payments failed with 'database is locked' errors at about 40-64%.",
+    "assessment": "Root causes were the reconciliation lock on the ledger (confidence 0.95) and the gateway cache setting (confidence 0.85), which would serve balances up to 10 minutes stale. The incident commander ended the reconciliation session, and ledger write errors dropped to 0. It then reverted balance_cache_ttl_s to 0.5, and app balances now match the ledger.",
+    "recommendation": "The interrupted reconciliation run rolled back, so re-run it off-peak and have operations check for any balance or settlement gaps from the incident window. Confirm with the operator why balance_cache_ttl_s was set to 600 and stop it being reapplied. The screening-standby restarts showed no errors and look benign."
   },
-  "t_start": 1793429567.3178337,
-  "t_first_action": null,
-  "t_declared": 1793429567.363091,
+  "t_start": 1793455234.0977004,
+  "t_first_action": 1793455240.5173101,
+  "t_declared": 1793455277.491875,
   "trace": [
     {
-      "t": 0.05,
+      "t": 0.04,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 45.1
+        "ms": 41.1
       }
     },
     {
-      "t": 0.05,
+      "t": 2.32,
       "phase": "triage",
       "kind": "model",
       "name": "react",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 2.275 s"
     },
     {
-      "t": 0.05,
+      "t": 2.32,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Start by observing all components' metrics to see where symptoms are."
+    },
+    {
+      "t": 2.43,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 109.4
+      }
+    },
+    {
+      "t": 6.42,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.993 s"
+    },
+    {
+      "t": 6.42,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: The reconciliation session holds a ledger write lock and is blocking writes (110 write errors), which explains the payment errors. Release it first; the gateway cache TTL change to 600 s also needs reverting afterwards."
+    },
+    {
+      "t": 6.55,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 9.23,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.672 s"
+    },
+    {
+      "t": 9.23,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "act: Now revert the gateway balance_cache_ttl_s change from 0.5 to 600 s, which will show stale balances."
+    },
+    {
+      "t": 9.23,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 12.1,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 2.873 s"
+    },
+    {
+      "t": 12.1,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: Observe again to confirm recovery and check for hidden faults."
+    },
+    {
+      "t": 12.22,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 118.3
+      }
+    },
+    {
+      "t": 15.48,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.254 s"
+    },
+    {
+      "t": 15.48,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "logs: Lock is gone but payments still errors at ~64% with ~1.2 s p95 while screening is healthy; check payments logs for the cause."
+    },
+    {
+      "t": 15.5,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "9 log records from payments",
+      "data": {
+        "ms": 25.5
+      }
+    },
+    {
+      "t": 19.44,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.932 s"
+    },
+    {
+      "t": 19.44,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "observe: The 'database is locked' errors all predate or coincide with the lock release, so the 20 s window still mixes in old failures; observe a short recent window to check whether payments has recovered."
+    },
+    {
+      "t": 19.55,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 118.5
+      }
+    },
+    {
+      "t": 23.29,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 3.735 s"
+    },
+    {
+      "t": 23.29,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "probe: Everything is back to baseline over the last 8 s with no write errors or lock holders. Run one probe to confirm the payment journey end to end, balance included."
+    },
+    {
+      "t": 24.17,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 884.1
+      }
+    },
+    {
+      "t": 28.3,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 4.125 s"
+    },
+    {
+      "t": 28.3,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "logs: The probe passes end to end. Before closing, check the screening-standby logs, since the scheduler stopped and started it repeatedly and that could hide a fault that only shows after a failover."
+    },
+    {
+      "t": 28.33,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "3 log records from screening-standby",
+      "data": {
+        "ms": 29.8
+      }
+    },
+    {
+      "t": 35.47,
+      "phase": "triage",
+      "kind": "model",
+      "name": "react",
+      "summary": "claude-opus-5-5 answered in 7.138 s"
+    },
+    {
+      "t": 35.47,
+      "phase": "triage",
+      "kind": "note",
+      "name": "react",
+      "summary": "done: The standby is up with no errors and its restarts look routine, so I count it as noise. The system is at baseline and the probe passes, so I'm declaring done with both root causes."
+    },
+    {
+      "t": 37.56,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 89.1
+      }
+    },
+    {
+      "t": 38.44,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 877.4
+      }
+    },
+    {
+      "t": 38.44,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 42.5,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 68.4
+      }
+    },
+    {
+      "t": 43.39,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 889.6
+      }
+    },
+    {
+      "t": 43.39,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 43.39,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.05,
+      "t": 49.55,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.05,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 6.151 s"
     }
   ],
   "calls": [
@@ -60,11 +358,107 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "react",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 2725,
+      "output_tokens": 89,
+      "latency_s": 2.275,
+      "estimated_cost_usd": 0.01268,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 4858,
+      "output_tokens": 237,
+      "latency_s": 3.993,
+      "estimated_cost_usd": 0.024172,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5054,
+      "output_tokens": 125,
+      "latency_s": 2.672,
+      "estimated_cost_usd": 0.022716,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 5254,
+      "output_tokens": 89,
+      "latency_s": 2.873,
+      "estimated_cost_usd": 0.022796,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7465,
+      "output_tokens": 154,
+      "latency_s": 3.254,
+      "estimated_cost_usd": 0.03294,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 7908,
+      "output_tokens": 217,
+      "latency_s": 3.932,
+      "estimated_cost_usd": 0.035972,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 10171,
+      "output_tokens": 198,
+      "latency_s": 3.735,
+      "estimated_cost_usd": 0.044644,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 10530,
+      "output_tokens": 266,
+      "latency_s": 4.125,
+      "estimated_cost_usd": 0.04744,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "react",
+      "input_tokens": 10677,
+      "output_tokens": 565,
+      "latency_s": 7.138,
+      "estimated_cost_usd": 0.054008,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -72,15 +466,46 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 998,
+      "output_tokens": 394,
+      "latency_s": 6.151,
+      "estimated_cost_usd": 0.011872,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 1,
-  "audit": []
+  "steps": 13,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793455240.5173101,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "The reconciliation session holds a ledger write lock and is blocking writes (110 write errors), which explains the payment errors. Release it first; the gateway cache TTL change to 600 s also needs reverting afterwards.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793455243.3230474,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Now revert the gateway balance_cache_ttl_s change from 0.5 to 600 s, which will show stale balances.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ]
 }

@@ -2,53 +2,93 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.95,
+        "evidence": "[B4] lock held by session reconciliation (write) for 10.5 s: UPDATE accounts SET ... and payments log 'ledger write failed: database is locked' with occurrences rising to 27 per interval. The ledger is the root of the 503 'ledger busy' at the payments step."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.6,
+        "evidence": "[C1] clearing: down (not answering) and [C2] process exited 1 time(s) in 15 min, last 12 s ago (exit code 15). The backlog [B3] has first item 91 with 0 attempts, and clearing has no logs, so there is no evidence that a specific item is poison."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793451961.4691749,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: [B4] lock held by session reconciliation (write) for 10.5 s: UPDATE accounts SET ... and payments log 'ledger write failed: database is locked' with occurrences rising to 27 per interval. The ledger is the root of the 503 'ledger busy' at the payments step.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793451962.5708256,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: [C1] clearing: down (not answering) and [C2] process exited 1 time(s) in 15 min, last 12 s ago (exit code 15). The backlog [B3] has first item 91 with 0 attempts, and clearing has no logs, so there is no evidence that a specific item is poison.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The system has recovered: the ledger lock was released and clearing was restarted, and two consecutive recovery checks came back clean. The incident commander took both actions itself, not automatically.",
+      "background": "The reconciliation batch session held a write lock on the ledger for 10.5 seconds, running UPDATE accounts statements. Payments logged 'ledger write failed: database is locked', rising to 27 occurrences per interval, and the gateway returned 503 'ledger busy'. Separately, clearing was down and had exited with code 1 once in the last 15 minutes, most recently 12 seconds before the check, with a backlog whose first item had 0 attempts.",
+      "assessment": "Root cause on the ledger, with confidence 0.95: the reconciliation session held the lock and blocked payment writes. Root cause on clearing, with confidence 0.6: the process exited and went down, and the logs show no sign of a poison item. Release_lock on the ledger ended the reconciliation session and cleared the block. Restart on clearing brought the process back up. Recovery was confirmed on look 2 at 26 seconds, with 2 of 2 clean checks in a row.",
+      "recommendation": "Confirm that the reconciliation batch job has not started again and find out why it held the lock for 10.5 seconds. Watch clearing for further exits, since its cause is only moderately confident and the backlog may still need draining. Ask the operations team to review any payments that failed or were delayed during the lock window and any clearing items affected by the downtime."
     },
-    "t_start": 1793439885.3122246,
-    "t_first_action": null,
-    "t_declared": 1793439886.8109875,
+    "t_start": 1793451949.7002342,
+    "t_first_action": 1793451961.4691749,
+    "t_declared": 1793451975.233769,
     "trace": [
       {
-        "t": 0.05,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 49.7
+          "ms": 36.9
         }
       },
       {
-        "t": 0.16,
+        "t": 0.19,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: clearing",
         "data": {
-          "ms": 114.2
+          "ms": 153.4
         }
       },
       {
-        "t": 1.41,
+        "t": 1.43,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 1243.7
+          "ms": 1241.2
         }
       },
       {
-        "t": 1.41,
+        "t": 1.43,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -81,35 +121,35 @@
               "letter": "B",
               "component": "gateway",
               "severity": "fault",
-              "text": "p95 1223 ms (baseline 59 ms)"
+              "text": "p95 1216 ms (baseline 57 ms)"
             },
             {
               "id": "B2",
               "letter": "B",
               "component": "payments",
               "severity": "fault",
-              "text": "p95 1202 ms (baseline 45 ms)"
+              "text": "p95 1201 ms (baseline 46 ms)"
             },
             {
               "id": "B3",
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 20 items waiting, oldest 12 s; first item 94 waiting 12 s after 0 attempt(s)"
+              "text": "backlog: 23 items waiting, oldest 13 s; first item 91 waiting 13 s after 0 attempt(s)"
             },
             {
               "id": "B4",
               "letter": "B",
               "component": "ledger",
               "severity": "fault",
-              "text": "lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)"
+              "text": "lock held by session reconciliation (write) for 10.5 s: UPDATE accounts SET ... (reconciliation batch)"
             },
             {
               "id": "B5",
               "letter": "B",
               "component": "ledger",
               "severity": "fault",
-              "text": "66 failed writes in the window"
+              "text": "65 failed writes in the window"
             },
             {
               "id": "C1",
@@ -144,92 +184,167 @@
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments are slow: p95 1222 ms (payments itself answered in 45 ms at baseline)"
+              "text": "calls to payments are slow: p95 1215 ms (payments itself answered in 46 ms at baseline)"
             },
             {
               "id": "E1",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by operator"
+              "text": "6 s ago: stop by operator"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by operator (release=4.1)"
+              "text": "6 s ago: start by operator (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 1.42,
+        "t": 1.46,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 15.2
+          "ms": 23.5
         }
       },
       {
-        "t": 1.45,
+        "t": 1.47,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "6 log records from payments",
         "data": {
-          "ms": 25.6
+          "ms": 15.3
         }
       },
       {
-        "t": 1.48,
+        "t": 1.49,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from clearing",
         "data": {
-          "ms": 27.5
+          "ms": 14.2
         }
       },
       {
-        "t": 1.5,
+        "t": 1.51,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "0 log records from ledger",
         "data": {
-          "ms": 22.3
+          "ms": 22.2
         }
       },
       {
-        "t": 1.5,
+        "t": 11.77,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-haiku-5-5 answered in 10.261 s"
       },
       {
-        "t": 1.5,
+        "t": 11.87,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.52,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 19.61,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 87.0
+        }
+      },
+      {
+        "t": 20.53,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 922.2
+        }
+      },
+      {
+        "t": 20.53,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 24.6,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 65.2
+        }
+      },
+      {
+        "t": 25.53,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 936.7
+        }
+      },
+      {
+        "t": 25.53,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 25.53,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 1.5,
+        "t": 28.88,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 1.5,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-haiku-5-5 answered in 3.341 s"
       }
     ],
     "calls": [
@@ -237,11 +352,11 @@
         "provider": "anthropic",
         "model": "claude-haiku-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3942,
+        "output_tokens": 2106,
+        "latency_s": 10.261,
+        "estimated_cost_usd": 0.001447,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -249,17 +364,46 @@
         "provider": "anthropic",
         "model": "claude-haiku-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 957,
+        "output_tokens": 500,
+        "latency_s": 3.341,
+        "estimated_cost_usd": 0.000346,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 7,
-    "audit": []
+    "steps": 13,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793451961.4691749,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: [B4] lock held by session reconciliation (write) for 10.5 s: UPDATE accounts SET ... and payments log 'ledger write failed: database is locked' with occurrences rising to 27 per interval. The ledger is the root of the 503 'ledger busy' at the payments step.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793451962.5708256,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: [C1] clearing: down (not answering) and [C2] process exited 1 time(s) in 15 min, last 12 s ago (exit code 15). The backlog [B3] has first item 91 with 0 attempts, and clearing has no logs, so there is no evidence that a specific item is poison.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
   },
   "error": null
 }

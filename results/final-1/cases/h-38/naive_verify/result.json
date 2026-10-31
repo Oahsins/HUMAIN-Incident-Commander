@@ -1,11 +1,30 @@
 {
   "arm": "naive_verify",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_config",
+      "confidence": 0.95,
+      "evidence": "E1: 14 s ago config by pipeline key=max_transfer_minor from=1000000 to=1. Payments logs show 'limit_reject ... limit_minor=1 amount_minor=33566', starting 14 s ago."
+    },
+    {
+      "target": "screening",
+      "class": "process_down",
+      "confidence": 0.8,
+      "evidence": "C1: screening down (not answering). C2: process exited 1 time in 15 min, last 12 s ago (exit code 15)."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.75,
+      "evidence": "E2: 10 s ago config by ops-maintenance key=balance_cache_ttl_s from=0.5 to=600.0. A 10-minute balance cache means a posted payment would not show in the balance, which breaks the journey's final step once payments recover."
+    }
+  ],
   "actions": [
     {
-      "t": 1793433593.1030738,
+      "t": 1793456428.419487,
       "action": "failover",
       "target": "screening",
       "params": {
@@ -18,52 +37,95 @@
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793456439.878929,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: C1: screening down (not answering). C2: process exited 1 time in 15 min, last 12 s ago (exit code 15).",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793456442.512158,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: 14 s ago config by pipeline key=max_transfer_minor from=1000000 to=1. Payments logs show 'limit_reject ... limit_minor=1 amount_minor=33566', starting 14 s ago.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793456443.5299053,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: E2: 10 s ago config by ops-maintenance key=balance_cache_ttl_s from=0.5 to=600.0. A 10-minute balance cache means a posted payment would not show in the balance, which breaks the journey's final step once payments recover.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
     }
   ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "failover on screening: done",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The bank system has recovered. The latest end-to-end probe passes, though refusal rates still include the period before the reverts.",
+    "background": "About 14 s before diagnosis, the pipeline changed payments max_transfer_minor from 1000000 to 1, so every payment was refused. About 10 s before diagnosis, ops-maintenance changed the gateway balance_cache_ttl_s from 0.5 to 600, and the screening primary process exited with code 15.",
+    "assessment": "The incident commander itself failed screening over to its standby and restarted the primary, and screening has had no exits since. It also reverted payments max_transfer_minor to 1000000 and gateway balance_cache_ttl_s to 0.5, and both reverts succeeded. The second of two recovery checks, at 35 s, was clean.",
+    "recommendation": "No further action is needed; watch that the payments refusal rate falls back to 0%. Operations should review the payments refused while max_transfer_minor was 1, and ask the pipeline and ops-maintenance owners why these changes were made."
   },
-  "t_start": 1793433592.9426043,
-  "t_first_action": 1793433593.1030738,
-  "t_declared": 1793433593.202364,
+  "t_start": 1793456428.2093403,
+  "t_first_action": 1793456428.419487,
+  "t_declared": 1793456463.4451635,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.05,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 32.9
+        "ms": 52.9
       }
     },
     {
-      "t": 0.12,
+      "t": 0.15,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: screening",
       "data": {
-        "ms": 91.8
+        "ms": 93.3
       }
     },
     {
-      "t": 0.16,
+      "t": 0.21,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 35.5
+        "ms": 63.7
       }
     },
     {
-      "t": 0.16,
+      "t": 0.21,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -82,7 +144,7 @@
             "letter": "A",
             "component": "payments",
             "severity": "fault",
-            "text": "95% of requests are refused (baseline 0%)"
+            "text": "94% of requests are refused (baseline 0%)"
           },
           {
             "id": "A3",
@@ -103,69 +165,69 @@
             "letter": "C",
             "component": "screening",
             "severity": "fault",
-            "text": "process exited 1 time(s) in 15 min, last 11 s ago (exit code 15)"
+            "text": "process exited 1 time(s) in 15 min, last 12 s ago (exit code 15)"
           },
           {
             "id": "E1",
             "letter": "E",
             "component": "payments",
             "severity": "info",
-            "text": "13 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+            "text": "14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "gateway",
             "severity": "info",
-            "text": "9 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            "text": "10 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0)"
           },
           {
             "id": "E3",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "7 s ago: stop by ops-maintenance"
+            "text": "8 s ago: stop by ops-maintenance"
           },
           {
             "id": "E4",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "7 s ago: start by ops-maintenance (release=4.1)"
+            "text": "8 s ago: start by ops-maintenance (release=4.1)"
           },
           {
             "id": "E5",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by pipeline"
+            "text": "7 s ago: stop by pipeline"
           },
           {
             "id": "E6",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: start by pipeline (release=4.1)"
+            "text": "7 s ago: start by pipeline (release=4.1)"
           },
           {
             "id": "E7",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by ops-maintenance"
+            "text": "6 s ago: stop by ops-maintenance"
           },
           {
             "id": "E8",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by ops-maintenance (release=4.1)"
+            "text": "6 s ago: start by ops-maintenance (release=4.1)"
           }
         ]
       }
     },
     {
-      "t": 0.17,
+      "t": 0.22,
       "phase": "survey",
       "kind": "action",
       "name": "containment",
@@ -181,62 +243,339 @@
       }
     },
     {
-      "t": 0.2,
+      "t": 0.23,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 30.6
+        "ms": 14.4
       }
     },
     {
-      "t": 0.23,
+      "t": 0.27,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "8 log records from payments",
       "data": {
-        "ms": 34.7
+        "ms": 35.2
       }
     },
     {
-      "t": 0.26,
+      "t": 0.28,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from screening",
       "data": {
-        "ms": 27.6
+        "ms": 13.5
       }
     },
     {
-      "t": 0.26,
+      "t": 11.67,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 11.39 s"
     },
     {
-      "t": 0.26,
+      "t": 12.3,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart screening: done (screening restarted)",
+      "data": {
+        "target": "screening",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 14.32,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+      "data": {
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.33,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 17.44,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 109.2
+      }
+    },
+    {
+      "t": 18.51,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1070.8
+      }
+    },
+    {
+      "t": 18.51,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: gateway: 18% of requests are refused (baseline 0%); payments: 19% of requests are refused (baseline 0%)"
+    },
+    {
+      "t": 18.59,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 83.8
+      }
+    },
+    {
+      "t": 19.5,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 909.2
+      }
+    },
+    {
+      "t": 19.5,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "2 fault findings, 17 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "36% of requests are refused (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "38% of requests are refused (baseline 0%)"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "screening",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 9.4/s): moved to its standby"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "screening",
+            "severity": "info",
+            "text": "process exited 1 time(s) in 15 min, last 30 s ago (exit code 15); none since the action taken on it 8 s ago"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "screening",
+            "severity": "info",
+            "text": "served by its standby"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "32 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "gateway",
+            "severity": "info",
+            "text": "28 s ago: config by ops-maintenance (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "26 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "26 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "25 s ago: stop by pipeline"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "25 s ago: start by pipeline (release=4.1)"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "24 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E8",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "24 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E9",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "18 s ago: failover by incident-commander (from=primary, to=standby)"
+          },
+          {
+            "id": "E10",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "7 s ago: restart by incident-commander (release=4.1)"
+          },
+          {
+            "id": "E11",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "4 s ago: config by incident-commander (key=max_transfer_minor, revert=True, from=1, to=1000000)"
+          },
+          {
+            "id": "E12",
+            "letter": "E",
+            "component": "gateway",
+            "severity": "info",
+            "text": "3 s ago: config by incident-commander (key=balance_cache_ttl_s, revert=True, from=600.0, to=0.5)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 19.51,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 13.5
+      }
+    },
+    {
+      "t": 19.54,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "15 log records from payments",
+      "data": {
+        "ms": 25.2
+      }
+    },
+    {
+      "t": 33.07,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 13.53 s"
+    },
+    {
+      "t": 33.07,
+      "phase": "triage",
+      "kind": "note",
+      "name": "check",
+      "summary": "nothing new to try and the main journey passes: checking again"
+    },
+    {
+      "t": 34.16,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 84.9
+      }
+    },
+    {
+      "t": 35.24,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1079.7
+      }
+    },
+    {
+      "t": 35.24,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: clean"
+    },
+    {
+      "t": 35.24,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.26,
+      "t": 40.08,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.26,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 4.84 s"
     }
   ],
   "calls": [
@@ -244,11 +583,23 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 4149,
+      "output_tokens": 1152,
+      "latency_s": 11.39,
+      "estimated_cost_usd": 0.039636,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 4996,
+      "output_tokens": 1232,
+      "latency_s": 13.53,
+      "estimated_cost_usd": 0.044624,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -256,20 +607,20 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1223,
+      "output_tokens": 351,
+      "latency_s": 4.84,
+      "estimated_cost_usd": 0.011912,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 7,
+  "steps": 18,
   "audit": [
     {
       "event": "act",
-      "t": 1793433593.1030738,
+      "t": 1793456428.419487,
       "action": "failover",
       "target": "screening",
       "params": {
@@ -282,6 +633,52 @@
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793456439.878929,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: C1: screening down (not answering). C2: process exited 1 time in 15 min, last 12 s ago (exit code 15).",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793456442.512158,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: 14 s ago config by pipeline key=max_transfer_minor from=1000000 to=1. Payments logs show 'limit_reject ... limit_minor=1 amount_minor=33566', starting 14 s ago.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793456443.5299053,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: E2: 10 s ago config by ops-maintenance key=balance_cache_ttl_s from=0.5 to=600.0. A 10-minute balance cache means a posted payment would not show in the balance, which breaks the journey's final step once payments recover.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
     }
   ]
 }

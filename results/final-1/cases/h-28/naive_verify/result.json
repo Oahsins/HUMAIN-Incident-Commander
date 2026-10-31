@@ -1,69 +1,104 @@
 {
   "arm": "naive_verify",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
+  "outcome": "escalated",
+  "root_causes": [
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.88,
+      "evidence": "Screening p95 is 1821 ms (baseline 14 ms) while payments logs 'fraud screening timeout via primary ... timeout_s=1.0', and the probe fails at 'payments: 503 screening unavailable (timeout)'. Screening's own logs show no errors."
+    },
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.6,
+      "evidence": "'deploy by pipeline (from=1.3, to=1.5)' happened 14 s ago, and the ledger data check now fails with 'duplicate payments = 15'. The first payments warning, 'response could not be completed', also appeared 14 s ago."
+    }
+  ],
   "actions": [
     {
-      "t": 1793430445.869398,
+      "t": 1793455529.0127242,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1028 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1031 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793455541.223496,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: 'deploy by pipeline (from=1.3, to=1.5)' happened 14 s ago, and the ledger data check now fails with 'duplicate payments = 15'. The first payments warning, 'response could not be completed', also appeared 14 s ago.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
     }
   ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "failover on screening: done",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "payments"
+    ],
+    "class": "bad_release",
+    "reason": "E1 shows 'payments: 32 s ago: deploy by pipeline (from=1.3, to=1.5)', followed by D1 'calls to payments fail: 22%' and D3 'duplicate payments = 88'. After the rollback to 1.3 (E7) the probe reports payments=ok and ledger=ok.; [E1] payments was deployed 47 s ago (from=1.3, to=1.5), and [D2] then reported 'duplicate payments = 88'. After the rollback to 1.3 [E7], the probe shows payments=ok and ledger=ok.",
+    "urgency": "soon",
+    "to": "the on-call engineer",
+    "ask": "The rollback to 1.3 is already done and payments is serving again; do not repeat it. A person must review and reconcile the 88 duplicate payments the 1.5 release wrote to the ledger. This tool must not reverse, refund or edit postings.; The cause is fixed: payments was rolled back to 1.3. A person must review and reconcile the 88 duplicate payments 1.5 created in the ledger, run reconciliation, and handle any correction through the bank's normal process. The incident commander must not move, reverse or edit money. Keep release 1.5 blocked until its duplicate-posting bug is fixed."
   },
-  "t_start": 1793430444.7034533,
-  "t_first_action": 1793430445.869398,
-  "t_declared": 1793430445.9923525,
+  "sbar": {
+    "situation": "Recovery is not confirmed: the last check at 47 s was not clean because the ledger data check still fails with 88 duplicate payments. The payment journey passes again, and payments is serving on version 1.3.",
+    "background": "The pipeline deployed payments 1.5 (from 1.3), and the ledger check then found duplicate payments, rising from 15 to 88. At the same time, screening p95 rose to 1821 ms (baseline 14 ms), and payments returned '503 screening unavailable (timeout)' at its 1.0 s timeout.",
+    "assessment": "The incident commander failed screening over to its standby, and screening now serves from the standby with no fault symptom. It also rolled payments back from 1.5 to 1.3, which stopped new duplicates, but the 88 duplicate payments already written remain in the ledger.",
+    "recommendation": "The payments on-call engineer has been paged (soon) to review and reconcile the 88 duplicate payments through the bank's normal correction process; do not repeat the rollback, and the incident commander must not move, reverse or edit money. Keep release 1.5 blocked until its duplicate-posting bug is fixed, and have operations review the money effect of the 88 duplicates."
+  },
+  "t_start": 1793455527.8643684,
+  "t_first_action": 1793455529.0127242,
+  "t_declared": 1793455575.3050811,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.05,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 31.7
+        "ms": 46.3
       }
     },
     {
-      "t": 0.11,
+      "t": 0.13,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components",
       "data": {
-        "ms": 76.3
+        "ms": 81.1
       }
     },
     {
-      "t": 1.17,
+      "t": 1.15,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 1057.6
+        "ms": 1020.7
       }
     },
     {
-      "t": 1.17,
+      "t": 1.15,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -96,21 +131,21 @@
             "letter": "B",
             "component": "gateway",
             "severity": "fault",
-            "text": "p95 1044 ms (baseline 55 ms)"
+            "text": "p95 1054 ms (baseline 59 ms)"
           },
           {
             "id": "B2",
             "letter": "B",
             "component": "payments",
             "severity": "fault",
-            "text": "p95 1029 ms (baseline 43 ms)"
+            "text": "p95 1032 ms (baseline 45 ms)"
           },
           {
             "id": "B3",
             "letter": "B",
             "component": "screening",
             "severity": "fault",
-            "text": "p95 1816 ms (baseline 15 ms)"
+            "text": "p95 1821 ms (baseline 14 ms)"
           },
           {
             "id": "D1",
@@ -124,7 +159,7 @@
             "letter": "D",
             "component": "gateway",
             "severity": "fault",
-            "text": "calls to payments are slow: p95 1044 ms (payments itself answered in 43 ms at baseline)"
+            "text": "calls to payments are slow: p95 1053 ms (payments itself answered in 45 ms at baseline)"
           },
           {
             "id": "D3",
@@ -138,7 +173,7 @@
             "letter": "D",
             "component": "payments",
             "severity": "fault",
-            "text": "calls to screening are slow: p95 1028 ms (screening itself answered in 15 ms at baseline)"
+            "text": "calls to screening are slow: p95 1031 ms (screening itself answered in 14 ms at baseline)"
           },
           {
             "id": "D5",
@@ -152,14 +187,14 @@
             "letter": "E",
             "component": "payments",
             "severity": "info",
-            "text": "13 s ago: deploy by pipeline (from=1.3, to=1.5)"
+            "text": "14 s ago: deploy by pipeline (from=1.3, to=1.5)"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "7 s ago: stop by ops-maintenance"
+            "text": "8 s ago: stop by ops-maintenance"
           },
           {
             "id": "E3",
@@ -173,7 +208,7 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by scheduler"
+            "text": "6 s ago: stop by scheduler"
           },
           {
             "id": "E5",
@@ -186,7 +221,7 @@
       }
     },
     {
-      "t": 1.18,
+      "t": 1.15,
       "phase": "survey",
       "kind": "action",
       "name": "containment",
@@ -202,13 +237,23 @@
       }
     },
     {
+      "t": 1.19,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 35.2
+      }
+    },
+    {
       "t": 1.2,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
-      "summary": "2 log records from gateway",
+      "summary": "9 log records from payments",
       "data": {
-        "ms": 21.2
+        "ms": 13.3
       }
     },
     {
@@ -216,58 +261,410 @@
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
-      "summary": "9 log records from payments",
-      "data": {
-        "ms": 29.6
-      }
-    },
-    {
-      "t": 1.27,
-      "phase": "survey",
-      "kind": "tool",
-      "name": "logs",
       "summary": "1 log records from screening",
       "data": {
-        "ms": 33.4
+        "ms": 31.4
       }
     },
     {
-      "t": 1.29,
+      "t": 1.26,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "0 log records from ledger",
       "data": {
-        "ms": 21.6
+        "ms": 22.1
       }
     },
     {
-      "t": 1.29,
+      "t": 13.36,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 12.102 s"
     },
     {
-      "t": 1.29,
+      "t": 14.05,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 17.11,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 58.0
+      }
+    },
+    {
+      "t": 18.06,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 949.6
+      }
+    },
+    {
+      "t": 18.06,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: gateway: 6% of requests fail (baseline 0%); gateway: p95 505 ms (baseline 59 ms); gateway: calls to payments fail: 6% (+2 more)"
+    },
+    {
+      "t": 18.12,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 59.7
+      }
+    },
+    {
+      "t": 19.04,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 922.8
+      }
+    },
+    {
+      "t": 19.04,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "3 fault findings, 12 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "22% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "screening",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 9.1/s): moved to its standby"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 22%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "screening",
+            "severity": "info",
+            "text": "served by its standby"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 88"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "32 s ago: deploy by pipeline (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "26 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "25 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "24 s ago: stop by scheduler"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "17 s ago: failover by incident-commander (from=primary, to=standby)"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "5 s ago: deploy by incident-commander (from=1.5, to=1.3, rollback=True)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 19.04,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 1.8
+      }
+    },
+    {
+      "t": 19.05,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 11.4
+      }
+    },
+    {
+      "t": 31.25,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 12.202 s"
+    },
+    {
+      "t": 31.25,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate payments (soon) to the on-call engineer"
+    },
+    {
+      "t": 32.35,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 93.2
+      }
+    },
+    {
+      "t": 33.29,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 939.7
+      }
+    },
+    {
+      "t": 33.29,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: ledger: data check failed: duplicate payments = 88"
+    },
+    {
+      "t": 33.4,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 111.3
+      }
+    },
+    {
+      "t": 34.47,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1068.5
+      }
+    },
+    {
+      "t": 34.47,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "1 fault findings, 10 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "screening",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 9.1/s): moved to its standby"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "screening",
+            "severity": "info",
+            "text": "served by its standby"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "data check failed: duplicate payments = 88"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "47 s ago: deploy by pipeline (from=1.3, to=1.5)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "41 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "41 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "39 s ago: stop by scheduler"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "39 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "32 s ago: failover by incident-commander (from=primary, to=standby)"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "20 s ago: deploy by incident-commander (from=1.5, to=1.3, rollback=True)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 34.48,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 13.6
+      }
+    },
+    {
+      "t": 45.52,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 11.042 s"
+    },
+    {
+      "t": 45.52,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate payments (soon) to the on-call engineer"
+    },
+    {
+      "t": 46.59,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 65.4
+      }
+    },
+    {
+      "t": 47.44,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 850.3
+      }
+    },
+    {
+      "t": 47.44,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: ledger: data check failed: duplicate payments = 88"
+    },
+    {
+      "t": 47.44,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "escalated"
     },
     {
-      "t": 1.29,
+      "t": 53.91,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 1.29,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 6.473 s"
     }
   ],
   "calls": [
@@ -275,11 +672,35 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 4162,
+      "output_tokens": 1177,
+      "latency_s": 12.102,
+      "estimated_cost_usd": 0.040188,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 3852,
+      "output_tokens": 1110,
+      "latency_s": 12.202,
+      "estimated_cost_usd": 0.037608,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 3777,
+      "output_tokens": 1024,
+      "latency_s": 11.042,
+      "estimated_cost_usd": 0.035588,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -287,32 +708,46 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1243,
+      "output_tokens": 543,
+      "latency_s": 6.473,
+      "estimated_cost_usd": 0.015832,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 8,
+  "steps": 22,
   "audit": [
     {
       "event": "act",
-      "t": 1793430445.869398,
+      "t": 1793455529.0127242,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1028 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1031 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793455541.223496,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: 'deploy by pipeline (from=1.3, to=1.5)' happened 14 s ago, and the ledger data check now fails with 'duplicate payments = 15'. The first payments warning, 'response could not be completed', also appeared 14 s ago.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
     }
   ]
 }

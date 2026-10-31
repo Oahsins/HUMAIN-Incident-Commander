@@ -47,20 +47,41 @@
   "result": {
     "arm": "fifo",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.88,
+        "evidence": "[C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'. The gateway has no recent changes and no error logs, which fits a stopped process."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793457498.8740518,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'. The gateway has no recent changes and no error logs, which fits a stopped process.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "Payment service at the bank has recovered. The gateway was down and is now answering, and two recovery checks in a row came back clean, the last at 21 seconds.",
+      "background": "The gateway process stopped and stopped answering, so every payment journey timed out at the gateway step after 3.0 seconds. The gateway had no recent changes and no error logs before it went down.",
+      "assessment": "The root cause was the gateway process being down (confidence 0.88). Downstream traffic fell to zero only because no requests got past the gateway. The incident commander restarted the gateway itself, and the restart succeeded. The screening-standby restart was routine maintenance and did not cause any symptom.",
+      "recommendation": "Find out why the gateway process stopped, since it had no recent changes and no error logs. Keep watching the gateway and the payment journey for a repeat. Ask the operations team to review the payments that timed out at the gateway during the outage for any money or data effects."
     },
-    "t_start": 1793424924.240074,
-    "t_first_action": null,
-    "t_declared": 1793424928.4440734,
+    "t_start": 1793457490.4011407,
+    "t_first_action": 1793457498.8740518,
+    "t_declared": 1793457511.4892735,
     "trace": [
       {
         "t": 0.04,
@@ -69,31 +90,31 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 36.3
+          "ms": 37.7
         }
       },
       {
-        "t": 1.16,
+        "t": 1.14,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: gateway",
         "data": {
-          "ms": 1122.1
+          "ms": 1097.5
         }
       },
       {
-        "t": 4.18,
+        "t": 4.15,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at gateway",
         "data": {
-          "ms": 3020.5
+          "ms": 3017.8
         }
       },
       {
-        "t": 4.18,
+        "t": 4.15,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -133,55 +154,116 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 4.2,
+        "t": 4.18,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 24.6
+          "ms": 22.8
         }
       },
       {
-        "t": 4.2,
+        "t": 8.47,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 4.296 s"
       },
       {
-        "t": 4.2,
+        "t": 9.16,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.25,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 92.3
+        }
+      },
+      {
+        "t": 16.15,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 897.6
+        }
+      },
+      {
+        "t": 16.15,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 20.21,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 64.3
+        }
+      },
+      {
+        "t": 21.09,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 873.0
+        }
+      },
+      {
+        "t": 21.09,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 21.09,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 4.2,
+        "t": 25.15,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.2,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.059 s"
       }
     ],
     "calls": [
@@ -189,11 +271,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3374,
+        "output_tokens": 323,
+        "latency_s": 4.296,
+        "estimated_cost_usd": 0.019956,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -201,43 +283,58 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 785,
+        "output_tokens": 311,
+        "latency_s": 4.059,
+        "estimated_cost_usd": 0.00936,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 4,
-    "audit": []
+    "steps": 9,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793457498.8740518,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'. The gateway has no recent changes and no error logs, which fits a stopped process.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793425043.9117486,
+    "recovered": true,
+    "t": 1793457609.9899106,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793425013.912,
-      1793425033.912
+      1793457579.99,
+      1793457599.99
     ],
     "journeys": {
-      "n": 43,
-      "ok": 0,
-      "success_rate": 0.0,
-      "p95_ms": null,
+      "n": 217,
+      "ok": 217,
+      "success_rate": 1.0,
+      "p95_ms": 73.99988174438477,
       "payments": {
-        "n": 33,
-        "ok": 0
+        "n": 166,
+        "ok": 166
       },
       "balances": {
-        "n": 10,
-        "fresh": 0
+        "n": 51,
+        "fresh": 51
       },
-      "p95_allowed_ms": 324.0
+      "p95_allowed_ms": 321.0
     },
-    "slo_ok": false,
+    "slo_ok": true,
     "integrity": {
       "money_conserved": true,
       "balances_match_postings": true,
@@ -247,21 +344,19 @@
       "lost_payments": 0,
       "stuck_items": 0,
       "wrongly_quarantined": 0,
-      "stale_reads": 10,
+      "stale_reads": 0,
       "for_operations": [],
       "harmful_quarantines": 0,
       "ok": true
     },
-    "reasons": [
-      "43 of 43 customer journeys failed (33 payments, 10 balance reads)"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793424910.8728478,
-      "until_t": 1793425033.9117486,
-      "breach_seconds": 120.0,
-      "failed_journeys": 259,
-      "time_to_mitigate_s": 123.0,
-      "mitigation_censored": true,
+      "since_t": 1793457476.918841,
+      "until_t": 1793457599.9899106,
+      "breach_seconds": 15.0,
+      "failed_journeys": 43,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
       "late_clearings": 0,
       "double_postings": 0,
       "unbalanced_payments": 0
@@ -273,7 +368,7 @@
       "target": "gateway",
       "class": "process_down",
       "detail": {},
-      "t": 1793424910.8728478,
+      "t": 1793457476.918841,
       "at_s": 0
     },
     {
@@ -281,19 +376,44 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793424918.9113524,
+      "t": 1793457484.9896736,
       "at_s": 8
     }
   ],
   "injection_complete": true,
   "telemetry_complete": true,
-  "actions": [],
-  "audit": [],
+  "actions": [
+    {
+      "t": 1793457499.5591588,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "gateway",
+      "detail": "gateway restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793457498.8740518,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] 'gateway: down (not answering)' and [A3] 'payment journey fails at step gateway: timeout: no answer within 3.0s'. The gateway has no recent changes and no error logs, which fits a stopped process.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ],
   "timing": {
-    "t0": 1793424910.8728478,
-    "t_alert": 1793424923.9113524,
-    "horizon": 1793425033.9113524,
-    "verdict_t": 1793425043.956425
+    "t0": 1793457476.918841,
+    "t_alert": 1793457489.9896736,
+    "horizon": 1793457599.9896736,
+    "verdict_t": 1793457610.0507724
   },
   "attempt": 1,
   "purpose": "main",

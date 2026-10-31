@@ -1,53 +1,102 @@
 {
   "arm": "fifo",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.85,
+      "evidence": "Deploy 12 s ago (from=1.3, to=1.5); payments logged response_unavailable warnings from 11 s ago onward, and 43% of its requests fail with 503. The ledger data check shows duplicate payments = 83, which most likely comes from the new release."
+    },
+    {
+      "target": "clearing",
+      "class": "process_down",
+      "confidence": 0.8,
+      "evidence": "Clearing is 'down (not answering)' and 'process exited 1 time(s) ... last 14 s ago (exit code 15)'. The backlog's first item, 87, shows 0 attempt(s), so no item is crashing the worker."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793458245.1782398,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: Deploy 12 s ago (from=1.3, to=1.5); payments logged response_unavailable warnings from 11 s ago onward, and 43% of its requests fail with 503. The ledger data check shows duplicate payments = 83, which most likely comes from the new release.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "t": 1793458247.8681452,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "process_down: Clearing is 'down (not answering)' and 'process exited 1 time(s) ... last 14 s ago (exit code 15)'. The backlog's first item, 87, shows 0 attempt(s), so no item is crashing the worker.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "ledger"
+    ],
+    "class": null,
+    "reason": "past damage, no longer growing: data check failed: duplicate payments = 149",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "find and put right the records behind 'data check failed: duplicate payments = 149'; the incident commander cannot change data"
   },
-  "t_start": 1793429697.7911294,
-  "t_first_action": null,
-  "t_declared": 1793429698.0987167,
+  "sbar": {
+    "situation": "The bank system has recovered. The last recovery check, at 30 s, was clean twice in a row.",
+    "background": "Payments was upgraded from 1.3 to 1.5 and began failing 43% of requests with 503 errors. Separately, the clearing worker exited with code 15 and stopped answering, so its queue backed up.",
+    "assessment": "The incident commander rolled payments back from 1.5 to 1.3, which succeeded, and restarted clearing, which also succeeded. Release 1.5 most likely caused the duplicate payments in the ledger. Clearing did not crash on a bad item, because the first backlog item, 87, showed 0 attempts.",
+    "recommendation": "The operations team has been asked to act soon to find and correct the duplicate payment records in the ledger. The last data check showed 149 duplicates, up from 83 earlier, so they should review the money effect on customers. Keep payments on 1.3 until release 1.5 is fixed, and watch clearing in case it exits again."
+  },
+  "t_start": 1793458236.1815672,
+  "t_first_action": 1793458245.1782398,
+  "t_declared": 1793458266.5026915,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.04,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 29.3
+        "ms": 38.6
       }
     },
     {
-      "t": 0.13,
+      "t": 0.14,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: clearing",
       "data": {
-        "ms": 102.7
+        "ms": 100.6
       }
     },
     {
-      "t": 0.2,
+      "t": 0.21,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 72.1
+        "ms": 66.7
       }
     },
     {
-      "t": 0.2,
+      "t": 0.21,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -59,14 +108,14 @@
             "letter": "A",
             "component": "gateway",
             "severity": "fault",
-            "text": "44% of requests fail (baseline 0%)"
+            "text": "43% of requests fail (baseline 0%)"
           },
           {
             "id": "A2",
             "letter": "A",
             "component": "payments",
             "severity": "fault",
-            "text": "44% of requests fail (baseline 0%)"
+            "text": "43% of requests fail (baseline 0%)"
           },
           {
             "id": "A3",
@@ -80,7 +129,7 @@
             "letter": "B",
             "component": "clearing",
             "severity": "fault",
-            "text": "backlog: 187 items waiting, oldest 14 s; first item 88 waiting 14 s after 0 attempt(s)"
+            "text": "backlog: 187 items waiting, oldest 14 s; first item 87 waiting 14 s after 0 attempt(s)"
           },
           {
             "id": "C1",
@@ -94,56 +143,56 @@
             "letter": "C",
             "component": "clearing",
             "severity": "fault",
-            "text": "process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)"
+            "text": "process exited 1 time(s) in 15 min, last 14 s ago (exit code 15)"
           },
           {
             "id": "D1",
             "letter": "D",
             "component": "gateway",
             "severity": "fault",
-            "text": "calls to payments fail: 44%"
+            "text": "calls to payments fail: 43%"
           },
           {
             "id": "D2",
             "letter": "D",
             "component": "ledger",
             "severity": "fault",
-            "text": "data check failed: duplicate payments = 82"
+            "text": "data check failed: duplicate payments = 83"
           },
           {
             "id": "E1",
             "letter": "E",
             "component": "payments",
             "severity": "info",
-            "text": "11 s ago: deploy by scheduler (from=1.3, to=1.5)"
+            "text": "12 s ago: deploy by scheduler (from=1.3, to=1.5)"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by operator"
+            "text": "7 s ago: stop by operator"
           },
           {
             "id": "E3",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: start by operator (release=4.1)"
+            "text": "7 s ago: start by operator (release=4.1)"
           },
           {
             "id": "E4",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by pipeline"
+            "text": "6 s ago: stop by pipeline"
           },
           {
             "id": "E5",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by pipeline (release=4.1)"
+            "text": "6 s ago: start by pipeline (release=4.1)"
           }
         ]
       }
@@ -153,9 +202,9 @@
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
-      "summary": "2 log records from gateway",
+      "summary": "1 log records from gateway",
       "data": {
-        "ms": 35.8
+        "ms": 32.8
       }
     },
     {
@@ -165,7 +214,7 @@
       "name": "logs",
       "summary": "8 log records from payments",
       "data": {
-        "ms": 28.8
+        "ms": 28.3
       }
     },
     {
@@ -175,46 +224,148 @@
       "name": "logs",
       "summary": "1 log records from clearing",
       "data": {
-        "ms": 12.2
+        "ms": 10.1
       }
     },
     {
-      "t": 0.31,
+      "t": 0.29,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "0 log records from ledger",
       "data": {
-        "ms": 26.2
+        "ms": 13.6
       }
     },
     {
-      "t": 0.31,
+      "t": 9.0,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 8.705 s"
     },
     {
-      "t": 0.31,
+      "t": 9.69,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 12.33,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 19.41,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 80.4
+      }
+    },
+    {
+      "t": 20.3,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 890.3
+      }
+    },
+    {
+      "t": 20.3,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: ledger: data check failed: duplicate payments = 149"
+    },
+    {
+      "t": 24.38,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 78.0
+      }
+    },
+    {
+      "t": 25.3,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 920.8
+      }
+    },
+    {
+      "t": 25.3,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 29.4,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 98.7
+      }
+    },
+    {
+      "t": 30.32,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 924.0
+      }
+    },
+    {
+      "t": 30.32,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 3: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 30.32,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.31,
+      "t": 34.67,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.31,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 4.352 s"
     }
   ],
   "calls": [
@@ -222,11 +373,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3868,
+      "output_tokens": 815,
+      "latency_s": 8.705,
+      "estimated_cost_usd": 0.031772,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -234,15 +385,44 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1002,
+      "output_tokens": 331,
+      "latency_s": 4.352,
+      "estimated_cost_usd": 0.010628,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 7,
-  "audit": []
+  "steps": 15,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793458245.1782398,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: Deploy 12 s ago (from=1.3, to=1.5); payments logged response_unavailable warnings from 11 s ago onward, and 43% of its requests fail with 503. The ledger data check shows duplicate payments = 83, which most likely comes from the new release.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "event": "act",
+      "t": 1793458247.8681452,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "process_down: Clearing is 'down (not answering)' and 'process exited 1 time(s) ... last 14 s ago (exit code 15)'. The backlog's first item, 87, shows 0 attempt(s), so no item is crashing the worker.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ]
 }

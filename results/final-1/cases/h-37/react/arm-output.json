@@ -2,20 +2,89 @@
   "result": {
     "arm": "react",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.9,
+        "evidence": "The reconciliation session held a ledger write lock (UPDATE accounts, about 13 s). Payments logged repeated 'database is locked' failures, and ledger write_errors went to 0 after release_lock."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.75,
+        "evidence": "Clearing was down (exit code 15, no error logs) with 44 items queued and the head item at 0 attempts. After a restart it drained the queue to the network with no errors."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.85,
+        "evidence": "Payments 1.5 was deployed just before the symptoms. After the lock was gone it still failed about 58% with p95 around 1.2 s ('response could not be completed') and duplicate payments kept rising. Rolling back to 1.3 brought errors to 0, p95 to 46 ms, and stopped the duplicates at 143."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793456586.0208948,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "Payments failures are 'database is locked' caused by the reconciliation session holding a ledger write lock; release it first.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793456593.7009034,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Clearing exited with code 15 (terminated) and logged no errors or poison item, so this looks like process_down; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "t": 1793456605.7091076,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Lock errors stopped after the release, but payments 1.5 (deployed just before the symptoms) still fails ~58% with slow 'response could not be completed' and rising duplicate payments, so roll it back.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "ledger",
+        "payments"
+      ],
+      "class": null,
+      "reason": "All components are back at baseline and the probe passes, but release 1.5 left 143 duplicate payments in the ledger. I cannot reverse or refund money, so I will hand that over to a person before closing.; past damage, no longer growing: data check failed: duplicate payments = 143",
+      "urgency": "soon",
+      "to": "the on-call engineer; the operations team",
+      "ask": "Payments release 1.5 (deployed by ops-maintenance) created 143 duplicate payments before it was rolled back to 1.3. The count has stayed at 143 since the rollback. Many of these were likely cleared to the network. Please identify the duplicate payments in the ledger and remediate them with the network and affected customers through the normal reversal process; the incident commander may not move or reverse money. Also please fix release 1.5 before it is redeployed. Separately, the reconciliation batch held a ledger write lock long enough to block payments. That session was ended and its transaction rolled back, so please rerun reconciliation and review how it locks the ledger.; find and put right the records behind 'data check failed: duplicate payments = 143'; the incident commander cannot change data"
     },
-    "t_start": 1793434178.1894736,
-    "t_first_action": null,
-    "t_declared": 1793434178.2319849,
+    "sbar": {
+      "situation": "The bank system has recovered and is back at baseline. The payment probe passes end to end, and the last of three recovery checks, at 74 s, was clean (2 of 2 in a row).",
+      "background": "Payments release 1.5 was deployed by ops-maintenance just before the symptoms began. At the same time, the reconciliation session held a ledger write lock (UPDATE accounts, about 13 s), and clearing was down with exit code 15 and 44 items queued.",
+      "assessment": "The incident commander took three actions itself. It ended the reconciliation session holding the ledger lock, which brought ledger write errors to 0; it restarted clearing, which drained the queue to the network with no errors; and it rolled payments back from 1.5 to 1.3, which brought errors to 0, cut p95 from about 1.2 s to 46 ms, and stopped duplicate payments at 143.",
+      "recommendation": "The operations team must find the 143 duplicate payments in the ledger and reverse them with the network and affected customers through the normal reversal process, as many were likely cleared. The incident commander cannot move money or change data. Fix payments release 1.5 before redeploying it, and rerun reconciliation (its transaction was rolled back) and review how it locks the ledger."
+    },
+    "t_start": 1793456575.9932795,
+    "t_first_action": 1793456586.0208948,
+    "t_declared": 1793456649.9760938,
     "trace": [
       {
         "t": 0.04,
@@ -24,36 +93,407 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 42.4
+          "ms": 36.0
         }
       },
       {
-        "t": 0.04,
+        "t": 2.49,
         "phase": "triage",
         "kind": "model",
         "name": "react",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 2.452 s"
       },
       {
-        "t": 0.04,
+        "t": 2.49,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing metrics across all components."
+      },
+      {
+        "t": 2.6,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 108.7
+        }
+      },
+      {
+        "t": 6.79,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.192 s"
+      },
+      {
+        "t": 6.79,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Several suspects: payments deployed 1.5 just before errors, reconciliation holds a ledger write lock, clearing is down. Check payments logs to see what its errors are."
+      },
+      {
+        "t": 6.82,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "11 log records from payments",
+        "data": {
+          "ms": 27.8
+        }
+      },
+      {
+        "t": 10.03,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.209 s"
+      },
+      {
+        "t": 10.03,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Payments failures are 'database is locked' caused by the reconciliation session holding a ledger write lock; release it first."
+      },
+      {
+        "t": 10.12,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.58,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.458 s"
+      },
+      {
+        "t": 13.58,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Lock released; clearing is down (exit code 15) with 44 queued, so check its logs before acting."
+      },
+      {
+        "t": 13.6,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from clearing",
+        "data": {
+          "ms": 22.4
+        }
+      },
+      {
+        "t": 17.71,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.107 s"
+      },
+      {
+        "t": 17.71,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Clearing exited with code 15 (terminated) and logged no errors or poison item, so this looks like process_down; restart it."
+      },
+      {
+        "t": 18.34,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 21.48,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.137 s"
+      },
+      {
+        "t": 21.48,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Now observe to see if payments recovered and whether the 1.5 release causes issues (duplicates were noted)."
+      },
+      {
+        "t": 21.59,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 107.0
+        }
+      },
+      {
+        "t": 26.21,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.622 s"
+      },
+      {
+        "t": 26.21,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Payments still fails at 58% with p95 ~1.2 s while the lock is gone, and duplicate payments keep rising. Check payments logs to see whether release 1.5 is the cause."
+      },
+      {
+        "t": 26.23,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "21 log records from payments",
+        "data": {
+          "ms": 16.7
+        }
+      },
+      {
+        "t": 29.72,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.49 s"
+      },
+      {
+        "t": 29.72,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Lock errors stopped after the release, but payments 1.5 (deployed just before the symptoms) still fails ~58% with slow 'response could not be completed' and rising duplicate payments, so roll it back."
+      },
+      {
+        "t": 30.4,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 33.26,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.856 s"
+      },
+      {
+        "t": 33.26,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Verify recovery after the rollback."
+      },
+      {
+        "t": 33.36,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 102.2
+        }
+      },
+      {
+        "t": 37.69,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.332 s"
+      },
+      {
+        "t": 37.69,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Payments now shows 0 errors, but the gateway window still shows 36% errors, likely from the rollback period. Probe the main journey to confirm end-to-end recovery."
+      },
+      {
+        "t": 38.61,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 920.2
+        }
+      },
+      {
+        "t": 42.49,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.874 s"
+      },
+      {
+        "t": 42.49,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Probe passes; confirm the gateway error rate has cleared now that the rollback window has passed."
+      },
+      {
+        "t": 42.62,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 130.0
+        }
+      },
+      {
+        "t": 51.42,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 8.803 s"
+      },
+      {
+        "t": 51.42,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "escalate: All components are back at baseline and the probe passes, but release 1.5 left 143 duplicate payments in the ledger. I cannot reverse or refund money, so I will hand that over to a person before closing."
+      },
+      {
+        "t": 58.03,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.601 s"
+      },
+      {
+        "t": 58.03,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: Everything is back at baseline, the probe passes, and the duplicate payments are handed over. Declaring done with the three root causes found."
+      },
+      {
+        "t": 63.11,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 80.0
+        }
+      },
+      {
+        "t": 64.03,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 923.9
+        }
+      },
+      {
+        "t": 64.03,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: ledger: data check failed: duplicate payments = 143"
+      },
+      {
+        "t": 68.12,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 87.6
+        }
+      },
+      {
+        "t": 68.86,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 742.3
+        }
+      },
+      {
+        "t": 68.86,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 72.89,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 33.7
+        }
+      },
+      {
+        "t": 73.98,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1088.1
+        }
+      },
+      {
+        "t": 73.98,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 73.98,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 0.04,
+        "t": 78.71,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.04,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.724 s"
       }
     ],
     "calls": [
@@ -61,11 +501,155 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "react",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 2725,
+        "output_tokens": 86,
+        "latency_s": 2.452,
+        "estimated_cost_usd": 0.01262,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4669,
+        "output_tokens": 229,
+        "latency_s": 4.192,
+        "estimated_cost_usd": 0.023256,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5200,
+        "output_tokens": 190,
+        "latency_s": 3.209,
+        "estimated_cost_usd": 0.0246,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5382,
+        "output_tokens": 174,
+        "latency_s": 3.458,
+        "estimated_cost_usd": 0.025008,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5502,
+        "output_tokens": 251,
+        "latency_s": 4.107,
+        "estimated_cost_usd": 0.027028,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5679,
+        "output_tokens": 104,
+        "latency_s": 3.137,
+        "estimated_cost_usd": 0.024796,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7795,
+        "output_tokens": 211,
+        "latency_s": 4.622,
+        "estimated_cost_usd": 0.0354,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8652,
+        "output_tokens": 157,
+        "latency_s": 3.49,
+        "estimated_cost_usd": 0.037748,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8859,
+        "output_tokens": 81,
+        "latency_s": 2.856,
+        "estimated_cost_usd": 0.037056,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 11041,
+        "output_tokens": 232,
+        "latency_s": 4.332,
+        "estimated_cost_usd": 0.048804,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 11407,
+        "output_tokens": 255,
+        "latency_s": 3.874,
+        "estimated_cost_usd": 0.050728,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 13608,
+        "output_tokens": 684,
+        "latency_s": 8.803,
+        "estimated_cost_usd": 0.068112,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 13989,
+        "output_tokens": 574,
+        "latency_s": 6.601,
+        "estimated_cost_usd": 0.067436,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -73,17 +657,60 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1314,
+        "output_tokens": 415,
+        "latency_s": 4.724,
+        "estimated_cost_usd": 0.013556,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 1,
-    "audit": []
+    "steps": 18,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793456586.0208948,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "Payments failures are 'database is locked' caused by the reconciliation session holding a ledger write lock; release it first.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793456593.7009034,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Clearing exited with code 15 (terminated) and logged no errors or poison item, so this looks like process_down; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793456605.7091076,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Lock errors stopped after the release, but payments 1.5 (deployed just before the symptoms) still fails ~58% with slow 'response could not be completed' and rising duplicate payments, so roll it back.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ]
   },
   "error": null
 }

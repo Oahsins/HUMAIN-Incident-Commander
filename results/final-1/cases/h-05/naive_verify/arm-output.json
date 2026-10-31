@@ -2,53 +2,69 @@
   "result": {
     "arm": "naive_verify",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "network",
+        "class": "external_outage",
+        "confidence": 0.92,
+        "evidence": "Findings: 'network: down (not answering)' and '100% of requests fail (baseline 0%)', with p95 2031 ms against a 28 ms baseline. The clearing log shows 'payment network timeout; item stays pending item_id=98'."
+      }
+    ],
     "actions": [],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "network"
+      ],
+      "class": "external_outage",
+      "reason": "Findings: 'network: down (not answering)' and '100% of requests fail (baseline 0%)', with p95 2031 ms against a 28 ms baseline. The clearing log shows 'payment network timeout; item stays pending item_id=98'.",
+      "urgency": "now",
+      "to": "the organisation that runs network",
+      "ask": "Contact the organisation that runs the national payment network to restore service. Clearing will drain the backlog of 126 pending items on its own once the network answers. Do not quarantine item 98: it is waiting on the network, not malformed."
     },
-    "t_start": 1793422406.7495985,
+    "sbar": {
+      "situation": "Recovery is not confirmed: the national payment network, run by another organisation, is down and every clearing send times out. Payments stay pending and the clearing queue keeps growing, now at 126 pending items.",
+      "background": "The network stopped answering, with 100% of requests failing against a 0% baseline and p95 latency at 2031 ms against 28 ms. The clearing log shows 'payment network timeout; item stays pending item_id=98'.",
+      "assessment": "Root cause is an external outage of the payment network (confidence 0.92), which no allowed action can fix. The incident commander checked and found the clearing worker healthy, item 98 not poison, and the screening-standby restarts only maintenance events, then escalated to the network operator itself.",
+      "recommendation": "Follow up with the organisation that runs the national payment network until service is restored, then confirm clearing drains the 126 pending items on its own. Do not quarantine item 98, which is waiting on the network rather than malformed. Operations should review the delayed settlement of the 126 pending payments."
+    },
+    "t_start": 1793453147.747995,
     "t_first_action": null,
-    "t_declared": 1793422411.6752446,
+    "t_declared": 1793453158.5338502,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.05,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 32.1
+          "ms": 49.5
         }
       },
       {
-        "t": 1.13,
+        "t": 1.17,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: network",
         "data": {
-          "ms": 1095.9
+          "ms": 1123.4
         }
       },
       {
-        "t": 4.9,
+        "t": 4.94,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at clearing",
         "data": {
-          "ms": 3767.8
+          "ms": 3764.0
         }
       },
       {
-        "t": 4.9,
+        "t": 4.94,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -67,7 +83,7 @@
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 123 items waiting, oldest 14 s, 0.0 processed/s; first item 101 waiting 14 s after 6 attempt(s)"
+              "text": "backlog: 126 items waiting, oldest 15 s, 0.0 processed/s; first item 98 waiting 15 s after 6 attempt(s)"
             },
             {
               "id": "D1",
@@ -81,7 +97,7 @@
               "letter": "D",
               "component": "clearing",
               "severity": "fault",
-              "text": "calls to network are slow: p95 2016 ms (network itself answered in 28 ms at baseline)"
+              "text": "calls to network are slow: p95 2031 ms (network itself answered in 28 ms at baseline)"
             },
             {
               "id": "D3",
@@ -102,97 +118,97 @@
               "letter": "D",
               "component": "network",
               "severity": "info",
-              "text": "traffic 0.4/s (baseline 9.8/s), less work from its callers (run by another organisation)"
+              "text": "traffic 0.5/s (baseline 9.7/s), less work from its callers (run by another organisation)"
             },
             {
               "id": "D6",
               "letter": "D",
               "component": "network",
               "severity": "fault",
-              "text": "p95 2016 ms (baseline 28 ms) (run by another organisation)"
+              "text": "p95 2031 ms (baseline 28 ms) (run by another organisation)"
             },
             {
               "id": "E1",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: stop by operator"
+              "text": "9 s ago: stop by operator"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: start by operator (release=4.1)"
+              "text": "9 s ago: start by operator (release=4.1)"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: stop by ops-maintenance"
+              "text": "8 s ago: stop by ops-maintenance"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: start by ops-maintenance (release=4.1)"
+              "text": "8 s ago: start by ops-maintenance (release=4.1)"
             },
             {
               "id": "E5",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E6",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 4.93,
+        "t": 4.96,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "9 log records from clearing",
         "data": {
-          "ms": 29.3
+          "ms": 24.5
         }
       },
       {
-        "t": 4.93,
+        "t": 10.79,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 5.823 s"
       },
       {
-        "t": 4.93,
+        "t": 10.79,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate network (now) to the organisation that runs network"
+      },
+      {
+        "t": 10.79,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "escalated"
       },
       {
-        "t": 4.93,
+        "t": 14.83,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.93,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.048 s"
       }
     ],
     "calls": [
@@ -200,11 +216,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3749,
+        "output_tokens": 514,
+        "latency_s": 5.823,
+        "estimated_cost_usd": 0.025276,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -212,11 +228,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 824,
+        "output_tokens": 343,
+        "latency_s": 4.048,
+        "estimated_cost_usd": 0.010156,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }

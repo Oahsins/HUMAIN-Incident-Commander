@@ -2,53 +2,138 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.6,
+        "evidence": "[C1] 'clearing: down (not answering)' and [C2] 'process exited 1 time(s)… exit code 1'; the log shows 'JSONDecodeError … in clear_one message = self.parse(item)'. The head item 100 has '0 attempt(s)', so no item in the queue is identified as poison."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.75,
+        "evidence": "[E1] 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)', 10 s ago. A 600 s balance cache means a posted payment would not show in the balance, which the payment journey checks; this stays hidden while clearing is down."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.85,
+        "evidence": "Clearing logs 'event=crash msg=JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)' (x2). B1 shows head item 100 still waiting after 0 attempts while the worker exits with code 1 (C2) and is down (C1)."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793449983.6070695,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E1] 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)', 10 s ago. A 600 s balance cache means a posted payment would not show in the balance, which the payment journey checks; this stays hidden while clearing is down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+      },
+      {
+        "t": 1793449984.6156824,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: [C1] 'clearing: down (not answering)' and [C2] 'process exited 1 time(s)… exit code 1'; the log shows 'JSONDecodeError … in clear_one message = self.parse(item)'. The head item 100 has '0 attempt(s)', so no item in the queue is identified as poison.",
+        "sent": true,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted, but it is not answering health checks"
+      },
+      {
+        "t": 1793450012.8997178,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 100
+        },
+        "reason": "poison_message: Clearing logs 'event=crash msg=JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)' (x2). B1 shows head item 100 still waiting after 0 attempts while the worker exits with code 1 (C2) and is down (C1).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 100 set aside for the operations team"
+      },
+      {
+        "t": 1793450013.9118814,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing logs 'event=crash msg=JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)' (x2). B1 shows head item 100 still waiting after 0 attempts while the worker exits with code 1 (C2) and is down (C1).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 100 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 100 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793431144.1075296,
-    "t_first_action": null,
-    "t_declared": 1793431148.0462265,
+    "sbar": {
+      "situation": "The bank is recovered: the clearing worker is running again and the payment journey passed two clean checks in a row, the last at 69 s.",
+      "background": "Clearing kept crashing with a JSONDecodeError while parsing queue item 100 in clear_one, so the clearing queue backed up. Separately, 10 s before, an operator changed the gateway setting balance_cache_ttl_s from 0.5 s to 600 s, which would hide posted payments from the balance.",
+      "assessment": "The incident commander reverted gateway balance_cache_ttl_s from 600 s back to 0.5 s, and that worked. Its first restart of clearing failed health checks, so it set aside item 100 as the poison message and restarted clearing again, which succeeded.",
+      "recommendation": "The operations team has been asked (soon) to review clearing item 100: repair and resubmit it, or close it with its customer, since that payment has not cleared. Check with the operator why balance_cache_ttl_s was set to 600 s so it is not changed again."
+    },
+    "t_start": 1793449964.9055154,
+    "t_first_action": 1793449983.6070695,
+    "t_declared": 1793450033.8910487,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 32.4
+          "ms": 38.2
         }
       },
       {
-        "t": 0.13,
+        "t": 0.11,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: clearing",
         "data": {
-          "ms": 95.4
+          "ms": 69.5
         }
       },
       {
-        "t": 3.91,
+        "t": 3.95,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at clearing",
         "data": {
-          "ms": 3780.3
+          "ms": 3845.4
         }
       },
       {
-        "t": 3.91,
+        "t": 3.95,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -67,7 +152,7 @@
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 99 items waiting, oldest 12 s; first item 99 waiting 12 s after 0 attempt(s)"
+              "text": "backlog: 98 items waiting, oldest 12 s; first item 100 waiting 12 s after 0 attempt(s)"
             },
             {
               "id": "C1",
@@ -88,14 +173,14 @@
               "letter": "E",
               "component": "gateway",
               "severity": "info",
-              "text": "9 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+              "text": "10 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by ops-maintenance"
+              "text": "6 s ago: stop by ops-maintenance"
             },
             {
               "id": "E3",
@@ -108,42 +193,341 @@
         }
       },
       {
-        "t": 3.94,
+        "t": 3.98,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "2 log records from clearing",
         "data": {
-          "ms": 30.1
+          "ms": 30.0
         }
       },
       {
-        "t": 3.94,
+        "t": 18.7,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 14.717 s"
       },
       {
-        "t": 3.94,
+        "t": 18.71,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 20.25,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: failed (clearing restarted, but it is not answering health checks)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": false,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 24.3,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 45.3
+        }
+      },
+      {
+        "t": 28.12,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3820.9
+        }
+      },
+      {
+        "t": 28.12,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: clearing: payment journey fails at step 'clearing': not cleared within 3 s (still pending); clearing: backlog: 317 items waiting, oldest 36 s; first item 100 waiting 36 s after 0 attempt(s); clearing: down (not answering) (+1 more)"
+      },
+      {
+        "t": 32.15,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 30.6
+        }
+      },
+      {
+        "t": 36.04,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3890.4
+        }
+      },
+      {
+        "t": 36.04,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: clearing: payment journey fails at step 'clearing': not cleared within 3 s (still pending); clearing: backlog: 379 items waiting, oldest 44 s; first item 100 waiting 44 s after 0 attempt(s); clearing: down (not answering) (+1 more)"
+      },
+      {
+        "t": 36.14,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: clearing",
+        "data": {
+          "ms": 100.2
+        }
+      },
+      {
+        "t": 39.85,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at clearing",
+        "data": {
+          "ms": 3714.8
+        }
+      },
+      {
+        "t": 39.85,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "4 fault findings, 9 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "payment journey fails at step 'clearing': not cleared within 3 s (still pending)"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "backlog: 418 items waiting, oldest 48 s; first item 100 waiting 48 s after 0 attempt(s)"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "fault",
+              "text": "process exited 2 time(s) in 15 min, last 16 s ago (exit code 1)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "46 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "42 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "42 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "17 s ago: config by incident-commander (key=balance_cache_ttl_s, revert=True, from=600.0, to=0.5)"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "clearing",
+              "severity": "info",
+              "text": "16 s ago: restart by incident-commander (release=3.2)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 39.88,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "3 log records from clearing",
+        "data": {
+          "ms": 24.5
+        }
+      },
+      {
+        "t": 47.99,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-opus-5-5 answered in 8.115 s"
+      },
+      {
+        "t": 48.01,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 100 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 100
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 49.65,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 55.76,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 109.6
+        }
+      },
+      {
+        "t": 58.99,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 3232.9
+        }
+      },
+      {
+        "t": 58.99,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: clearing: backlog: 158 items waiting, oldest 19 s, 67.2 processed/s; first item 521 waiting 19 s after 0 attempt(s)"
+      },
+      {
+        "t": 63.09,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 98.9
+        }
+      },
+      {
+        "t": 63.97,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 878.6
+        }
+      },
+      {
+        "t": 63.97,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 68.05,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 76.0
+        }
+      },
+      {
+        "t": 68.99,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 939.5
+        }
+      },
+      {
+        "t": 68.99,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 68.99,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 3.94,
+        "t": 73.39,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 3.94,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.4 s"
       }
     ],
     "calls": [
@@ -151,11 +535,23 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3601,
+        "output_tokens": 1365,
+        "latency_s": 14.717,
+        "estimated_cost_usd": 0.041704,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "reassess",
+        "input_tokens": 3996,
+        "output_tokens": 732,
+        "latency_s": 8.115,
+        "estimated_cost_usd": 0.030624,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -163,17 +559,78 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1288,
+        "output_tokens": 338,
+        "latency_s": 4.4,
+        "estimated_cost_usd": 0.011912,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 4,
-    "audit": []
+    "steps": 21,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793449983.6070695,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E1] 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)', 10 s ago. A 600 s balance cache means a posted payment would not show in the balance, which the payment journey checks; this stays hidden while clearing is down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+      },
+      {
+        "event": "act",
+        "t": 1793449984.6156824,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: [C1] 'clearing: down (not answering)' and [C2] 'process exited 1 time(s)… exit code 1'; the log shows 'JSONDecodeError … in clear_one message = self.parse(item)'. The head item 100 has '0 attempt(s)', so no item in the queue is identified as poison.",
+        "sent": true,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted, but it is not answering health checks"
+      },
+      {
+        "event": "act",
+        "t": 1793450012.8997178,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 100
+        },
+        "reason": "poison_message: Clearing logs 'event=crash msg=JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)' (x2). B1 shows head item 100 still waiting after 0 attempts while the worker exits with code 1 (C2) and is down (C1).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 100 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793450013.9118814,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing logs 'event=crash msg=JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at 'message = self.parse(item)' (x2). B1 shows head item 100 still waiting after 0 attempts while the worker exits with code 1 (C2) and is down (C1).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
   },
   "error": null
 }

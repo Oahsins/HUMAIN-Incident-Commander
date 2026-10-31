@@ -2,20 +2,84 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "[C1] gateway: down (not answering); [A3] payment journey fails at step 'gateway': timeout: no answer within 3.0s. There is no recent change to the gateway."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.8,
+        "evidence": "Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item); [B1] the first item, 92, has been waiting 14 s and the worker is down ([C2], [C3])."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793449684.5294847,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 92
+        },
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item); [B1] the first item, 92, has been waiting 14 s and the worker is down ([C2], [C3]).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 92 set aside for the operations team"
+      },
+      {
+        "t": 1793449685.5489106,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item); [B1] the first item, 92, has been waiting 14 s and the worker is down ([C2], [C3]).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "t": 1793449688.208114,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering); [A3] payment journey fails at step 'gateway': timeout: no answer within 3.0s. There is no recent change to the gateway.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 92 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 92 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793428805.4236138,
-    "t_first_action": null,
-    "t_declared": 1793428809.6769383,
+    "sbar": {
+      "situation": "The bank payment service has recovered. Two checks in a row came back clean, the last at 28 seconds.",
+      "background": "The gateway process went down with no recent change to it, so every payment journey timed out at the gateway step after 3.0 seconds. Separately, the clearing worker crashed on a malformed queue item, 92, with a JSONDecodeError, and its backlog began to grow.",
+      "assessment": "The incident commander quarantined clearing item 92, which worked and set the item aside for the operations team. It then restarted clearing and restarted the gateway, and both restarts succeeded.",
+      "recommendation": "Watch the gateway, since it went down with no known cause, and find out why the process stopped. The operations team has been asked (soon) to review item 92 from clearing and either repair and resubmit it or close it with its customer, because that payment has not been processed."
+    },
+    "t_start": 1793449672.7759547,
+    "t_first_action": 1793449684.5294847,
+    "t_declared": 1793449700.921307,
     "trace": [
       {
         "t": 0.03,
@@ -24,31 +88,31 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 32.4
+          "ms": 26.3
         }
       },
       {
-        "t": 1.16,
+        "t": 1.13,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: gateway, clearing",
         "data": {
-          "ms": 1131.7
+          "ms": 1108.2
         }
       },
       {
-        "t": 4.2,
+        "t": 4.15,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at gateway",
         "data": {
-          "ms": 3031.1
+          "ms": 3018.7
         }
       },
       {
-        "t": 4.2,
+        "t": 4.15,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -60,14 +124,14 @@
               "letter": "A",
               "component": "payments",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 11.6/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 11.1/s), less work from its callers"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "screening",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 9.4/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 8.9/s), less work from its callers"
             },
             {
               "id": "A3",
@@ -81,7 +145,7 @@
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 14 items waiting, oldest 14 s; first item 96 waiting 14 s after 0 attempt(s)"
+              "text": "backlog: 17 items waiting, oldest 14 s; first item 92 waiting 14 s after 0 attempt(s)"
             },
             {
               "id": "C1",
@@ -109,79 +173,170 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: stop by pipeline"
+              "text": "8 s ago: stop by pipeline"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: start by pipeline (release=4.1)"
+              "text": "8 s ago: start by pipeline (release=4.1)"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 4.22,
+        "t": 4.16,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 25.5
+          "ms": 9.0
         }
       },
       {
-        "t": 4.25,
+        "t": 4.19,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "2 log records from clearing",
         "data": {
-          "ms": 32.0
+          "ms": 30.8
         }
       },
       {
-        "t": 4.25,
+        "t": 11.75,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 7.559 s"
       },
       {
-        "t": 4.25,
+        "t": 11.77,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 92 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 92
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.43,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 16.13,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 22.19,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 58.7
+        }
+      },
+      {
+        "t": 23.11,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 912.1
+        }
+      },
+      {
+        "t": 23.11,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 27.21,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 107.7
+        }
+      },
+      {
+        "t": 28.15,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 930.2
+        }
+      },
+      {
+        "t": 28.15,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 28.15,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 4.25,
+        "t": 32.06,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.25,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 3.912 s"
       }
     ],
     "calls": [
@@ -189,11 +344,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3699,
+        "output_tokens": 694,
+        "latency_s": 7.559,
+        "estimated_cost_usd": 0.028676,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -201,17 +356,62 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 989,
+        "output_tokens": 281,
+        "latency_s": 3.912,
+        "estimated_cost_usd": 0.009576,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 5,
-    "audit": []
+    "steps": 12,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793449684.5294847,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 92
+        },
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item); [B1] the first item, 92, has been waiting 14 s and the worker is down ([C2], [C3]).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 92 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793449685.5489106,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item); [B1] the first item, 92, has been waiting 14 s and the worker is down ([C2], [C3]).",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793449688.208114,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering); [A3] payment journey fails at step 'gateway': timeout: no answer within 3.0s. There is no recent change to the gateway.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
   },
   "error": null
 }

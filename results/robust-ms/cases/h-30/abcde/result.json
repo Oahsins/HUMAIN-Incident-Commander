@@ -1,53 +1,132 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.92,
+      "evidence": "Log: 'JSONDecodeError: Expecting property name enclosed in double quotes' raised in clear_one at self.parse(item) with the crash repeated; the backlog's first item is 101, waiting 12 s with 0 attempts. Clearing is down (C1) and has exited 1 time in 15 min (C2)."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.9,
+      "evidence": "A1 shows the app returning 99999900 while the ledger holds 99999600. E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 33 s ago, which is the only recent change and matches the stale balance."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793452552.1696582,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 101
+      },
+      "reason": "poison_message: Log: 'JSONDecodeError: Expecting property name enclosed in double quotes' raised in clear_one at self.parse(item) with the crash repeated; the backlog's first item is 101, waiting 12 s with 0 attempts. Clearing is down (C1) and has exited 1 time in 15 min (C2).",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 101 set aside for the operations team"
+    },
+    {
+      "t": 1793452553.2046502,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Log: 'JSONDecodeError: Expecting property name enclosed in double quotes' raised in clear_one at self.parse(item) with the crash repeated; the backlog's first item is 101, waiting 12 s with 0 attempts. Clearing is down (C1) and has exited 1 time in 15 min (C2).",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "t": 1793452578.1250389,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: A1 shows the app returning 99999900 while the ledger holds 99999600. E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 33 s ago, which is the only recent change and matches the stale balance.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    },
+    {
+      "t": 1793452579.148545,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "bad_config: A1 shows the app returning 99999900 while the ledger holds 99999600. E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 33 s ago, which is the only recent change and matches the stale balance.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "clearing"
+    ],
+    "class": null,
+    "reason": "item 101 was set aside from clearing's work queue",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "review item 101 set aside from clearing: repair and resubmit it, or close it with its customer"
   },
-  "t_start": 1793440477.7421153,
-  "t_first_action": null,
-  "t_declared": 1793440481.7113953,
+  "sbar": {
+    "situation": "The payment journey has recovered, with two clean recovery checks in a row at 49 s. The engineer taking over must confirm the stale balance is gone and deal with clearing item 101, which is set aside.",
+    "background": "33 s before the incident, an operator raised gateway balance_cache_ttl_s from 0.5 to 600 seconds, and the balance step began serving a stale balance. Separately, clearing item 101 crashed its worker with a JSON parse error and kept crashing it. The incident commander itself quarantined item 101, restarted clearing, reverted balance_cache_ttl_s to 0.5, and restarted the gateway.",
+    "assessment": "Root cause one: the operator's TTL change on the gateway caused the app to return 99999900 while the ledger held 99999600. Reverting the TTL and restarting the gateway resolved it. Root cause two: poison message item 101 on clearing crashed the worker in clear_one at self.parse; quarantining it and restarting clearing stopped the crash loop, and clearing has not exited since. Recovery was confirmed by the journey checks, not by the actions alone.",
+    "recommendation": "Confirm the gateway cache has cleared and balances match the ledger. Escalated soon to the operations team: review clearing item 101, which is set aside, and either repair and resubmit it or close it with its customer. Operations should also review any money effect from the stale balance window of about 300 units, since the app showed 99999900 against the ledger's 99999600."
+  },
+  "t_start": 1793452542.2223008,
+  "t_first_action": 1793452552.1696582,
+  "t_declared": 1793452591.7064648,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.05,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 33.8
+        "ms": 51.7
       }
     },
     {
-      "t": 0.13,
+      "t": 0.14,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: clearing",
       "data": {
-        "ms": 97.4
+        "ms": 86.4
       }
     },
     {
-      "t": 3.95,
+      "t": 3.93,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at clearing",
       "data": {
-        "ms": 3815.2
+        "ms": 3795.3
       }
     },
     {
-      "t": 3.95,
+      "t": 3.93,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -66,7 +145,7 @@
             "letter": "B",
             "component": "clearing",
             "severity": "fault",
-            "text": "backlog: 99 items waiting, oldest 12 s; first item 98 waiting 12 s after 0 attempt(s)"
+            "text": "backlog: 97 items waiting, oldest 12 s; first item 101 waiting 12 s after 0 attempt(s)"
           },
           {
             "id": "C1",
@@ -87,62 +166,317 @@
             "letter": "E",
             "component": "gateway",
             "severity": "info",
-            "text": "9 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            "text": "10 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by ops-maintenance"
+            "text": "6 s ago: stop by ops-maintenance"
           },
           {
             "id": "E3",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by ops-maintenance (release=4.1)"
+            "text": "6 s ago: start by ops-maintenance (release=4.1)"
           }
         ]
       }
     },
     {
-      "t": 3.97,
+      "t": 3.95,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "2 log records from clearing",
       "data": {
-        "ms": 22.5
+        "ms": 20.5
       }
     },
     {
-      "t": 3.97,
+      "t": 9.95,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-haiku-5-5 answered in 5.992 s"
     },
     {
-      "t": 3.97,
+      "t": 9.98,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "quarantine",
+      "summary": "quarantine clearing: done (clearing item 101 set aside for the operations team)",
+      "data": {
+        "target": "clearing",
+        "params": {
+          "item": 101
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 11.62,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 17.72,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 99.4
+      }
+    },
+    {
+      "t": 18.67,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at balance",
+      "data": {
+        "ms": 941.3
+      }
+    },
+    {
+      "t": 18.67,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999800"
+    },
+    {
+      "t": 22.76,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 90.1
+      }
+    },
+    {
+      "t": 23.64,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at balance",
+      "data": {
+        "ms": 882.9
+      }
+    },
+    {
+      "t": 23.64,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: not clean (0 of 2 in a row); still abnormal: payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999700"
+    },
+    {
+      "t": 23.74,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 98.8
+      }
+    },
+    {
+      "t": 24.64,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at balance",
+      "data": {
+        "ms": 905.9
+      }
+    },
+    {
+      "t": 24.64,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "1 fault findings, 8 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": null,
+            "severity": "fault",
+            "text": "payment journey fails at step 'balance': app shows 99999900 but the ledger holds 99999600"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "info",
+            "text": "process exited 1 time(s) in 15 min, last 35 s ago (exit code 1); none since the action taken on it 14 s ago"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "clearing",
+            "severity": "info",
+            "text": "1 item(s) already set aside"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "gateway",
+            "severity": "info",
+            "text": "33 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "29 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "29 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "14 s ago: quarantine by incident-commander (item=101)"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "13 s ago: restart by incident-commander (release=3.2)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 35.9,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-haiku-5-5 answered in 11.258 s"
+    },
+    {
+      "t": 35.93,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 37.64,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart gateway: done (gateway restarted)",
+      "data": {
+        "target": "gateway",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 43.73,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 94.4
+      }
+    },
+    {
+      "t": 44.49,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 753.0
+      }
+    },
+    {
+      "t": 44.49,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 48.56,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 71.5
+      }
+    },
+    {
+      "t": 49.48,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 924.4
+      }
+    },
+    {
+      "t": 49.48,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 49.48,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 3.97,
+      "t": 52.76,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 3.97,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-haiku-5-5 answered in 3.276 s"
     }
   ],
   "calls": [
@@ -150,11 +484,23 @@
       "provider": "anthropic",
       "model": "claude-haiku-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3601,
+      "output_tokens": 1146,
+      "latency_s": 5.992,
+      "estimated_cost_usd": 0.000933,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "purpose": "reassess",
+      "input_tokens": 3737,
+      "output_tokens": 2292,
+      "latency_s": 11.258,
+      "estimated_cost_usd": 0.00152,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -162,15 +508,76 @@
       "provider": "anthropic",
       "model": "claude-haiku-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1151,
+      "output_tokens": 492,
+      "latency_s": 3.276,
+      "estimated_cost_usd": 0.000361,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 4,
-  "audit": []
+  "steps": 18,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793452552.1696582,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 101
+      },
+      "reason": "poison_message: Log: 'JSONDecodeError: Expecting property name enclosed in double quotes' raised in clear_one at self.parse(item) with the crash repeated; the backlog's first item is 101, waiting 12 s with 0 attempts. Clearing is down (C1) and has exited 1 time in 15 min (C2).",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 101 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793452553.2046502,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Log: 'JSONDecodeError: Expecting property name enclosed in double quotes' raised in clear_one at self.parse(item) with the crash repeated; the backlog's first item is 101, waiting 12 s with 0 attempts. Clearing is down (C1) and has exited 1 time in 15 min (C2).",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793452578.1250389,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: A1 shows the app returning 99999900 while the ledger holds 99999600. E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 33 s ago, which is the only recent change and matches the stale balance.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    },
+    {
+      "event": "act",
+      "t": 1793452579.148545,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "bad_config: A1 shows the app returning 99999900 while the ledger holds 99999600. E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 33 s ago, which is the only recent change and matches the stale balance.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    }
+  ]
 }

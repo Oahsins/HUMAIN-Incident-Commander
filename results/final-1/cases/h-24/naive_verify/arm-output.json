@@ -2,69 +2,97 @@
   "result": {
     "arm": "naive_verify",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.9,
+        "evidence": "Screening p95 is 1812 ms against a 15 ms baseline, and payments logs 'fraud screening timeout via primary ... timeout_s=1.0' repeatedly. Payments, gateway and the probe all fail at step 'payments' with '503 screening unavailable (timeout)'."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.7,
+        "evidence": "E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 10 s ago. A 600 s balance cache means a posted payment will not show in the balance, which breaks the payment journey's last step. The symptom is hidden for now because payments are failing upstream."
+      }
+    ],
     "actions": [
       {
-        "t": 1793428344.3095343,
+        "t": 1793455076.0499263,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1031 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1028 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793455087.89799,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 10 s ago. A 600 s balance cache means a posted payment will not show in the balance, which breaks the payment journey's last step. The symptom is hidden for now because payments are failing upstream.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
       }
     ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "failover on screening: done",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank payment journey is working again after the incident commander's fixes. One recovery check at 16 s ran the main journey cleanly.",
+      "background": "Fraud screening primary slowed to 1812 ms p95 against a 15 ms baseline, so payments failed with '503 screening unavailable (timeout)'. Separately, an operator raised the gateway balance_cache_ttl_s from 0.5 s to 600 s about 10 s before the incident review.",
+      "assessment": "Screening primary timing out (timeout_s=1.0) was the main cause, and the incident commander failed screening over to its standby, which is now serving. The gateway cache change was a hidden second fault that would have kept balances stale for 10 minutes, and the incident commander reverted balance_cache_ttl_s from 600 to 0.5.",
+      "recommendation": "Investigate why the screening primary slowed before failing back from standby, and keep watching the payment journey since only one check was run. Ask the operator why balance_cache_ttl_s was changed, and have operations review any payments that failed with the screening timeout."
     },
-    "t_start": 1793428343.1339705,
-    "t_first_action": 1793428344.3095343,
-    "t_declared": 1793428344.4239721,
+    "t_start": 1793455074.8942134,
+    "t_first_action": 1793455076.0499263,
+    "t_declared": 1793455090.9731126,
     "trace": [
       {
-        "t": 0.05,
+        "t": 0.03,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 51.1
+          "ms": 30.7
         }
       },
       {
-        "t": 0.14,
+        "t": 0.13,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components",
         "data": {
-          "ms": 93.6
+          "ms": 102.7
         }
       },
       {
-        "t": 1.18,
+        "t": 1.16,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 1030.6
+          "ms": 1022.0
         }
       },
       {
-        "t": 1.18,
+        "t": 1.16,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -97,21 +125,21 @@
               "letter": "B",
               "component": "gateway",
               "severity": "fault",
-              "text": "p95 1046 ms (baseline 60 ms)"
+              "text": "p95 1046 ms (baseline 62 ms)"
             },
             {
               "id": "B2",
               "letter": "B",
               "component": "payments",
               "severity": "fault",
-              "text": "p95 1035 ms (baseline 46 ms)"
+              "text": "p95 1030 ms (baseline 47 ms)"
             },
             {
               "id": "B3",
               "letter": "B",
               "component": "screening",
               "severity": "fault",
-              "text": "p95 1820 ms (baseline 15 ms)"
+              "text": "p95 1812 ms (baseline 15 ms)"
             },
             {
               "id": "D1",
@@ -125,7 +153,7 @@
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments are slow: p95 1051 ms (payments itself answered in 46 ms at baseline)"
+              "text": "calls to payments are slow: p95 1046 ms (payments itself answered in 47 ms at baseline)"
             },
             {
               "id": "D3",
@@ -139,7 +167,7 @@
               "letter": "D",
               "component": "payments",
               "severity": "fault",
-              "text": "calls to screening are slow: p95 1031 ms (screening itself answered in 15 ms at baseline)"
+              "text": "calls to screening are slow: p95 1028 ms (screening itself answered in 15 ms at baseline)"
             },
             {
               "id": "E1",
@@ -153,7 +181,7 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by ops-maintenance"
+              "text": "6 s ago: stop by ops-maintenance"
             },
             {
               "id": "E3",
@@ -166,7 +194,7 @@
         }
       },
       {
-        "t": 1.19,
+        "t": 1.16,
         "phase": "survey",
         "kind": "action",
         "name": "containment",
@@ -182,13 +210,23 @@
         }
       },
       {
-        "t": 1.23,
+        "t": 1.2,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 34.8
+          "ms": 32.8
+        }
+      },
+      {
+        "t": 1.23,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "7 log records from payments",
+        "data": {
+          "ms": 32.4
         }
       },
       {
@@ -196,48 +234,74 @@
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
-        "summary": "7 log records from payments",
-        "data": {
-          "ms": 32.3
-        }
-      },
-      {
-        "t": 1.29,
-        "phase": "survey",
-        "kind": "tool",
-        "name": "logs",
         "summary": "1 log records from screening",
         "data": {
-          "ms": 27.8
+          "ms": 30.6
         }
       },
       {
-        "t": 1.29,
+        "t": 13.0,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 11.744 s"
       },
       {
-        "t": 1.29,
+        "t": 13.03,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.14,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 105.4
+        }
+      },
+      {
+        "t": 16.08,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 939.5
+        }
+      },
+      {
+        "t": 16.08,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "single look: clean"
+      },
+      {
+        "t": 16.08,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 1.29,
+        "t": 21.3,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 1.29,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 5.225 s"
       }
     ],
     "calls": [
@@ -245,11 +309,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4026,
+        "output_tokens": 1078,
+        "latency_s": 11.744,
+        "estimated_cost_usd": 0.037664,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -257,32 +321,48 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1066,
+        "output_tokens": 357,
+        "latency_s": 5.225,
+        "estimated_cost_usd": 0.011404,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 7,
+    "steps": 10,
     "audit": [
       {
         "event": "act",
-        "t": 1793428344.3095343,
+        "t": 1793455076.0499263,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1031 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1028 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793455087.89799,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E1: 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)' 10 s ago. A 600 s balance cache means a posted payment will not show in the balance, which breaks the payment journey's last step. The symptom is hidden for now because payments are failing upstream.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
       }
     ]
   },

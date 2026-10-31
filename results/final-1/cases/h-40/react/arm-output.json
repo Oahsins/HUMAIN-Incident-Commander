@@ -2,20 +2,90 @@
   "result": {
     "arm": "react",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "Gateway was up=false and not answering, with no errors logged and no release or config change. A restart brought it back and it now serves at its baseline of about 62 ms."
+      },
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.85,
+        "evidence": "Screening primary p95 rose to about 1800 ms (baseline 15 ms) with no release or config change. Payments timed out at its 1.0 s limit with 100% errors while its own process was healthy. Failover to screening-standby (15 ms) cleared the timeouts."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.9,
+        "evidence": "Release 1.3 to 1.5 was deployed just before the incident. Once screening was fixed, payments returned 503 'response could not be completed' and 62 duplicate payments appeared from client retries. Rollback to 1.3 brought errors to 0 and the journey passes end to end. The duplicates are escalated for reconciliation and reversal by a person."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793456883.1853325,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway process is not answering with no errors logged, consistent with process_down; restart it, then check payments' new release 1.5.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "t": 1793456901.4907405,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Screening primary itself is now slow (p95 1817 ms vs 15 ms baseline, no release or config change), so payments' callers time out: dependency_slow, so fail over to the standby. Payments 1.5 still needs checking afterwards.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793456911.8346472,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "With screening fixed, payments now fails on its own with 'response could not be completed', a fault hidden until now; release 1.5 was deployed just before the incident, so roll it back.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "ledger"
+      ],
+      "class": null,
+      "reason": "Live traffic is healthy now, and the 62 duplicate payments have stopped growing. Those duplicates came from payments 1.5 posting and then failing the response, which made clients retry, and no allowed action may reverse money. I am escalating them to a person before declaring done.",
+      "urgency": "now",
+      "to": "the on-call engineer",
+      "ask": "62 duplicate payments were posted to the ledger, and many were likely cleared to the network. They were created while payments release 1.5 was live (about t=1793456862 to 1793456912): it posted transfers but failed the response, so clients retried. The count is stable since the rollback to 1.3. A person must run reconciliation, identify the duplicate payments and handle reversal or recall with the network and customers through the proper money-movement process. The incident commander must not move or reverse money. Separately, the screening primary is still slow (p95 about 1800 ms) with no release or config change. Traffic now runs on screening-standby; please investigate the primary or its network link before failing back."
     },
-    "t_start": 1793435215.2648187,
-    "t_first_action": null,
-    "t_declared": 1793435215.317692,
+    "sbar": {
+      "situation": "Recovery is not yet confirmed: only one of two required clean checks has passed, at 74 s. All live metrics are at baseline and the payment journey passes end to end, and two items are escalated to the on-call engineer.",
+      "background": "Payments release 1.5 replaced 1.3 just before the incident. At the same time the gateway process went down and the screening primary slowed to about 1800 ms p95 (baseline 15 ms), with no release or config change to either.",
+      "assessment": "The incident commander restarted the gateway, which is back at about 62 ms, and failed screening over to screening-standby (15 ms), which cleared the payments timeouts at its 1.0 s limit. It then rolled payments back from 1.5 to 1.3, because 1.5 posted transfers but returned 503s, causing 62 duplicate payments from client retries; errors are now 0.",
+      "recommendation": "Run a second recovery check to confirm recovery. The on-call engineer has the escalation: 62 duplicate payments posted to the ledger between about t=1793456862 and t=1793456912, many likely cleared to the network, need reconciliation and reversal or recall through the proper money-movement process, and operations should review them. Traffic stays on screening-standby until the slow screening primary or its network link is investigated."
+    },
+    "t_start": 1793456873.3181093,
+    "t_first_action": 1793456883.1853325,
+    "t_declared": 1793456948.685146,
     "trace": [
       {
         "t": 0.05,
@@ -24,36 +94,427 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 52.7
+          "ms": 47.8
         }
       },
       {
-        "t": 0.05,
+        "t": 2.74,
         "phase": "triage",
         "kind": "model",
         "name": "react",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 2.696 s"
       },
       {
-        "t": 0.05,
+        "t": 2.74,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all component metrics to see where symptoms are."
+      },
+      {
+        "t": 3.86,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway",
+        "data": {
+          "ms": 1115.4
+        }
+      },
+      {
+        "t": 6.7,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.837 s"
+      },
+      {
+        "t": 6.7,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Gateway is not answering and payments got a new release 1.5 shortly before; check gateway logs to see why it is down."
+      },
+      {
+        "t": 6.73,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 30.9
+        }
+      },
+      {
+        "t": 9.87,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.138 s"
+      },
+      {
+        "t": 9.87,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Gateway process is not answering with no errors logged, consistent with process_down; restart it, then check payments' new release 1.5."
+      },
+      {
+        "t": 10.54,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.13,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.587 s"
+      },
+      {
+        "t": 13.13,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Gateway restarted; now probe the main journey to see whether payments release 1.5 causes failures."
+      },
+      {
+        "t": 14.19,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1057.0
+        }
+      },
+      {
+        "t": 17.4,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.208 s"
+      },
+      {
+        "t": 17.4,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Payments reports screening timeouts while screening itself looks healthy (p95 15 ms), and payments just moved to release 1.5; check payments logs."
+      },
+      {
+        "t": 17.41,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "5 log records from payments",
+        "data": {
+          "ms": 13.0
+        }
+      },
+      {
+        "t": 20.79,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.383 s"
+      },
+      {
+        "t": 20.79,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Payments times out calling the screening primary even though screening reports 15 ms on its side, which points at either the network link to screening or payments 1.5; check screening logs."
+      },
+      {
+        "t": 20.82,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 21.6
+        }
+      },
+      {
+        "t": 24.35,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.532 s"
+      },
+      {
+        "t": 24.35,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Screening's own logs are clean, yet payments times out reaching it; observe fresh metrics now that traffic flows to tell a slow link (dependency_slow) from a bad payments release."
+      },
+      {
+        "t": 24.44,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 95.3
+        }
+      },
+      {
+        "t": 28.17,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.728 s"
+      },
+      {
+        "t": 28.17,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Screening primary itself is now slow (p95 1817 ms vs 15 ms baseline, no release or config change), so payments' callers time out: dependency_slow, so fail over to the standby. Payments 1.5 still needs checking afterwards."
+      },
+      {
+        "t": 28.18,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "failover",
+        "summary": "failover screening: done (screening now served by its standby)",
+        "data": {
+          "target": "screening",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 31.25,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.076 s"
+      },
+      {
+        "t": 31.25,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Probe the journey to see if failover fixed screening and whether payments 1.5 causes other failures."
+      },
+      {
+        "t": 31.29,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 38.0
+        }
+      },
+      {
+        "t": 33.97,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.676 s"
+      },
+      {
+        "t": 33.97,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Screening timeouts are gone but payments now returns a generic 503, which points at release 1.5; check payments logs."
+      },
+      {
+        "t": 34.0,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "14 log records from payments",
+        "data": {
+          "ms": 28.6
+        }
+      },
+      {
+        "t": 38.52,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.518 s"
+      },
+      {
+        "t": 38.52,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: With screening fixed, payments now fails on its own with 'response could not be completed', a fault hidden until now; release 1.5 was deployed just before the incident, so roll it back."
+      },
+      {
+        "t": 39.18,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 41.87,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.684 s"
+      },
+      {
+        "t": 41.87,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Payments rolled back to 1.3; probe the journey to confirm the whole path, including clearing and the network, works end to end."
+      },
+      {
+        "t": 42.78,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 909.8
+        }
+      },
+      {
+        "t": 46.16,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.382 s"
+      },
+      {
+        "t": 46.16,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The journey passes end to end; observe once more to confirm the error rate, latency and the clearing queue are healthy before declaring done."
+      },
+      {
+        "t": 46.27,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 114.7
+        }
+      },
+      {
+        "t": 51.34,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.066 s"
+      },
+      {
+        "t": 51.34,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Ledger now shows 62 duplicate payments, likely postings made by release 1.5 whose responses failed and were retried, and gateway's 26% error rate may include the time before the rollback. Observe a short fresh window to see whether either is still growing."
+      },
+      {
+        "t": 51.42,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 81.4
+        }
+      },
+      {
+        "t": 58.6,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 7.179 s"
+      },
+      {
+        "t": 58.6,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "escalate: Live traffic is healthy now, and the 62 duplicate payments have stopped growing. Those duplicates came from payments 1.5 posting and then failing the response, which made clients retry, and no allowed action may reverse money. I am escalating them to a person before declaring done."
+      },
+      {
+        "t": 68.52,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 9.911 s"
+      },
+      {
+        "t": 68.52,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: Every component is back to baseline, the journey passes end to end, and the duplicates and slow screening primary are escalated. I am declaring done with the three root causes found."
+      },
+      {
+        "t": 73.59,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 73.7
+        }
+      },
+      {
+        "t": 74.37,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 776.7
+        }
+      },
+      {
+        "t": 74.37,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 75.37,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "budget_exhausted"
       },
       {
-        "t": 0.05,
+        "t": 80.71,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.05,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 5.346 s"
       }
     ],
     "calls": [
@@ -61,11 +522,191 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "react",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 2725,
+        "output_tokens": 88,
+        "latency_s": 2.696,
+        "estimated_cost_usd": 0.01266,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4516,
+        "output_tokens": 162,
+        "latency_s": 2.837,
+        "estimated_cost_usd": 0.021304,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4641,
+        "output_tokens": 180,
+        "latency_s": 3.138,
+        "estimated_cost_usd": 0.022164,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4795,
+        "output_tokens": 101,
+        "latency_s": 2.587,
+        "estimated_cost_usd": 0.0212,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5022,
+        "output_tokens": 190,
+        "latency_s": 3.208,
+        "estimated_cost_usd": 0.023888,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5317,
+        "output_tokens": 197,
+        "latency_s": 3.383,
+        "estimated_cost_usd": 0.025208,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5454,
+        "output_tokens": 223,
+        "latency_s": 3.532,
+        "estimated_cost_usd": 0.026276,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7456,
+        "output_tokens": 235,
+        "latency_s": 3.728,
+        "estimated_cost_usd": 0.034524,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7652,
+        "output_tokens": 101,
+        "latency_s": 3.076,
+        "estimated_cost_usd": 0.032628,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7874,
+        "output_tokens": 107,
+        "latency_s": 2.676,
+        "estimated_cost_usd": 0.033636,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8604,
+        "output_tokens": 272,
+        "latency_s": 4.518,
+        "estimated_cost_usd": 0.039856,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 8781,
+        "output_tokens": 109,
+        "latency_s": 2.684,
+        "estimated_cost_usd": 0.037304,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 9131,
+        "output_tokens": 171,
+        "latency_s": 3.382,
+        "estimated_cost_usd": 0.039944,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 11306,
+        "output_tokens": 349,
+        "latency_s": 5.066,
+        "estimated_cost_usd": 0.052204,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 13492,
+        "output_tokens": 509,
+        "latency_s": 7.179,
+        "estimated_cost_usd": 0.064148,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 13900,
+        "output_tokens": 872,
+        "latency_s": 9.911,
+        "estimated_cost_usd": 0.07304,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -73,17 +714,62 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1341,
+        "output_tokens": 425,
+        "latency_s": 5.346,
+        "estimated_cost_usd": 0.013864,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 1,
-    "audit": []
+    "steps": 17,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793456883.1853325,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway process is not answering with no errors logged, consistent with process_down; restart it, then check payments' new release 1.5.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793456901.4907405,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Screening primary itself is now slow (p95 1817 ms vs 15 ms baseline, no release or config change), so payments' callers time out: dependency_slow, so fail over to the standby. Payments 1.5 still needs checking afterwards.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793456911.8346472,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "With screening fixed, payments now fails on its own with 'response could not be completed', a fault hidden until now; release 1.5 was deployed just before the incident, so roll it back.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ]
   },
   "error": null
 }

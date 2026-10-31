@@ -1,0 +1,359 @@
+{
+  "case": {
+    "id": "h-18",
+    "input": {
+      "system": "bank",
+      "seed": 260018,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "double_posting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 2,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "payments",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "react",
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "gave_up",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
+      "background": "No cause identified.",
+      "assessment": "No action was taken.",
+      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    },
+    "t_start": 1793426406.3223732,
+    "t_first_action": null,
+    "t_declared": 1793426406.3443065,
+    "trace": [
+      {
+        "t": 0.02,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 21.8
+        }
+      },
+      {
+        "t": 0.02,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 0.02,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "gave_up"
+      },
+      {
+        "t": 0.02,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 0.02,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "handover written from the template"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 1,
+    "audit": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793426526.0468695,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793426496.047,
+      1793426516.047
+    ],
+    "journeys": {
+      "n": 66,
+      "ok": 15,
+      "success_rate": 0.2273,
+      "p95_ms": null,
+      "payments": {
+        "n": 51,
+        "ok": 0
+      },
+      "balances": {
+        "n": 15,
+        "fresh": 15
+      },
+      "p95_allowed_ms": 317.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 3,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-01-000006",
+          "payment_ids": [
+            "cb0a73fc1c464464",
+            "6615d6a77002486a"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000005",
+          "payment_ids": [
+            "40d0cfcf626340b6",
+            "dcd68836f97c4876"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000006",
+          "payment_ids": [
+            "ce502aded8d44b5d",
+            "2b0db20400ee43e6"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000005",
+          "payment_ids": [
+            "a946dc3de8114bcf",
+            "e20115dc6ff84ab7"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000006",
+          "payment_ids": [
+            "e396d10a43a04569",
+            "52285614e4b64e01"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000006",
+          "payment_ids": [
+            "947b59b0f7bc4745",
+            "b1a1a0eaf8134796"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000005",
+          "payment_ids": [
+            "23c4f1ccc9b547f9",
+            "355f5e21cfe64ec5"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000006",
+          "payment_ids": [
+            "e2d996e386b94ba2",
+            "9296c142e1024057"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-13-000006",
+          "payment_ids": [
+            "ffbddc1f3b82434a",
+            "ffb31f97220a4a2b"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000006",
+          "payment_ids": [
+            "86466e10eb3d4c24",
+            "73c065e10f0341de"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-18-000005",
+          "payment_ids": [
+            "dffd85dc92804300",
+            "2b7f179eb6e445e8"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-20-000007",
+          "payment_ids": [
+            "2610d18c9b094395",
+            "ccfd5c1512b340ae"
+          ],
+          "copies": 2
+        }
+      ],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "51 of 66 customer journeys failed (51 payments, 0 balance reads)",
+      "3 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793426394.622368,
+      "until_t": 1793426516.0468695,
+      "breach_seconds": 125.0,
+      "failed_journeys": 319,
+      "time_to_mitigate_s": 121.4,
+      "mitigation_censored": true,
+      "late_clearings": 3,
+      "double_postings": 12,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "double_posting",
+      "target": "payments",
+      "class": "bad_release",
+      "detail": {
+        "release": "1.5"
+      },
+      "t": 1793426394.622368,
+      "at_s": 0
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 62508,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793426400.9594269,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793426401.046723,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793426394.622368,
+    "t_alert": 1793426406.046723,
+    "horizon": 1793426516.046723,
+    "verdict_t": 1793426526.089673
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

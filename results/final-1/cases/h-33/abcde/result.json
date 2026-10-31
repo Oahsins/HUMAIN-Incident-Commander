@@ -1,53 +1,123 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.95,
+      "evidence": "[B4] 'lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)'. The payments log shows 'ledger write failed: database is locked' and the probe fails with '503 ledger busy'."
+    },
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.6,
+      "evidence": "[D3] 'duplicate payments = 27' appeared shortly after [E1] 'deploy by ops-maintenance (from=1.3, to=1.5)' 15 s ago. Payments logged response_unavailable warnings from 15 s ago, before the lock errors began."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.7,
+      "evidence": "[E2] 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)'. A 10-minute balance cache means the balance will not show a new payment, so the journey fails once the ledger is unblocked."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793450128.256009,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: [B4] 'lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)'. The payments log shows 'ledger write failed: database is locked' and the probe fails with '503 ledger busy'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793450129.31821,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: [D3] 'duplicate payments = 27' appeared shortly after [E1] 'deploy by ops-maintenance (from=1.3, to=1.5)' 15 s ago. Payments logged response_unavailable warnings from 15 s ago, before the lock errors began.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "t": 1793450131.9934225,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: [E2] 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)'. A 10-minute balance cache means the balance will not show a new payment, so the journey fails once the ledger is unblocked.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "ledger"
+    ],
+    "class": null,
+    "reason": "past damage, no longer growing: data check failed: duplicate payments = 39",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "find and put right the records behind 'data check failed: duplicate payments = 39'; the incident commander cannot change data"
   },
-  "t_start": 1793432194.3552,
-  "t_first_action": null,
-  "t_declared": 1793432195.8646533,
+  "sbar": {
+    "situation": "The bank has recovered. The main payment journey ran clean on the last two of three recovery checks, the last at 34 s.",
+    "background": "Payments release 1.5 was deployed by ops-maintenance, replacing 1.3, 15 s before the incident. An operator raised the gateway setting balance_cache_ttl_s from 0.5 s to 600 s, and the reconciliation job held a write lock on the ledger for over 10 s.",
+    "assessment": "The reconciliation session's ledger write lock blocked payment and clearing writes, causing the 503 errors, the latency and the clearing backlog; payments release 1.5 likely caused the duplicate payments, and the 600 s balance cache would have shown customers stale balances. The incident commander itself ended the reconciliation session, rolled payments back from 1.5 to 1.3, and restored balance_cache_ttl_s to 0.5, and all three actions succeeded.",
+    "recommendation": "The operations team has been asked to find and correct the records behind 'data check failed: duplicate payments = 39'. That count is up from 27 earlier, so they should check every affected customer's money. Before release 1.5 is redeployed, find out why it duplicated payments, and find out why the reconciliation job held its ledger lock so long."
+  },
+  "t_start": 1793450114.8843179,
+  "t_first_action": 1793450128.256009,
+  "t_declared": 1793450149.002,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.04,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 33.0
+        "ms": 37.9
       }
     },
     {
-      "t": 0.16,
+      "t": 0.15,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components",
       "data": {
-        "ms": 125.5
+        "ms": 108.2
       }
     },
     {
-      "t": 1.4,
+      "t": 1.36,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 1241.2
+        "ms": 1216.5
       }
     },
     {
-      "t": 1.4,
+      "t": 1.36,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -80,21 +150,21 @@
             "letter": "B",
             "component": "gateway",
             "severity": "fault",
-            "text": "p95 1214 ms (baseline 60 ms)"
+            "text": "p95 1217 ms (baseline 62 ms)"
           },
           {
             "id": "B2",
             "letter": "B",
             "component": "payments",
             "severity": "fault",
-            "text": "p95 1203 ms (baseline 44 ms)"
+            "text": "p95 1201 ms (baseline 46 ms)"
           },
           {
             "id": "B3",
             "letter": "B",
             "component": "clearing",
             "severity": "fault",
-            "text": "backlog: 3 items waiting, oldest 10 s, 0.0 processed/s; first item 155 waiting 10 s after 0 attempt(s)"
+            "text": "backlog: 4 items waiting, oldest 10 s, 0.0 processed/s; first item 153 waiting 10 s after 0 attempt(s)"
           },
           {
             "id": "B4",
@@ -129,21 +199,21 @@
             "letter": "D",
             "component": "gateway",
             "severity": "fault",
-            "text": "calls to payments are slow: p95 1216 ms (payments itself answered in 44 ms at baseline)"
+            "text": "calls to payments are slow: p95 1217 ms (payments itself answered in 46 ms at baseline)"
           },
           {
             "id": "D3",
             "letter": "D",
             "component": "ledger",
             "severity": "fault",
-            "text": "data check failed: duplicate payments = 28"
+            "text": "data check failed: duplicate payments = 27"
           },
           {
             "id": "D4",
             "letter": "D",
             "component": "network",
             "severity": "info",
-            "text": "traffic 0.5/s (baseline 9.7/s), less work from its callers (run by another organisation)"
+            "text": "traffic 0.5/s (baseline 9.4/s), less work from its callers (run by another organisation)"
           },
           {
             "id": "E1",
@@ -164,16 +234,36 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by operator"
+            "text": "6 s ago: stop by operator"
           },
           {
             "id": "E4",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by operator (release=4.1)"
+            "text": "6 s ago: start by operator (release=4.1)"
           }
         ]
+      }
+    },
+    {
+      "t": 1.39,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 24.5
+      }
+    },
+    {
+      "t": 1.41,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "9 log records from payments",
+      "data": {
+        "ms": 20.5
       }
     },
     {
@@ -181,68 +271,166 @@
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
-      "summary": "1 log records from gateway",
-      "data": {
-        "ms": 22.3
-      }
-    },
-    {
-      "t": 1.46,
-      "phase": "survey",
-      "kind": "tool",
-      "name": "logs",
-      "summary": "10 log records from payments",
-      "data": {
-        "ms": 32.9
-      }
-    },
-    {
-      "t": 1.49,
-      "phase": "survey",
-      "kind": "tool",
-      "name": "logs",
       "summary": "5 log records from clearing",
       "data": {
-        "ms": 31.6
+        "ms": 8.0
       }
     },
     {
-      "t": 1.51,
+      "t": 1.44,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "0 log records from ledger",
       "data": {
-        "ms": 22.4
+        "ms": 22.5
       }
     },
     {
-      "t": 1.51,
+      "t": 13.37,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 11.932 s"
     },
     {
-      "t": 1.51,
+      "t": 13.43,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.11,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 17.13,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 23.24,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 105.6
+      }
+    },
+    {
+      "t": 24.18,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 938.4
+      }
+    },
+    {
+      "t": 24.18,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: ledger: data check failed: duplicate payments = 39"
+    },
+    {
+      "t": 28.27,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 88.1
+      }
+    },
+    {
+      "t": 29.12,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 849.5
+      }
+    },
+    {
+      "t": 29.12,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 33.21,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 91.6
+      }
+    },
+    {
+      "t": 34.12,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 909.4
+      }
+    },
+    {
+      "t": 34.12,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 3: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 34.12,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 1.51,
+      "t": 39.56,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 1.51,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 5.438 s"
     }
   ],
   "calls": [
@@ -250,11 +438,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 4170,
+      "output_tokens": 1197,
+      "latency_s": 11.932,
+      "estimated_cost_usd": 0.04062,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -262,15 +450,60 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1241,
+      "output_tokens": 421,
+      "latency_s": 5.438,
+      "estimated_cost_usd": 0.013384,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 7,
-  "audit": []
+  "steps": 16,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793450128.256009,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: [B4] 'lock held by session reconciliation (write) for 10.4 s: UPDATE accounts SET ... (reconciliation batch)'. The payments log shows 'ledger write failed: database is locked' and the probe fails with '503 ledger busy'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793450129.31821,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: [D3] 'duplicate payments = 27' appeared shortly after [E1] 'deploy by ops-maintenance (from=1.3, to=1.5)' 15 s ago. Payments logged response_unavailable warnings from 15 s ago, before the lock errors began.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "event": "act",
+      "t": 1793450131.9934225,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: [E2] 'config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)'. A 10-minute balance cache means the balance will not show a new payment, so the journey fails once the ledger is unblocked.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ]
 }

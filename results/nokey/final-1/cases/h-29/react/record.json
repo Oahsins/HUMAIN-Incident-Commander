@@ -1,0 +1,282 @@
+{
+  "case": {
+    "id": "h-29",
+    "input": {
+      "system": "bank",
+      "seed": 260029,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "bad_setting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "blind_1",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "gateway",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "react",
+  "result": {
+    "arm": "react",
+    "mode": "auto",
+    "outcome": "gave_up",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
+      "background": "No cause identified.",
+      "assessment": "No action was taken.",
+      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    },
+    "t_start": 1793431210.1733549,
+    "t_first_action": null,
+    "t_declared": 1793431210.2068758,
+    "trace": [
+      {
+        "t": 0.03,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 33.4
+        }
+      },
+      {
+        "t": 0.03,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 0.03,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "gave_up"
+      },
+      {
+        "t": 0.03,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 0.03,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "handover written from the template"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 1,
+    "audit": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793431329.8584023,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793431299.858,
+      1793431319.858
+    ],
+    "journeys": {
+      "n": 40,
+      "ok": 0,
+      "success_rate": 0.0,
+      "p95_ms": null,
+      "payments": {
+        "n": 31,
+        "ok": 0
+      },
+      "balances": {
+        "n": 9,
+        "fresh": 0
+      },
+      "p95_allowed_ms": 323.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 9,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [
+      "40 of 40 customer journeys failed (31 payments, 9 balance reads)"
+    ],
+    "impact": {
+      "since_t": 1793431196.805012,
+      "until_t": 1793431319.8584023,
+      "breach_seconds": 120.0,
+      "failed_journeys": 265,
+      "time_to_mitigate_s": 123.1,
+      "mitigation_censored": true,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793431196.805012,
+      "at_s": 0
+    },
+    {
+      "type": "blind_1",
+      "target": "gateway",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793431198.7932506,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793431202.8534105,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793431203.8331916,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793431204.8580558,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793431196.805012,
+    "t_alert": 1793431209.8580558,
+    "horizon": 1793431319.8580558,
+    "verdict_t": 1793431329.9018981
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

@@ -2,53 +2,95 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "[C1] \"clearing: down (not answering)\" and [C2] \"process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)\". The first queued item 98 has \"0 attempt(s)\" and there are no clearing errors, so this is not a poison message."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.7,
+        "evidence": "[E1] \"config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0)\". A 600 s balance cache means a customer's balance will not show a new payment for up to 10 minutes. This is currently hidden because the journey fails earlier, at clearing."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793449542.230293,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E1] \"config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0)\". A 600 s balance cache means a customer's balance will not show a new payment for up to 10 minutes. This is currently hidden because the journey fails earlier, at clearing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      },
+      {
+        "t": 1793449543.2358775,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: [C1] \"clearing: down (not answering)\" and [C2] \"process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)\". The first queued item 98 has \"0 attempt(s)\" and there are no clearing errors, so this is not a poison message.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank payment system has recovered. Two clean recovery checks in a row, the last at 28 s, ran the main payment journey successfully.",
+      "background": "The clearing worker process was terminated (exit code 15, last exit 13 s before diagnosis) and did not come back, leaving 117 posted payments queued and the journey failing at clearing. Separately, a scheduler raised the gateway setting balance_cache_ttl_s from 0.5 s to 600 s, a fault hidden behind the clearing failure.",
+      "assessment": "The incident commander restarted the clearing process itself, and clearing came back up. It also reverted gateway balance_cache_ttl_s from 600 to 0.5 itself, and the revert succeeded; the clearing fault was not a poison message, since queued item 98 had 0 attempts and there were no clearing errors.",
+      "recommendation": "Find out what sent the clearing worker its termination signal (exit code 15), and stop the scheduler from setting balance_cache_ttl_s again. Operations should confirm all 117 queued payments cleared exactly once, and check whether customers saw stale balances while the 600 s cache was in place."
     },
-    "t_start": 1793427477.1747525,
-    "t_first_action": null,
-    "t_declared": 1793427481.1194115,
+    "t_start": 1793449527.5834856,
+    "t_first_action": 1793449542.230293,
+    "t_declared": 1793449555.950305,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 31.1
+          "ms": 38.7
         }
       },
       {
-        "t": 0.08,
+        "t": 0.13,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: clearing",
         "data": {
-          "ms": 46.4
+          "ms": 89.4
         }
       },
       {
-        "t": 3.92,
+        "t": 3.89,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at clearing",
         "data": {
-          "ms": 3843.2
+          "ms": 3764.5
         }
       },
       {
-        "t": 3.92,
+        "t": 3.89,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -67,7 +109,7 @@
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 115 items waiting, oldest 13 s; first item 100 waiting 13 s after 0 attempt(s)"
+              "text": "backlog: 117 items waiting, oldest 14 s; first item 98 waiting 14 s after 0 attempt(s)"
             },
             {
               "id": "C1",
@@ -88,28 +130,28 @@
               "letter": "E",
               "component": "gateway",
               "severity": "info",
-              "text": "11 s ago: config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+              "text": "12 s ago: config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0)"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: stop by operator"
+              "text": "8 s ago: stop by operator"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: start by operator (release=4.1)"
+              "text": "8 s ago: start by operator (release=4.1)"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E5",
@@ -123,55 +165,132 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by operator"
+              "text": "6 s ago: stop by operator"
             },
             {
               "id": "E7",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by operator (release=4.1)"
+              "text": "6 s ago: start by operator (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 3.94,
+        "t": 3.92,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from clearing",
         "data": {
-          "ms": 23.5
+          "ms": 26.8
         }
       },
       {
-        "t": 3.94,
+        "t": 14.65,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 10.726 s"
       },
       {
-        "t": 3.94,
+        "t": 14.65,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 16.3,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 22.39,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 83.0
+        }
+      },
+      {
+        "t": 23.34,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 947.6
+        }
+      },
+      {
+        "t": 23.34,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 27.44,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 108.2
+        }
+      },
+      {
+        "t": 28.37,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 922.5
+        }
+      },
+      {
+        "t": 28.37,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 28.37,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 3.94,
+        "t": 34.01,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 3.94,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 5.643 s"
       }
     ],
     "calls": [
@@ -179,11 +298,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3590,
+        "output_tokens": 993,
+        "latency_s": 10.726,
+        "estimated_cost_usd": 0.03422,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -191,17 +310,48 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1054,
+        "output_tokens": 384,
+        "latency_s": 5.643,
+        "estimated_cost_usd": 0.011896,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 4,
-    "audit": []
+    "steps": 10,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793449542.230293,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: [E1] \"config by scheduler (key=balance_cache_ttl_s, from=0.5, to=600.0)\". A 600 s balance cache means a customer's balance will not show a new payment for up to 10 minutes. This is currently hidden because the journey fails earlier, at clearing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      },
+      {
+        "event": "act",
+        "t": 1793449543.2358775,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: [C1] \"clearing: down (not answering)\" and [C2] \"process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)\". The first queued item 98 has \"0 attempt(s)\" and there are no clearing errors, so this is not a poison message.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
   },
   "error": null
 }

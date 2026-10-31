@@ -1,11 +1,24 @@
 {
   "arm": "naive_verify",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_config",
+      "confidence": 0.96,
+      "evidence": "E1: 'config by scheduler (key=max_transfer_minor, from=1000000, to=1)' 14 s ago. Payments logs show 'limit_reject ... limit_minor=1 amount_minor=42240', and the probe fails at payments with '422 amount exceeds transfer limit'."
+    },
+    {
+      "target": "screening",
+      "class": "process_down",
+      "confidence": 0.75,
+      "evidence": "C1: 'screening: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 12 s ago (exit code 15)'."
+    }
+  ],
   "actions": [
     {
-      "t": 1793425834.5846603,
+      "t": 1793454190.442282,
       "action": "failover",
       "target": "screening",
       "params": {
@@ -18,52 +31,80 @@
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793454200.766086,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: C1: 'screening: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 12 s ago (exit code 15)'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793454203.4088144,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: 'config by scheduler (key=max_transfer_minor, from=1000000, to=1)' 14 s ago. Payments logs show 'limit_reject ... limit_minor=1 amount_minor=42240', and the probe fails at payments with '422 amount exceeds transfer limit'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
     }
   ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "failover on screening: done",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "Payments on the bank system are flowing again after a bad limit setting was reverted. The payment probe now passes end to end, confirmed by one clean recovery look at 32 s.",
+    "background": "The scheduler changed max_transfer_minor on payments from 1000000 to 1, so every payment was refused at payments and at the gateway with '422 amount exceeds transfer limit'. Separately, the screening process exited once with exit code 15 and stopped answering, but this caused no symptom.",
+    "assessment": "The incident commander itself reverted max_transfer_minor on payments from 1 back to 1000000, and payments recovered. The commander also failed screening over to its standby and restarted screening; both completed, and screening is now served by its standby.",
+    "recommendation": "Find out why the scheduler set max_transfer_minor to 1 and stop it from doing so again. Expect refusal rates to stay high until the pre-revert window ages out. Operations should review the payments refused during the window when the limit was 1, as customers may need to retry them."
   },
-  "t_start": 1793425834.440633,
-  "t_first_action": 1793425834.5846603,
-  "t_declared": 1793425834.6841707,
+  "t_start": 1793454190.286107,
+  "t_first_action": 1793454190.442282,
+  "t_declared": 1793454221.9259822,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.06,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 32.2
+        "ms": 62.7
       }
     },
     {
-      "t": 0.11,
+      "t": 0.12,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: screening",
       "data": {
-        "ms": 74.3
+        "ms": 59.1
       }
     },
     {
-      "t": 0.14,
+      "t": 0.16,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 37.2
+        "ms": 34.0
       }
     },
     {
-      "t": 0.14,
+      "t": 0.16,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -103,14 +144,14 @@
             "letter": "C",
             "component": "screening",
             "severity": "fault",
-            "text": "process exited 1 time(s) in 15 min, last 11 s ago (exit code 15)"
+            "text": "process exited 1 time(s) in 15 min, last 12 s ago (exit code 15)"
           },
           {
             "id": "E1",
             "letter": "E",
             "component": "payments",
             "severity": "info",
-            "text": "13 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1)"
+            "text": "14 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1)"
           },
           {
             "id": "E2",
@@ -131,7 +172,7 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by scheduler"
+            "text": "7 s ago: stop by scheduler"
           },
           {
             "id": "E5",
@@ -145,7 +186,7 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by operator"
+            "text": "6 s ago: stop by operator"
           },
           {
             "id": "E7",
@@ -158,7 +199,7 @@
       }
     },
     {
-      "t": 0.16,
+      "t": 0.18,
       "phase": "survey",
       "kind": "action",
       "name": "containment",
@@ -174,62 +215,316 @@
       }
     },
     {
-      "t": 0.18,
+      "t": 0.21,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 19.7
+        "ms": 37.5
       }
     },
     {
-      "t": 0.21,
+      "t": 0.24,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "8 log records from payments",
       "data": {
-        "ms": 34.5
+        "ms": 31.3
       }
     },
     {
-      "t": 0.24,
+      "t": 0.27,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from screening",
       "data": {
-        "ms": 29.0
+        "ms": 28.9
       }
     },
     {
-      "t": 0.24,
+      "t": 10.48,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 10.206 s"
     },
     {
-      "t": 0.24,
+      "t": 11.12,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart screening: done (screening restarted)",
+      "data": {
+        "target": "screening",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 13.14,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler))",
+      "data": {
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.25,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 105.2
+      }
+    },
+    {
+      "t": 16.18,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 933.4
+      }
+    },
+    {
+      "t": 16.18,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: gateway: 41% of requests are refused (baseline 0%); payments: 37% of requests are refused (baseline 0%)"
+    },
+    {
+      "t": 16.26,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 75.6
+      }
+    },
+    {
+      "t": 17.17,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 906.6
+      }
+    },
+    {
+      "t": 17.17,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "2 fault findings, 16 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "49% of requests are refused (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "47% of requests are refused (baseline 0%)"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "screening",
+            "severity": "info",
+            "text": "traffic 0.0/s (baseline 9.3/s): moved to its standby"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "screening",
+            "severity": "info",
+            "text": "process exited 1 time(s) in 15 min, last 28 s ago (exit code 15); none since the action taken on it 7 s ago"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "screening",
+            "severity": "info",
+            "text": "served by its standby"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "network",
+            "severity": "info",
+            "text": "traffic 3.1/s (baseline 9.1/s), less work from its callers (run by another organisation)"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "30 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "24 s ago: stop by scheduler"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "24 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: stop by scheduler"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "22 s ago: stop by operator"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "22 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E8",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "16 s ago: failover by incident-commander (from=primary, to=standby)"
+          },
+          {
+            "id": "E9",
+            "letter": "E",
+            "component": "screening",
+            "severity": "info",
+            "text": "6 s ago: restart by incident-commander (release=4.1)"
+          },
+          {
+            "id": "E10",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "3 s ago: config by incident-commander (key=max_transfer_minor, revert=True, from=1, to=1000000)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 17.17,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 2.0
+      }
+    },
+    {
+      "t": 17.2,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "14 log records from payments",
+      "data": {
+        "ms": 32.0
+      }
+    },
+    {
+      "t": 29.64,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 12.438 s"
+    },
+    {
+      "t": 29.64,
+      "phase": "triage",
+      "kind": "note",
+      "name": "check",
+      "summary": "nothing new to try and the main journey passes: checking again"
+    },
+    {
+      "t": 30.73,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 87.0
+      }
+    },
+    {
+      "t": 31.64,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 913.4
+      }
+    },
+    {
+      "t": 31.64,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: clean"
+    },
+    {
+      "t": 31.64,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.24,
+      "t": 36.24,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.24,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 4.599 s"
     }
   ],
   "calls": [
@@ -237,11 +532,23 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 4078,
+      "output_tokens": 922,
+      "latency_s": 10.206,
+      "estimated_cost_usd": 0.034752,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 4836,
+      "output_tokens": 1082,
+      "latency_s": 12.438,
+      "estimated_cost_usd": 0.040984,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -249,20 +556,20 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1022,
+      "output_tokens": 338,
+      "latency_s": 4.599,
+      "estimated_cost_usd": 0.010848,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 7,
+  "steps": 17,
   "audit": [
     {
       "event": "act",
-      "t": 1793425834.5846603,
+      "t": 1793454190.442282,
       "action": "failover",
       "target": "screening",
       "params": {
@@ -275,6 +582,36 @@
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793454200.766086,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "process_down: C1: 'screening: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 12 s ago (exit code 15)'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793454203.4088144,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: 'config by scheduler (key=max_transfer_minor, from=1000000, to=1)' 14 s ago. Payments logs show 'limit_reject ... limit_minor=1 amount_minor=42240', and the probe fails at payments with '422 amount exceeds transfer limit'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
     }
   ]
 }

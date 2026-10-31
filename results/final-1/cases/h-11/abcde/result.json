@@ -1,53 +1,84 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.85,
+      "evidence": "E1 'deploy by ops-maintenance (from=1.3, to=1.5)' 14 s ago, followed from 13 s ago by repeated 'event=response_unavailable msg=response could not be completed' and A3 '503 response temporarily unavailable'. D2 'duplicate payments = 99' matches postings that succeeded while the response failed and the client retried."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793449090.706114,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: E1 'deploy by ops-maintenance (from=1.3, to=1.5)' 14 s ago, followed from 13 s ago by repeated 'event=response_unavailable msg=response could not be completed' and A3 '503 response temporarily unavailable'. D2 'duplicate payments = 99' matches postings that succeeded while the response ",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "ledger",
+      "payments"
+    ],
+    "class": null,
+    "reason": "E1 'deploy by ops-maintenance (from=1.3, to=1.5)' 14 s ago, followed from 13 s ago by repeated 'event=response_unavailable msg=response could not be completed' and A3 '503 response temporarily unavailable'. D2 'duplicate payments = 99' matches postings that succeeded while the response failed and the client retried.; past damage, no longer growing: data check failed: duplicate payments = 172",
+    "urgency": "soon",
+    "to": "the on-call engineer; the operations team",
+    "ask": "A person must review the 99 duplicate payments in the ledger and arrange any correction through the proper processes; the incident commander must not reverse or refund money.; find and put right the records behind 'data check failed: duplicate payments = 172'; the incident commander cannot change data"
   },
-  "t_start": 1793424940.703613,
-  "t_first_action": null,
-  "t_declared": 1793424940.9500613,
+  "sbar": {
+    "situation": "Payments has recovered after the incident commander rolled it back from version 1.5 to 1.3. The last two recovery checks, ending at 28 s, were clean.",
+    "background": "Ops-maintenance deployed payments release 1.5, replacing 1.3. One second later payments began returning 503 'response could not be completed' on 43% of requests.",
+    "assessment": "The 1.5 release was the fault (confidence 0.85), and the ledger shows 99 duplicate payments, consistent with requests that posted but returned errors and were retried. The incident commander rolled payments back to 1.3 itself, and the main journey then ran clean on two looks in a row.",
+    "recommendation": "This was escalated to you and the operations team for ledger and payments: a person must review the 99 duplicate payments and arrange any correction through the proper processes, because the commander must not reverse or refund money. A separate data check reported 172 duplicate payments, so find and put right the records behind it; the commander cannot change data."
+  },
+  "t_start": 1793449081.0022504,
+  "t_first_action": 1793449090.706114,
+  "t_declared": 1793449109.4706776,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.04,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 34.7
+        "ms": 36.8
       }
     },
     {
-      "t": 0.11,
+      "t": 0.12,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components",
       "data": {
-        "ms": 78.8
+        "ms": 80.7
       }
     },
     {
-      "t": 0.19,
+      "t": 0.2,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 74.1
+        "ms": 78.3
       }
     },
     {
-      "t": 0.19,
+      "t": 0.2,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -87,56 +118,56 @@
             "letter": "D",
             "component": "ledger",
             "severity": "fault",
-            "text": "data check failed: duplicate payments = 98"
+            "text": "data check failed: duplicate payments = 99"
           },
           {
             "id": "E1",
             "letter": "E",
             "component": "payments",
             "severity": "info",
-            "text": "13 s ago: deploy by ops-maintenance (from=1.3, to=1.5)"
+            "text": "14 s ago: deploy by ops-maintenance (from=1.3, to=1.5)"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "7 s ago: stop by pipeline"
+            "text": "8 s ago: stop by pipeline"
           },
           {
             "id": "E3",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "7 s ago: start by pipeline (release=4.1)"
+            "text": "8 s ago: start by pipeline (release=4.1)"
           },
           {
             "id": "E4",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by scheduler"
+            "text": "7 s ago: stop by scheduler"
           },
           {
             "id": "E5",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: start by scheduler (release=4.1)"
+            "text": "7 s ago: start by scheduler (release=4.1)"
           },
           {
             "id": "E6",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by scheduler"
+            "text": "6 s ago: stop by scheduler"
           },
           {
             "id": "E7",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by scheduler (release=4.1)"
+            "text": "6 s ago: start by scheduler (release=4.1)"
           }
         ]
       }
@@ -146,9 +177,9 @@
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
-      "summary": "2 log records from gateway",
+      "summary": "1 log records from gateway",
       "data": {
-        "ms": 24.4
+        "ms": 12.1
       }
     },
     {
@@ -158,46 +189,141 @@
       "name": "logs",
       "summary": "9 log records from payments",
       "data": {
-        "ms": 32.5
+        "ms": 27.2
       }
     },
     {
-      "t": 0.25,
+      "t": 0.26,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "0 log records from ledger",
       "data": {
-        "ms": 1.5
+        "ms": 21.3
       }
     },
     {
-      "t": 0.25,
+      "t": 9.7,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 9.446 s"
     },
     {
-      "t": 0.25,
+      "t": 10.42,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 12.42,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate payments (now) to the on-call engineer"
+    },
+    {
+      "t": 17.52,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 97.7
+      }
+    },
+    {
+      "t": 18.43,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 911.1
+      }
+    },
+    {
+      "t": 18.43,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: ledger: data check failed: duplicate payments = 172"
+    },
+    {
+      "t": 22.55,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 120.4
+      }
+    },
+    {
+      "t": 23.46,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 905.3
+      }
+    },
+    {
+      "t": 23.46,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 27.56,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 100.9
+      }
+    },
+    {
+      "t": 28.47,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 908.0
+      }
+    },
+    {
+      "t": 28.47,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 3: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 28.47,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.25,
+      "t": 32.72,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.25,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 4.254 s"
     }
   ],
   "calls": [
@@ -205,11 +331,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3776,
+      "output_tokens": 857,
+      "latency_s": 9.446,
+      "estimated_cost_usd": 0.032244,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -217,15 +343,30 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1000,
+      "output_tokens": 325,
+      "latency_s": 4.254,
+      "estimated_cost_usd": 0.0105,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 6,
-  "audit": []
+  "steps": 13,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793449090.706114,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: E1 'deploy by ops-maintenance (from=1.3, to=1.5)' 14 s ago, followed from 13 s ago by repeated 'event=response_unavailable msg=response could not be completed' and A3 '503 response temporarily unavailable'. D2 'duplicate payments = 99' matches postings that succeeded while the response ",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ]
 }

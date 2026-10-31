@@ -2,58 +2,352 @@
   "result": {
     "arm": "react",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.9,
+        "evidence": "Payments was deployed 1.3→1.5 at t=…879, just before it hit a 44% error rate and the ledger began accumulating duplicate payments (up to 169). After the rollback to 1.3, errors fell to 0, duplicates stopped growing, and probes passed. The duplicates were escalated for reconciliation and refund."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793453901.822531,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Payments errors and duplicate postings began right after the 1.3→1.5 deploy, so roll payments back to its previous release.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "ledger"
+      ],
+      "class": null,
+      "reason": "Everything is back to baseline and duplicates have stopped at 169, but those duplicate payments from release 1.5 need a person to review and reverse them. I cannot move money, so I will escalate on the ledger.",
+      "urgency": "now",
+      "to": "the on-call engineer",
+      "ask": "Payments release 1.5 (now rolled back to 1.3) created 169 duplicate payments in the ledger between about t=1793453879 and t=1793453902. No new duplicates have appeared since the rollback. Postings are balanced, but customers may have been debited twice and duplicates may have been cleared to the network. Please run reconciliation, identify the duplicates and reverse or refund them through the proper finance process. Also block payments 1.5 from redeploying until it is fixed."
     },
-    "t_start": 1793424642.388129,
-    "t_first_action": null,
-    "t_declared": 1793424642.419843,
+    "sbar": {
+      "situation": "Payments is stable on version 1.3 and all components are at baseline; two recovery checks in a row came back clean, the last at 56 s. The 169 duplicate payments in the ledger are not yet resolved and have been escalated to the on-call engineer.",
+      "background": "Payments was deployed from 1.3 to 1.5 at t=1793453879. It then hit a 44% error rate, and the ledger accumulated 169 duplicate payments between about t=1793453879 and t=1793453902.",
+      "assessment": "The root cause is a bad release, payments 1.5 (confidence 0.9). The incident commander rolled payments back from 1.5 to 1.3 itself; after that, errors fell to 0, no new duplicates appeared and probes passed.",
+      "recommendation": "Run ledger reconciliation, identify the 169 duplicates and reverse or refund them through the proper finance process. Postings are balanced, but customers may have been debited twice and duplicates may have been cleared to the network, so operations should review the money impact. Block payments 1.5 from redeploying until it is fixed."
+    },
+    "t_start": 1793453892.3466713,
+    "t_first_action": 1793453901.822531,
+    "t_declared": 1793453947.843635,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 31.6
+          "ms": 39.6
         }
       },
       {
-        "t": 0.03,
+        "t": 2.43,
         "phase": "triage",
         "kind": "model",
         "name": "react",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 2.392 s"
       },
       {
-        "t": 0.03,
+        "t": 2.43,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all components to see metrics and recent changes."
+      },
+      {
+        "t": 2.52,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 83.1
+        }
+      },
+      {
+        "t": 5.91,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.391 s"
+      },
+      {
+        "t": 5.91,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Payments was deployed 1.3→1.5 just before its 44% error rate, and the ledger shows 116 duplicate payments; check the payments logs to confirm."
+      },
+      {
+        "t": 5.93,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "11 log records from payments",
+        "data": {
+          "ms": 27.5
+        }
+      },
+      {
+        "t": 9.48,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.541 s"
+      },
+      {
+        "t": 9.48,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Payments errors and duplicate postings began right after the 1.3→1.5 deploy, so roll payments back to its previous release."
+      },
+      {
+        "t": 10.15,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 12.76,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.604 s"
+      },
+      {
+        "t": 12.76,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Rollback applied; observe to confirm payments recovered and check for hidden faults downstream."
+      },
+      {
+        "t": 12.86,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 106.8
+        }
+      },
+      {
+        "t": 17.33,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.463 s"
+      },
+      {
+        "t": 17.33,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: The 20 s window mostly covers the time before the rollback, so gateway errors may be leftovers; run a probe to check the journey now."
+      },
+      {
+        "t": 18.25,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 927.7
+        }
+      },
+      {
+        "t": 22.99,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.734 s"
+      },
+      {
+        "t": 22.99,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The probe passed but took 926 ms, and the last window still mixed in pre-rollback errors; observe a short window to confirm gateway errors have cleared."
+      },
+      {
+        "t": 23.12,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 132.2
+        }
+      },
+      {
+        "t": 29.99,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 6.872 s"
+      },
+      {
+        "t": 29.99,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "escalate: Everything is back to baseline and duplicates have stopped at 169, but those duplicate payments from release 1.5 need a person to review and reverse them. I cannot move money, so I will escalate on the ledger."
+      },
+      {
+        "t": 34.81,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.812 s"
+      },
+      {
+        "t": 34.81,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Metrics are at baseline, but the earlier probe took 926 ms, close to the 1000 ms limit; run one more probe to check latency before declaring done."
+      },
+      {
+        "t": 35.57,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 762.2
+        }
+      },
+      {
+        "t": 39.96,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.392 s"
+      },
+      {
+        "t": 39.96,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: The journey is healthy, but screening-standby was stopped and started three times just before the alert; check its logs for a hidden fault that would only show after a failover."
+      },
+      {
+        "t": 39.98,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "3 log records from screening-standby",
+        "data": {
+          "ms": 14.3
+        }
+      },
+      {
+        "t": 44.61,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.627 s"
+      },
+      {
+        "t": 44.61,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: The standby restarts look like routine pipeline and scheduler activity, its config and release are unchanged, and its logs are clean; the system is at baseline, so declare done."
+      },
+      {
+        "t": 49.7,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 90.5
+        }
+      },
+      {
+        "t": 50.6,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 902.1
+        }
+      },
+      {
+        "t": 50.6,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 54.64,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 39.4
+        }
+      },
+      {
+        "t": 55.5,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 858.2
+        }
+      },
+      {
+        "t": 55.5,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 55.5,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "escalated"
       },
       {
-        "t": 0.03,
+        "t": 59.93,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.03,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.434 s"
       }
     ],
     "calls": [
@@ -61,11 +355,119 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "react",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 2725,
+        "output_tokens": 87,
+        "latency_s": 2.392,
+        "estimated_cost_usd": 0.01264,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4787,
+        "output_tokens": 185,
+        "latency_s": 3.391,
+        "estimated_cost_usd": 0.022848,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5186,
+        "output_tokens": 189,
+        "latency_s": 3.541,
+        "estimated_cost_usd": 0.024524,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5348,
+        "output_tokens": 99,
+        "latency_s": 2.604,
+        "estimated_cost_usd": 0.023372,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7496,
+        "output_tokens": 257,
+        "latency_s": 4.463,
+        "estimated_cost_usd": 0.035124,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 7849,
+        "output_tokens": 277,
+        "latency_s": 4.734,
+        "estimated_cost_usd": 0.036936,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 10015,
+        "output_tokens": 494,
+        "latency_s": 6.872,
+        "estimated_cost_usd": 0.04994,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 10346,
+        "output_tokens": 311,
+        "latency_s": 4.812,
+        "estimated_cost_usd": 0.047604,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 10707,
+        "output_tokens": 264,
+        "latency_s": 4.392,
+        "estimated_cost_usd": 0.048108,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 10844,
+        "output_tokens": 312,
+        "latency_s": 4.627,
+        "estimated_cost_usd": 0.049616,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -73,17 +475,32 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 971,
+        "output_tokens": 360,
+        "latency_s": 4.434,
+        "estimated_cost_usd": 0.011084,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 1,
-    "audit": []
+    "steps": 13,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793453901.822531,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Payments errors and duplicate postings began right after the 1.3→1.5 deploy, so roll payments back to its previous release.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ]
   },
   "error": null
 }

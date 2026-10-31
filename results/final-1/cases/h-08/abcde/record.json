@@ -63,53 +63,69 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "network",
+        "class": "external_outage",
+        "confidence": 0.93,
+        "evidence": "[D3] network: down (not answering); [D4] 100% of requests fail (baseline 0%). The clearing log shows 'payment network timeout; item stays pending item_id=96'."
+      }
+    ],
     "actions": [],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "network"
+      ],
+      "class": "external_outage",
+      "reason": "[D3] network: down (not answering); [D4] 100% of requests fail (baseline 0%). The clearing log shows 'payment network timeout; item stays pending item_id=96'.",
+      "urgency": "now",
+      "to": "the organisation that runs network",
+      "ask": "Contact the national payment network operator to restore their service. Clearing will send its pending backlog once the network answers again. Do not quarantine item 96: it is not poison."
     },
-    "t_start": 1793423896.0310638,
+    "sbar": {
+      "situation": "Recovery is not confirmed: the national payment network, run by another organisation, is down and fails 100% of requests. Clearing cannot send posted payments, so its pending backlog keeps growing.",
+      "background": "The network stopped answering, and its failure rate rose from a baseline of 0% to 100%. The clearing log shows 'payment network timeout; item stays pending item_id=96'.",
+      "assessment": "The root cause is an external outage of the national payment network (confidence 0.93). No allowed action fixes it, so the incident commander escalated it to the network operator itself. Item 96 is not poison; it is waiting only because the network times out, and the screening-standby restarts were routine and caused no symptom.",
+      "recommendation": "Follow up with the national payment network operator, who has been asked to restore their service, and confirm clearing sends its pending backlog once the network answers. Do not quarantine item 96. Operations should review the posted payments that are delayed in the clearing backlog."
+    },
+    "t_start": 1793448932.0859377,
     "t_first_action": null,
-    "t_declared": 1793423900.8629143,
+    "t_declared": 1793448941.7761798,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 32.0
+          "ms": 38.3
         }
       },
       {
-        "t": 1.11,
+        "t": 1.15,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: network",
         "data": {
-          "ms": 1080.2
+          "ms": 1110.3
         }
       },
       {
-        "t": 4.81,
+        "t": 4.93,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at clearing",
         "data": {
-          "ms": 3697.2
+          "ms": 3777.3
         }
       },
       {
-        "t": 4.81,
+        "t": 4.93,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -128,7 +144,7 @@
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 123 items waiting, oldest 14 s, 0.0 processed/s; first item 97 waiting 14 s after 6 attempt(s)"
+              "text": "backlog: 125 items waiting, oldest 15 s, 0.0 processed/s; first item 96 waiting 15 s after 6 attempt(s)"
             },
             {
               "id": "D1",
@@ -142,7 +158,7 @@
               "letter": "D",
               "component": "clearing",
               "severity": "fault",
-              "text": "calls to network are slow: p95 2038 ms (network itself answered in 28 ms at baseline)"
+              "text": "calls to network are slow: p95 2030 ms (network itself answered in 29 ms at baseline)"
             },
             {
               "id": "D3",
@@ -163,97 +179,97 @@
               "letter": "D",
               "component": "network",
               "severity": "info",
-              "text": "traffic 0.5/s (baseline 9.6/s), less work from its callers (run by another organisation)"
+              "text": "traffic 0.5/s (baseline 9.2/s), less work from its callers (run by another organisation)"
             },
             {
               "id": "D6",
               "letter": "D",
               "component": "network",
               "severity": "fault",
-              "text": "p95 2038 ms (baseline 28 ms) (run by another organisation)"
+              "text": "p95 2030 ms (baseline 29 ms) (run by another organisation)"
             },
             {
               "id": "E1",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: stop by pipeline"
+              "text": "9 s ago: stop by pipeline"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: start by pipeline (release=4.1)"
+              "text": "9 s ago: start by pipeline (release=4.1)"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: stop by scheduler"
+              "text": "8 s ago: stop by scheduler"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: start by scheduler (release=4.1)"
+              "text": "8 s ago: start by scheduler (release=4.1)"
             },
             {
               "id": "E5",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E6",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 4.83,
+        "t": 4.95,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "9 log records from clearing",
         "data": {
-          "ms": 22.1
+          "ms": 21.9
         }
       },
       {
-        "t": 4.83,
+        "t": 9.69,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 4.741 s"
       },
       {
-        "t": 4.83,
+        "t": 9.69,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate network (now) to the organisation that runs network"
+      },
+      {
+        "t": 9.69,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "escalated"
       },
       {
-        "t": 4.83,
+        "t": 13.67,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.83,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 3.978 s"
       }
     ],
     "calls": [
@@ -261,11 +277,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3747,
+        "output_tokens": 360,
+        "latency_s": 4.741,
+        "estimated_cost_usd": 0.022188,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -273,11 +289,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 798,
+        "output_tokens": 321,
+        "latency_s": 3.978,
+        "estimated_cost_usd": 0.009612,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
@@ -287,27 +303,27 @@
   },
   "checker": {
     "recovered": false,
-    "t": 1793424015.7281559,
+    "t": 1793449051.7139962,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793423985.728,
-      1793424005.728
+      1793449021.714,
+      1793449041.714
     ],
     "journeys": {
-      "n": 228,
-      "ok": 228,
+      "n": 229,
+      "ok": 229,
       "success_rate": 1.0,
-      "p95_ms": 71.0000991821289,
+      "p95_ms": 62.99996376037598,
       "payments": {
         "n": 169,
         "ok": 169
       },
       "balances": {
-        "n": 59,
-        "fresh": 59
+        "n": 60,
+        "fresh": 60
       },
-      "p95_allowed_ms": 318.0
+      "p95_allowed_ms": 313.0
     },
     "slo_ok": true,
     "integrity": {
@@ -317,7 +333,7 @@
       "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
-      "stuck_items": 1113,
+      "stuck_items": 1115,
       "wrongly_quarantined": 0,
       "stale_reads": 0,
       "for_operations": [],
@@ -325,16 +341,16 @@
       "ok": false
     },
     "reasons": [
-      "1113 payments waiting more than 5 s to clear"
+      "1115 payments waiting more than 5 s to clear"
     ],
     "impact": {
-      "since_t": 1793423882.660826,
-      "until_t": 1793424005.7281559,
+      "since_t": 1793448918.6402504,
+      "until_t": 1793449041.7139962,
       "breach_seconds": 0.0,
       "failed_journeys": 0,
       "time_to_mitigate_s": 0.0,
       "mitigation_censored": false,
-      "late_clearings": 1031,
+      "late_clearings": 1032,
       "double_postings": 0,
       "unbalanced_payments": 0
     }
@@ -345,7 +361,7 @@
       "target": "network",
       "class": "external_outage",
       "detail": {},
-      "t": 1793423882.660826,
+      "t": 1793448918.6402504,
       "at_s": 0
     },
     {
@@ -353,7 +369,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793423888.7148721,
+      "t": 1793448924.6888728,
       "at_s": 6
     },
     {
@@ -361,7 +377,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793423889.7088313,
+      "t": 1793448925.6856706,
       "at_s": 7
     },
     {
@@ -369,7 +385,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793423890.7278614,
+      "t": 1793448926.7136264,
       "at_s": 8
     }
   ],
@@ -378,10 +394,10 @@
   "actions": [],
   "audit": [],
   "timing": {
-    "t0": 1793423882.660826,
-    "t_alert": 1793423895.7278614,
-    "horizon": 1793424005.7278614,
-    "verdict_t": 1793424015.796405
+    "t0": 1793448918.6402504,
+    "t_alert": 1793448931.7136264,
+    "horizon": 1793449041.7136264,
+    "verdict_t": 1793449051.7705307
   },
   "attempt": 1,
   "purpose": "main",

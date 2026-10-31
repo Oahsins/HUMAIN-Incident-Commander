@@ -2,53 +2,97 @@
   "result": {
     "arm": "naive_verify",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.97,
+        "evidence": "E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 14 s ago. Logs show 'limit_reject ... limit_minor=1 amount_minor=49961', and the probe fails with '422 amount exceeds transfer limit'."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.75,
+        "evidence": "E2: 'config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)' 12 s ago. A 10-minute balance cache means a just-posted payment will not show in the balance; this is masked while payments are failing."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793454498.7782497,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 14 s ago. Logs show 'limit_reject ... limit_minor=1 amount_minor=49961', and the probe fails with '422 amount exceeds transfer limit'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793454499.8068616,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E2: 'config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)' 12 s ago. A 10-minute balance cache means a just-posted payment will not show in the balance; this is masked while payments are failing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank system has recovered after the incident commander reverted two bad pipeline config changes. The latest probe passes at every step.",
+      "background": "About 14 s before the handover, the pipeline set payments max_transfer_minor from 1000000 to 1. About 12 s before, it set gateway balance_cache_ttl_s from 0.5 to 600.0.",
+      "assessment": "With a limit of 1 minor unit, payments rejected almost every transfer ('422 amount exceeds transfer limit'), so the gateway refused requests. The 600 s balance cache would have shown stale balances, but this was hidden while payments were failing. The incident commander reverted payments max_transfer_minor to 1000000 and gateway balance_cache_ttl_s to 0.5, and both reverts succeeded; the last of 2 recovery checks, at 28 s, was clean.",
+      "recommendation": "No further action is needed; keep watching the A1 and A2 refusal rates fall to 0%, as they are recent-window figures still draining rejects logged just before the revert. Operations should review the transfers rejected while the 1-minor-unit limit was in place."
     },
-    "t_start": 1793426730.1152241,
-    "t_first_action": null,
-    "t_declared": 1793426730.295681,
+    "t_start": 1793454488.4518218,
+    "t_first_action": 1793454498.7782497,
+    "t_declared": 1793454516.897288,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 31.7
+          "ms": 35.7
         }
       },
       {
-        "t": 0.12,
+        "t": 0.13,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components",
         "data": {
-          "ms": 91.4
+          "ms": 94.3
         }
       },
       {
-        "t": 0.14,
+        "t": 0.15,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 19.4
+          "ms": 23.8
         }
       },
       {
-        "t": 0.14,
+        "t": 0.15,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -74,7 +118,7 @@
               "letter": "A",
               "component": "screening",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 9.3/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 9.1/s), less work from its callers"
             },
             {
               "id": "A4",
@@ -88,107 +132,335 @@
               "letter": "E",
               "component": "payments",
               "severity": "info",
-              "text": "13 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+              "text": "14 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "gateway",
               "severity": "info",
-              "text": "11 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+              "text": "12 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: stop by scheduler"
+              "text": "8 s ago: stop by scheduler"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: start by scheduler (release=4.1)"
+              "text": "8 s ago: start by scheduler (release=4.1)"
             },
             {
               "id": "E5",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by operator"
+              "text": "7 s ago: stop by operator"
             },
             {
               "id": "E6",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by operator (release=4.1)"
+              "text": "7 s ago: start by operator (release=4.1)"
             },
             {
               "id": "E7",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by pipeline"
+              "text": "6 s ago: stop by pipeline"
             },
             {
               "id": "E8",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by pipeline (release=4.1)"
+              "text": "6 s ago: start by pipeline (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 0.15,
+        "t": 0.19,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 8.9
+          "ms": 33.5
         }
       },
       {
-        "t": 0.18,
+        "t": 0.22,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "8 log records from payments",
         "data": {
-          "ms": 28.5
+          "ms": 29.4
         }
       },
       {
-        "t": 0.18,
+        "t": 10.33,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 10.108 s"
       },
       {
-        "t": 0.18,
+        "t": 10.35,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+        "data": {
+          "target": "payments",
+          "params": {
+            "key": "max_transfer_minor"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 11.36,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.48,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 115.8
+        }
+      },
+      {
+        "t": 14.47,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 985.9
+        }
+      },
+      {
+        "t": 14.47,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "single look: not clean; still abnormal: gateway: 20% of requests are refused (baseline 0%); payments: 24% of requests are refused (baseline 0%)"
+      },
+      {
+        "t": 14.54,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 73.3
+        }
+      },
+      {
+        "t": 15.41,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 866.3
+        }
+      },
+      {
+        "t": 15.41,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "2 fault findings, 12 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "33% of requests are refused (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "40% of requests are refused (baseline 0%)"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "28 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "26 s ago: config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "22 s ago: stop by scheduler"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "22 s ago: start by scheduler (release=4.1)"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "21 s ago: stop by operator"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "21 s ago: start by operator (release=4.1)"
+            },
+            {
+              "id": "E7",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "20 s ago: stop by pipeline"
+            },
+            {
+              "id": "E8",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "20 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E9",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "4 s ago: config by incident-commander (key=max_transfer_minor, revert=True, from=1, to=1000000)"
+            },
+            {
+              "id": "E10",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "3 s ago: config by incident-commander (key=balance_cache_ttl_s, revert=True, from=600.0, to=0.5)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 15.42,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 15.6
+        }
+      },
+      {
+        "t": 15.45,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "13 log records from payments",
+        "data": {
+          "ms": 24.5
+        }
+      },
+      {
+        "t": 26.45,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-opus-5-5 answered in 10.997 s"
+      },
+      {
+        "t": 26.45,
+        "phase": "triage",
+        "kind": "note",
+        "name": "check",
+        "summary": "nothing new to try and the main journey passes: checking again"
+      },
+      {
+        "t": 27.53,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 80.5
+        }
+      },
+      {
+        "t": 28.45,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 918.4
+        }
+      },
+      {
+        "t": 28.45,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "single look: clean"
+      },
+      {
+        "t": 28.45,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 0.18,
+        "t": 33.22,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.18,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.77 s"
       }
     ],
     "calls": [
@@ -196,11 +468,23 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4063,
+        "output_tokens": 974,
+        "latency_s": 10.108,
+        "estimated_cost_usd": 0.035732,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "reassess",
+        "input_tokens": 4743,
+        "output_tokens": 975,
+        "latency_s": 10.997,
+        "estimated_cost_usd": 0.038472,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -208,17 +492,50 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1114,
+        "output_tokens": 377,
+        "latency_s": 4.77,
+        "estimated_cost_usd": 0.011996,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 5,
-    "audit": []
+    "steps": 15,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793454498.7782497,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 14 s ago. Logs show 'limit_reject ... limit_minor=1 amount_minor=49961', and the probe fails with '422 amount exceeds transfer limit'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "event": "act",
+        "t": 1793454499.8068616,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E2: 'config by pipeline (key=balance_cache_ttl_s, from=0.5, to=600.0)' 12 s ago. A 10-minute balance cache means a just-posted payment will not show in the balance; this is masked while payments are failing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by pipeline)"
+      }
+    ]
   },
   "error": null
 }

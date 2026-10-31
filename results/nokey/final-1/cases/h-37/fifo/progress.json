@@ -1,0 +1,169 @@
+{
+  "case": {
+    "id": "h-37",
+    "input": {
+      "system": "bank",
+      "seed": 260037,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "crash",
+          "at_s": 0,
+          "params": {
+            "target": "clearing"
+          }
+        },
+        {
+          "type": "double_posting",
+          "at_s": 2,
+          "params": {
+            "target": "payments",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 4,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "clearing",
+            "params": {}
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "payments",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "fifo",
+  "result": {
+    "arm": "fifo",
+    "mode": "auto",
+    "outcome": "harness_error",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "",
+      "background": "",
+      "assessment": "",
+      "recommendation": ""
+    },
+    "t_start": 1793434299.7323105,
+    "t_first_action": null,
+    "t_declared": 1793434299.7323108,
+    "trace": [],
+    "calls": []
+  },
+  "checker": null,
+  "manifest": [
+    {
+      "type": "crash",
+      "target": "clearing",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793434313.2240689,
+      "at_s": 0
+    },
+    {
+      "type": "double_posting",
+      "target": "payments",
+      "class": "bad_release",
+      "detail": {
+        "release": "1.5"
+      },
+      "t": 1793434315.8853822,
+      "at_s": 2
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 22028,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793434322.2409344,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793434322.3424525,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793434322.4531417,
+      "at_s": 7
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": false,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793434313.2240689,
+    "t_alert": 1793434327.4531417,
+    "horizon": 1793434437.4531417
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

@@ -2,53 +2,119 @@
   "result": {
     "arm": "fifo",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.95,
+        "evidence": "E1: 12 s ago, config by pipeline (key=max_transfer_minor, from=1000000, to=1). Logs show limit_reject with limit_minor=1 starting at that same time."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.85,
+        "evidence": "Clearing crashed 13 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The first backlog item is 85, waiting 14 s."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793458096.0300572,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: E1: 12 s ago, config by pipeline (key=max_transfer_minor, from=1000000, to=1). Logs show limit_reject with limit_minor=1 starting at that same time.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793458097.0577116,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 85
+        },
+        "reason": "poison_message: Clearing crashed 13 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The first backlog item is 85, waiting 14 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 85 set aside for the operations team"
+      },
+      {
+        "t": 1793458098.0779703,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed 13 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The first backlog item is 85, waiting 14 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 85 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 85 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793428971.21395,
-    "t_first_action": null,
-    "t_declared": 1793428971.455519,
+    "sbar": {
+      "situation": "The bank has recovered from two separate faults, one on payments and one on clearing. Two recovery checks in a row, the last at 21 s, ran the main journey cleanly.",
+      "background": "About 12 s before the incident, a pipeline config change on payments set max_transfer_minor from 1000000 to 1. A second later, the clearing worker crashed on queue item 85 with 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item).",
+      "assessment": "The payments limit change caused nearly every payment to be refused with 422; the incident commander reverted max_transfer_minor to 1000000, which worked. Malformed item 85 crashed clearing and its backlog grew; the incident commander quarantined item 85 and restarted clearing, which brought it back up.",
+      "recommendation": "Find out why the pipeline set max_transfer_minor to 1 and stop it recurring. The operations team has been asked (soon) to review clearing item 85: repair and resubmit it, or close it with its customer. Operations should also review the payments wrongly refused with 422 while the limit was 1."
+    },
+    "t_start": 1793458090.0696099,
+    "t_first_action": 1793458096.0300572,
+    "t_declared": 1793458110.735557,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 32.0
+          "ms": 38.8
         }
       },
       {
-        "t": 0.11,
+        "t": 0.08,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: clearing",
         "data": {
-          "ms": 80.0
+          "ms": 40.1
         }
       },
       {
-        "t": 0.17,
+        "t": 0.12,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 55.5
+          "ms": 42.0
         }
       },
       {
-        "t": 0.17,
+        "t": 0.12,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -60,14 +126,14 @@
               "letter": "A",
               "component": "gateway",
               "severity": "fault",
-              "text": "74% of requests are refused (baseline 0%)"
+              "text": "73% of requests are refused (baseline 0%)"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "payments",
               "severity": "fault",
-              "text": "73% of requests are refused (baseline 0%)"
+              "text": "72% of requests are refused (baseline 0%)"
             },
             {
               "id": "A3",
@@ -88,7 +154,7 @@
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 18 items waiting, oldest 14 s; first item 85 waiting 14 s after 0 attempt(s)"
+              "text": "backlog: 20 items waiting, oldest 14 s; first item 85 waiting 14 s after 0 attempt(s)"
             },
             {
               "id": "C1",
@@ -109,7 +175,7 @@
               "letter": "E",
               "component": "payments",
               "severity": "info",
-              "text": "11 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+              "text": "12 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
             },
             {
               "id": "E2",
@@ -157,13 +223,23 @@
         }
       },
       {
-        "t": 0.18,
+        "t": 0.14,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 14.5
+          "ms": 21.7
+        }
+      },
+      {
+        "t": 0.17,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "7 log records from payments",
+        "data": {
+          "ms": 30.0
         }
       },
       {
@@ -171,48 +247,131 @@
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
-        "summary": "7 log records from payments",
-        "data": {
-          "ms": 24.4
-        }
-      },
-      {
-        "t": 0.24,
-        "phase": "survey",
-        "kind": "tool",
-        "name": "logs",
         "summary": "2 log records from clearing",
         "data": {
-          "ms": 34.6
+          "ms": 33.9
         }
       },
       {
-        "t": 0.24,
+        "t": 5.96,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 5.753 s"
       },
       {
-        "t": 0.24,
+        "t": 5.99,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+        "data": {
+          "target": "payments",
+          "params": {
+            "key": "max_transfer_minor"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 7.01,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 85 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 85
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 8.65,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.73,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 84.7
+        }
+      },
+      {
+        "t": 15.64,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 908.6
+        }
+      },
+      {
+        "t": 15.64,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 19.74,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 94.1
+        }
+      },
+      {
+        "t": 20.67,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 930.1
+        }
+      },
+      {
+        "t": 20.67,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 20.67,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 0.24,
+        "t": 25.86,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.24,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 5.191 s"
       }
     ],
     "calls": [
@@ -220,11 +379,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4214,
+        "output_tokens": 565,
+        "latency_s": 5.753,
+        "estimated_cost_usd": 0.028156,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -232,17 +391,64 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1053,
+        "output_tokens": 367,
+        "latency_s": 5.191,
+        "estimated_cost_usd": 0.011552,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 6,
-    "audit": []
+    "steps": 13,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793458096.0300572,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: E1: 12 s ago, config by pipeline (key=max_transfer_minor, from=1000000, to=1). Logs show limit_reject with limit_minor=1 starting at that same time.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "event": "act",
+        "t": 1793458097.0577116,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 85
+        },
+        "reason": "poison_message: Clearing crashed 13 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The first backlog item is 85, waiting 14 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 85 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793458098.0779703,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed 13 s ago with 'JSONDecodeError: Expecting property name enclosed in double quotes' in parse(item). The first backlog item is 85, waiting 14 s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      }
+    ]
   },
   "error": null
 }

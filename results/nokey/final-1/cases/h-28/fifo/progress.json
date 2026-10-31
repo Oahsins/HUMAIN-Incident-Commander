@@ -1,0 +1,148 @@
+{
+  "case": {
+    "id": "h-28",
+    "input": {
+      "system": "bank",
+      "seed": 260028,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "double_posting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "slow_screening",
+          "at_s": 2,
+          "params": {
+            "latency_ms": 1800,
+            "jitter_ms": 0
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "screening",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "screening",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "payments",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "fifo",
+  "result": {
+    "arm": "fifo",
+    "mode": "auto",
+    "outcome": "harness_error",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "",
+      "background": "",
+      "assessment": "",
+      "recommendation": ""
+    },
+    "t_start": 1793430567.34594,
+    "t_first_action": null,
+    "t_declared": 1793430567.3459406,
+    "trace": [],
+    "calls": []
+  },
+  "checker": null,
+  "manifest": [
+    {
+      "type": "double_posting",
+      "target": "payments",
+      "class": "bad_release",
+      "detail": {
+        "release": "1.5"
+      },
+      "t": 1793430581.499338,
+      "at_s": 0
+    },
+    {
+      "type": "slow_screening",
+      "target": "screening",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "payments->screening",
+        "latency_ms": 1800,
+        "jitter_ms": 0
+      },
+      "t": 1793430582.8305252,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430586.8826962,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430588.8743494,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": false,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793430581.499338,
+    "t_alert": 1793430593.8743494,
+    "horizon": 1793430703.8743494
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

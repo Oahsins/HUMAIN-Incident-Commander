@@ -2,29 +2,71 @@
   "result": {
     "arm": "naive_verify",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "[C1] 'gateway: down (not answering)'; the probe fails at step 'gateway' with 'timeout: no answer within 3.0s', and downstream traffic is 0.0/s."
+      },
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "[E1] 'config by scheduler (key=max_transfer_minor, from=1000000, to=1)': a transfer limit of 1 minor unit cannot work for normal payments. It shows no symptom yet only because the gateway is down."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793455542.9003868,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: [E1] 'config by scheduler (key=max_transfer_minor, from=1000000, to=1)': a transfer limit of 1 minor unit cannot work for normal payments. It shows no symptom yet only because the gateway is down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      },
+      {
+        "t": 1793455543.9069395,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)'; the probe fails at step 'gateway' with 'timeout: no answer within 3.0s', and downstream traffic is 0.0/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank payment system has recovered. One check at 16 s after the actions ran the main payment journey cleanly.",
+      "background": "The gateway process went down and stopped answering, so every payment journey timed out at the gateway. Earlier, the scheduler changed max_transfer_minor on payments from 1000000 to 1.",
+      "assessment": "The gateway was down (confidence 0.9): the probe failed at step 'gateway' with no answer within 3.0s, and downstream traffic was 0.0/s. A hidden bad config on payments (confidence 0.8) set max_transfer_minor to 1, which would have rejected normal transfers once the gateway returned. The incident commander reverted max_transfer_minor from 1 back to 1000000 (done) and then restarted the gateway (done), and the recovery check was clean.",
+      "recommendation": "Find out why the scheduler changed max_transfer_minor on payments, and stop it from doing so again. Find out why the gateway process went down. Operations should review any payments that failed or timed out while the gateway was down."
     },
-    "t_start": 1793431061.454591,
-    "t_first_action": null,
-    "t_declared": 1793431065.5959024,
+    "t_start": 1793455532.9965305,
+    "t_first_action": 1793455542.9003868,
+    "t_declared": 1793455548.7909915,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 31.1
+          "ms": 38.5
         }
       },
       {
@@ -34,21 +76,21 @@
         "name": "observe",
         "summary": "8 components; down: gateway",
         "data": {
-          "ms": 1085.9
+          "ms": 1076.5
         }
       },
       {
-        "t": 4.13,
+        "t": 4.14,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at gateway",
         "data": {
-          "ms": 3010.8
+          "ms": 3025.5
         }
       },
       {
-        "t": 4.13,
+        "t": 4.14,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -60,14 +102,14 @@
               "letter": "A",
               "component": "payments",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 11.8/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 11.5/s), less work from its callers"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "screening",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 9.2/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 8.9/s), less work from its callers"
             },
             {
               "id": "A3",
@@ -88,90 +130,140 @@
               "letter": "E",
               "component": "payments",
               "severity": "info",
-              "text": "14 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1)"
+              "text": "15 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1)"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: stop by ops-maintenance"
+              "text": "9 s ago: stop by ops-maintenance"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "8 s ago: start by ops-maintenance (release=4.1)"
+              "text": "9 s ago: start by ops-maintenance (release=4.1)"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: stop by pipeline"
+              "text": "8 s ago: stop by pipeline"
             },
             {
               "id": "E5",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: start by pipeline (release=4.1)"
+              "text": "8 s ago: start by pipeline (release=4.1)"
             },
             {
               "id": "E6",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E7",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 4.14,
+        "t": 4.16,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 13.1
+          "ms": 24.2
         }
       },
       {
-        "t": 4.14,
+        "t": 9.9,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 5.738 s"
       },
       {
-        "t": 4.14,
+        "t": 9.91,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler))",
+        "data": {
+          "target": "payments",
+          "params": {
+            "key": "max_transfer_minor"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 11.6,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.69,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 89.3
+        }
+      },
+      {
+        "t": 15.79,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1109.1
+        }
+      },
+      {
+        "t": 15.79,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "single look: clean"
+      },
+      {
+        "t": 15.79,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 4.14,
+        "t": 20.16,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.14,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.37 s"
       }
     ],
     "calls": [
@@ -179,11 +271,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3550,
+        "output_tokens": 501,
+        "latency_s": 5.738,
+        "estimated_cost_usd": 0.02422,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -191,17 +283,48 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 949,
+        "output_tokens": 348,
+        "latency_s": 4.37,
+        "estimated_cost_usd": 0.010756,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 4,
-    "audit": []
+    "steps": 8,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793455542.9003868,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "bad_config: [E1] 'config by scheduler (key=max_transfer_minor, from=1000000, to=1)': a transfer limit of 1 minor unit cannot work for normal payments. It shows no symptom yet only because the gateway is down.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      },
+      {
+        "event": "act",
+        "t": 1793455543.9069395,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] 'gateway: down (not answering)'; the probe fails at step 'gateway' with 'timeout: no answer within 3.0s', and downstream traffic is 0.0/s.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
   },
   "error": null
 }

@@ -1,53 +1,116 @@
 {
   "arm": "fifo",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "payments",
+      "class": "bad_config",
+      "confidence": 0.95,
+      "evidence": "E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 13 s ago. Since then payments logs repeat 'limit_reject ... limit_minor=1', and the probe fails with '422 amount exceeds transfer limit'."
+    },
+    {
+      "target": "clearing",
+      "class": "process_down",
+      "confidence": 0.75,
+      "evidence": "C1: 'clearing: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 10 s ago (exit code 15)'. Exit code 15 is a termination signal, and the clearing log shows no errors and no unreadable work item."
+    },
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.85,
+      "evidence": "B3: screening p95 is 1826 ms (baseline 15 ms) and D3: calls to screening fail 100%. Payments logs show 'fraud screening timeout via primary timeout_s=1.0', and the probe fails with '503 screening unavailable (timeout)'."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793458542.841952,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 13 s ago. Since then payments logs repeat 'limit_reject ... limit_minor=1', and the probe fails with '422 amount exceeds transfer limit'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793458543.8661778,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "process_down: C1: 'clearing: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 10 s ago (exit code 15)'. Exit code 15 is a termination signal, and the clearing log shows no errors and no unreadable work item.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "t": 1793458568.096056,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "dependency_slow: B3: screening p95 is 1826 ms (baseline 15 ms) and D3: calls to screening fail 100%. Payments logs show 'fraud screening timeout via primary timeout_s=1.0', and the probe fails with '503 screening unavailable (timeout)'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    }
+  ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The bank payment journey has recovered. The last two recovery checks ran clean, the final one at 51 s.",
+    "background": "About 13 s before the incident was raised, a pipeline change set payments max_transfer_minor from 1000000 to 1, so every payment was rejected with '422 amount exceeds transfer limit'. Around the same time the screening primary slowed to p95 1826 ms (baseline 15 ms), and clearing exited once with exit code 15.",
+    "assessment": "The incident commander reverted payments max_transfer_minor to 1000000, which stopped the limit rejections. It failed screening over to its standby, which ended the 1.0 s screening timeouts and 503s, and it restarted clearing, which has stayed up since. Clearing's exit code 15 is a termination signal with no errors in its log, so the cause of that stop is not known.",
+    "recommendation": "Find out why the pipeline set max_transfer_minor to 1, and block that change from being reapplied. Fix the slow screening primary before failing back from screening-standby, and find what sent the termination signal to clearing. Operations should review the payments rejected by the limit and those that failed with 503 screening timeouts during the incident, and confirm which ones need resubmitting."
   },
-  "t_start": 1793431340.296413,
-  "t_first_action": null,
-  "t_declared": 1793431340.5615156,
+  "t_start": 1793458533.8784544,
+  "t_first_action": 1793458542.841952,
+  "t_declared": 1793458584.3863997,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.06,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 33.6
+        "ms": 55.0
       }
     },
     {
-      "t": 0.12,
+      "t": 0.13,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: clearing",
       "data": {
-        "ms": 86.3
+        "ms": 75.5
       }
     },
     {
-      "t": 0.18,
+      "t": 0.17,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 58.3
+        "ms": 36.4
       }
     },
     {
-      "t": 0.18,
+      "t": 0.17,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -73,7 +136,7 @@
             "letter": "A",
             "component": "screening",
             "severity": "info",
-            "text": "traffic 0.0/s (baseline 9.8/s), less work from its callers"
+            "text": "traffic 0.0/s (baseline 9.7/s), less work from its callers"
           },
           {
             "id": "A4",
@@ -101,96 +164,464 @@
             "letter": "E",
             "component": "payments",
             "severity": "info",
-            "text": "12 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+            "text": "13 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
           },
           {
             "id": "E2",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by ops-maintenance"
+            "text": "7 s ago: stop by ops-maintenance"
           },
           {
             "id": "E3",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: start by ops-maintenance (release=4.1)"
+            "text": "7 s ago: start by ops-maintenance (release=4.1)"
           },
           {
             "id": "E4",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by ops-maintenance"
+            "text": "6 s ago: stop by ops-maintenance"
           },
           {
             "id": "E5",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by ops-maintenance (release=4.1)"
+            "text": "6 s ago: start by ops-maintenance (release=4.1)"
           }
         ]
       }
     },
     {
-      "t": 0.2,
+      "t": 0.19,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 21.6
+        "ms": 23.8
       }
     },
     {
-      "t": 0.23,
+      "t": 0.22,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "7 log records from payments",
       "data": {
-        "ms": 32.3
+        "ms": 28.4
       }
     },
     {
-      "t": 0.26,
+      "t": 0.25,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from clearing",
       "data": {
-        "ms": 32.4
+        "ms": 33.0
       }
     },
     {
-      "t": 0.27,
+      "t": 8.96,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 8.71 s"
     },
     {
-      "t": 0.27,
+      "t": 8.99,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config payments: done (payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline))",
+      "data": {
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 10.6,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 16.68,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 74.1
+      }
+    },
+    {
+      "t": 17.7,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at payments",
+      "data": {
+        "ms": 1022.3
+      }
+    },
+    {
+      "t": 17.7,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: gateway: 86% of requests fail (baseline 0%); payments: 86% of requests fail (baseline 0%); payments: payment journey fails at step 'payments': 503 screening unavailable (timeout) (+7 more)"
+    },
+    {
+      "t": 21.77,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 74.0
+      }
+    },
+    {
+      "t": 22.83,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at payments",
+      "data": {
+        "ms": 1054.4
+      }
+    },
+    {
+      "t": 22.83,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: not clean (0 of 2 in a row); still abnormal: gateway: 100% of requests fail (baseline 0%); payments: 100% of requests fail (baseline 0%); payments: payment journey fails at step 'payments': 503 screening unavailable (timeout) (+7 more)"
+    },
+    {
+      "t": 22.89,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 57.8
+      }
+    },
+    {
+      "t": 23.94,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey failed at payments",
+      "data": {
+        "ms": 1049.1
+      }
+    },
+    {
+      "t": 23.94,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "10 fault findings, 18 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "89% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "89% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A3",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "p95 1045 ms (baseline 62 ms)"
+          },
+          {
+            "id": "B2",
+            "letter": "B",
+            "component": "payments",
+            "severity": "fault",
+            "text": "p95 1030 ms (baseline 46 ms)"
+          },
+          {
+            "id": "B3",
+            "letter": "B",
+            "component": "screening",
+            "severity": "fault",
+            "text": "p95 1826 ms (baseline 15 ms)"
+          },
+          {
+            "id": "C1",
+            "letter": "C",
+            "component": "clearing",
+            "severity": "info",
+            "text": "process exited 1 time(s) in 15 min, last 33 s ago (exit code 15); none since the action taken on it 14 s ago"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 89%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments are slow: p95 1044 ms (payments itself answered in 46 ms at baseline)"
+          },
+          {
+            "id": "D3",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening fail: 100%"
+          },
+          {
+            "id": "D4",
+            "letter": "D",
+            "component": "payments",
+            "severity": "fault",
+            "text": "calls to screening are slow: p95 1029 ms (screening itself answered in 15 ms at baseline)"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "35 s ago: config by pipeline (key=max_transfer_minor, from=1000000, to=1)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "29 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "29 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "28 s ago: stop by ops-maintenance"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "28 s ago: start by ops-maintenance (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "payments",
+            "severity": "info",
+            "text": "14 s ago: config by incident-commander (key=max_transfer_minor, revert=True, from=1, to=1000000)"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "clearing",
+            "severity": "info",
+            "text": "13 s ago: restart by incident-commander (release=3.2)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 23.95,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 15.2
+      }
+    },
+    {
+      "t": 23.97,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "18 log records from payments",
+      "data": {
+        "ms": 22.7
+      }
+    },
+    {
+      "t": 24.0,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from screening",
+      "data": {
+        "ms": 30.8
+      }
+    },
+    {
+      "t": 34.22,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 10.213 s"
+    },
+    {
+      "t": 34.24,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "failover",
+      "summary": "failover screening: done (screening now served by its standby)",
+      "data": {
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 39.35,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 115.2
+      }
+    },
+    {
+      "t": 40.32,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 970.6
+      }
+    },
+    {
+      "t": 40.32,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: screening: p95 1814 ms (baseline 15 ms)"
+    },
+    {
+      "t": 44.39,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 68.6
+      }
+    },
+    {
+      "t": 45.32,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 929.1
+      }
+    },
+    {
+      "t": 45.32,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 49.42,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 103.6
+      }
+    },
+    {
+      "t": 50.51,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 1083.0
+      }
+    },
+    {
+      "t": 50.51,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 3: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 50.51,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 0.27,
+      "t": 55.78,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 0.27,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 5.269 s"
     }
   ],
   "calls": [
@@ -198,11 +629,23 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3979,
+      "output_tokens": 860,
+      "latency_s": 8.71,
+      "estimated_cost_usd": 0.033116,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 4853,
+      "output_tokens": 990,
+      "latency_s": 10.213,
+      "estimated_cost_usd": 0.039212,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -210,15 +653,62 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1196,
+      "output_tokens": 410,
+      "latency_s": 5.269,
+      "estimated_cost_usd": 0.012984,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 6,
-  "audit": []
+  "steps": 24,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793458542.841952,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "bad_config: E1: 'config by pipeline (key=max_transfer_minor, from=1000000, to=1)' 13 s ago. Since then payments logs repeat 'limit_reject ... limit_minor=1', and the probe fails with '422 amount exceeds transfer limit'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793458543.8661778,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "process_down: C1: 'clearing: down (not answering)'. C2: 'process exited 1 time(s) in 15 min, last 10 s ago (exit code 15)'. Exit code 15 is a termination signal, and the clearing log shows no errors and no unreadable work item.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793458568.096056,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "dependency_slow: B3: screening p95 is 1826 ms (baseline 15 ms) and D3: calls to screening fail 100%. Payments logs show 'fraud screening timeout via primary timeout_s=1.0', and the probe fails with '503 screening unavailable (timeout)'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    }
+  ]
 }

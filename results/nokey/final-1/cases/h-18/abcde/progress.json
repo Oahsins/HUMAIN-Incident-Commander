@@ -1,0 +1,129 @@
+{
+  "case": {
+    "id": "h-18",
+    "input": {
+      "system": "bank",
+      "seed": 260018,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "double_posting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 2,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "payments",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "harness_error",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "",
+      "background": "",
+      "assessment": "",
+      "recommendation": ""
+    },
+    "t_start": 1793426083.937108,
+    "t_first_action": null,
+    "t_declared": 1793426083.9371083,
+    "trace": [],
+    "calls": []
+  },
+  "checker": null,
+  "manifest": [
+    {
+      "type": "double_posting",
+      "target": "payments",
+      "class": "bad_release",
+      "detail": {
+        "release": "1.5"
+      },
+      "t": 1793426098.1112273,
+      "at_s": 0
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 12876,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793426104.4511373,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793426104.5203507,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": false,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793426098.1112273,
+    "t_alert": 1793426109.5203507,
+    "horizon": 1793426219.5203507
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

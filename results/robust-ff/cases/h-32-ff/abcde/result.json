@@ -1,69 +1,158 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "screening",
+      "class": "dependency_slow",
+      "confidence": 0.85,
+      "evidence": "Screening p95 is 1820 ms (baseline 15 ms) and payments logs 'fraud screening timeout via primary ... timeout_s=1.0'. Calls to screening fail 100% while gateway and payments are otherwise healthy."
+    },
+    {
+      "target": "clearing",
+      "class": "poison_message",
+      "confidence": 0.9,
+      "evidence": "The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). The first item, 95, has been waiting 16 s after 0 attempts, and the worker is down after exiting."
+    },
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.75,
+      "evidence": "'lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)'. This blocks ledger writes for postings and clearing."
+    },
+    {
+      "target": "payments",
+      "class": "bad_release",
+      "confidence": 0.6,
+      "evidence": "Payments was deployed 14 s ago (from=1.3, to=1.5), skipping 1.4. The ledger data check now fails with 'duplicate payments = 16', and payments is the component that posts payments."
+    }
+  ],
   "actions": [
     {
-      "t": 1793437175.266066,
+      "t": 1793451039.3652442,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1031 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1030 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793451055.1505685,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: 'lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)'. This blocks ledger writes for postings and clearing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793451056.2479768,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: Payments was deployed 14 s ago (from=1.3, to=1.5), skipping 1.4. The ledger data check now fails with 'duplicate payments = 16', and payments is the component that posts payments.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "t": 1793451058.9545774,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 95
+      },
+      "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). The first item, 95, has been waiting 16 s after 0 attempts, and the worker is down after exiting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 95 set aside for the operations team"
+    },
+    {
+      "t": 1793451059.9870925,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). The first item, 95, has been waiting 16 s after 0 attempts, and the worker is down after exiting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
     }
   ],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "failover on screening: done",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "clearing",
+      "ledger"
+    ],
+    "class": null,
+    "reason": "past damage, no longer growing: data check failed: duplicate payments = 21; item 95 was set aside from clearing's work queue",
+    "urgency": "soon",
+    "to": "the operations team",
+    "ask": "find and put right the records behind 'data check failed: duplicate payments = 21'; the incident commander cannot change data; review item 95 set aside from clearing: repair and resubmit it, or close it with its customer"
   },
-  "t_start": 1793437174.0202806,
-  "t_first_action": 1793437175.266066,
-  "t_declared": 1793437175.3678067,
+  "sbar": {
+    "situation": "The bank system has recovered after four faults; the last recovery check at 41 s was clean, with 2 clean looks in a row. Ledger data still holds duplicate payments that need the operations team.",
+    "background": "Payments was deployed from 1.3 to 1.5 (skipping 1.4) about 14 s before diagnosis, and the ledger data check then failed with duplicate payments. At the same time the screening primary slowed to p95 1820 ms (baseline 15 ms), clearing crashed on item 95, and a reconciliation session held a write lock on the ledger.",
+    "assessment": "Screening calls timed out against the payments 1.0 s limit, so the incident commander failed screening over to its standby, which now serves it. It also ended the reconciliation session holding the ledger lock and rolled payments back from 1.5 to 1.3. It quarantined clearing item 95, which caused a JSONDecodeError, and restarted clearing; all of these actions completed.",
+    "recommendation": "The operations team must find and correct the duplicate payment records in the ledger; the latest data check shows 21, up from 16. They must also review clearing item 95 and either repair and resubmit it or close it with its customer. Check the screening primary and the payments 1.5 release before moving back to either."
+  },
+  "t_start": 1793451038.127177,
+  "t_first_action": 1793451039.3652442,
+  "t_declared": 1793451078.738305,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.02,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 33.9
+        "ms": 24.0
       }
     },
     {
-      "t": 0.17,
+      "t": 0.16,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: clearing",
       "data": {
-        "ms": 139.3
+        "ms": 139.9
       }
     },
     {
-      "t": 1.25,
+      "t": 1.24,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 1072.1
+        "ms": 1073.9
       }
     },
     {
-      "t": 1.25,
+      "t": 1.24,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -96,28 +185,28 @@
             "letter": "B",
             "component": "gateway",
             "severity": "fault",
-            "text": "p95 1040 ms (baseline 59 ms)"
+            "text": "p95 1051 ms (baseline 59 ms)"
           },
           {
             "id": "B2",
             "letter": "B",
             "component": "payments",
             "severity": "fault",
-            "text": "p95 1031 ms (baseline 45 ms)"
+            "text": "p95 1030 ms (baseline 45 ms)"
           },
           {
             "id": "B3",
             "letter": "B",
             "component": "screening",
             "severity": "fault",
-            "text": "p95 1822 ms (baseline 15 ms)"
+            "text": "p95 1820 ms (baseline 15 ms)"
           },
           {
             "id": "B4",
             "letter": "B",
             "component": "clearing",
             "severity": "fault",
-            "text": "backlog: 49 items waiting, oldest 16 s; first item 96 waiting 16 s after 0 attempt(s)"
+            "text": "backlog: 50 items waiting, oldest 16 s; first item 95 waiting 16 s after 0 attempt(s)"
           },
           {
             "id": "B5",
@@ -159,7 +248,7 @@
             "letter": "D",
             "component": "gateway",
             "severity": "fault",
-            "text": "calls to payments are slow: p95 1040 ms (payments itself answered in 45 ms at baseline)"
+            "text": "calls to payments are slow: p95 1051 ms (payments itself answered in 45 ms at baseline)"
           },
           {
             "id": "D3",
@@ -173,7 +262,7 @@
             "letter": "D",
             "component": "payments",
             "severity": "fault",
-            "text": "calls to screening are slow: p95 1031 ms (screening itself answered in 15 ms at baseline)"
+            "text": "calls to screening are slow: p95 1030 ms (screening itself answered in 15 ms at baseline)"
           },
           {
             "id": "D5",
@@ -222,7 +311,7 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by pipeline"
+            "text": "6 s ago: stop by pipeline"
           },
           {
             "id": "E7",
@@ -251,72 +340,204 @@
       }
     },
     {
-      "t": 1.28,
+      "t": 1.29,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from gateway",
       "data": {
-        "ms": 12.6
+        "ms": 35.4
       }
     },
     {
-      "t": 1.3,
+      "t": 1.32,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "9 log records from payments",
       "data": {
-        "ms": 25.2
+        "ms": 30.0
       }
     },
     {
-      "t": 1.33,
+      "t": 1.35,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "1 log records from screening",
       "data": {
-        "ms": 28.2
+        "ms": 29.7
       }
     },
     {
-      "t": 1.35,
+      "t": 1.38,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "2 log records from clearing",
       "data": {
-        "ms": 17.1
+        "ms": 31.1
       }
     },
     {
-      "t": 1.35,
+      "t": 17.02,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-opus-5-5 answered in 15.639 s"
     },
     {
-      "t": 1.35,
+      "t": 17.12,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 18.83,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+      "data": {
+        "target": "payments",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 20.86,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "quarantine",
+      "summary": "quarantine clearing: done (clearing item 95 set aside for the operations team)",
+      "data": {
+        "target": "clearing",
+        "params": {
+          "item": 95
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 22.49,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "restart",
+      "summary": "restart clearing: done (clearing restarted)",
+      "data": {
+        "target": "clearing",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 29.58,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 91.7
+      }
+    },
+    {
+      "t": 30.54,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 954.1
+      }
+    },
+    {
+      "t": 30.54,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: not clean (0 of 2 in a row); still abnormal: ledger: data check failed: duplicate payments = 21"
+    },
+    {
+      "t": 34.64,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 106.0
+      }
+    },
+    {
+      "t": 35.54,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 898.9
+      }
+    },
+    {
+      "t": 35.54,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 39.64,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 96.3
+      }
+    },
+    {
+      "t": 40.61,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 971.0
+      }
+    },
+    {
+      "t": 40.61,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 3: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 40.61,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 1.35,
+      "t": 45.96,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 1.35,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 5.351 s"
     }
   ],
   "calls": [
@@ -324,11 +545,11 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 4533,
+      "output_tokens": 1643,
+      "latency_s": 15.639,
+      "estimated_cost_usd": 0.050992,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -336,32 +557,90 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1338,
+      "output_tokens": 419,
+      "latency_s": 5.351,
+      "estimated_cost_usd": 0.013732,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 8,
+  "steps": 18,
   "audit": [
     {
       "event": "act",
-      "t": 1793437175.266066,
+      "t": 1793451039.3652442,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1031 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1030 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793451055.1505685,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: 'lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)'. This blocks ledger writes for postings and clearing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793451056.2479768,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: Payments was deployed 14 s ago (from=1.3, to=1.5), skipping 1.4. The ledger data check now fails with 'duplicate payments = 16', and payments is the component that posts payments.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "event": "act",
+      "t": 1793451058.9545774,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 95
+      },
+      "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). The first item, 95, has been waiting 16 s after 0 attempts, and the worker is down after exiting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 95 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793451059.9870925,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: The clearing log shows 'JSONDecodeError: Expecting property name enclosed in double quotes' in self.parse(item). The first item, 95, has been waiting 16 s after 0 attempts, and the worker is down after exiting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
     }
   ]
 }

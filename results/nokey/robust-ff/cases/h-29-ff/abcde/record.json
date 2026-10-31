@@ -1,0 +1,484 @@
+{
+  "case": {
+    "id": "h-29-ff",
+    "input": {
+      "system": "bank",
+      "seed": 260029,
+      "condition": "four_faults",
+      "faults": [
+        {
+          "type": "bad_setting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "blind_1",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "slow_screening",
+          "at_s": 4,
+          "params": {
+            "latency_ms": 1800,
+            "jitter_ms": 0
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 5,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "screening",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "screening",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "gateway",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    },
+    "source_id": "h-29"
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "gave_up",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
+      "background": "No cause identified.",
+      "assessment": "No action was taken.",
+      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    },
+    "t_start": 1793436857.3192472,
+    "t_first_action": null,
+    "t_declared": 1793436861.630254,
+    "trace": [
+      {
+        "t": 0.03,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "bank: 8 components",
+        "data": {
+          "ms": 30.1
+        }
+      },
+      {
+        "t": 1.23,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway",
+        "data": {
+          "ms": 1198.6
+        }
+      },
+      {
+        "t": 4.29,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at gateway",
+        "data": {
+          "ms": 3057.0
+        }
+      },
+      {
+        "t": 4.29,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "3 fault findings, 13 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "payments",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 11.9/s), less work from its callers"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "screening",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 9.2/s), less work from its callers"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "payment journey fails at step 'gateway': timeout: no answer within 3.0s"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "ledger",
+              "severity": "fault",
+              "text": "lock held by session reconciliation (write) for 11.7 s: UPDATE accounts SET ... (reconciliation batch)"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "C2",
+              "letter": "C",
+              "component": "reconciliation",
+              "severity": "info",
+              "text": "job running"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "payments",
+              "severity": "info",
+              "text": "17 s ago: config by scheduler (key=max_transfer_minor, from=1000000, to=1)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by pipeline"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E7",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 4.31,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 23.5
+        }
+      },
+      {
+        "t": 4.31,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "0 log records from ledger",
+        "data": {
+          "ms": 1.3
+        }
+      },
+      {
+        "t": 4.31,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 4.31,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "gave_up"
+      },
+      {
+        "t": 4.31,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      },
+      {
+        "t": 4.31,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "handover written from the template"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": null,
+        "output_tokens": null,
+        "latency_s": 0.0,
+        "estimated_cost_usd": null,
+        "status": "failed",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 5,
+    "audit": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793436976.9803228,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793436946.98,
+      1793436966.98
+    ],
+    "journeys": {
+      "n": 38,
+      "ok": 0,
+      "success_rate": 0.0,
+      "p95_ms": null,
+      "payments": {
+        "n": 28,
+        "ok": 0
+      },
+      "balances": {
+        "n": 10,
+        "fresh": 0
+      },
+      "p95_allowed_ms": 319.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 10,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [
+      "38 of 38 customer journeys failed (28 payments, 10 balance reads)"
+    ],
+    "impact": {
+      "since_t": 1793436841.728138,
+      "until_t": 1793436966.9803228,
+      "breach_seconds": 120.0,
+      "failed_journeys": 268,
+      "time_to_mitigate_s": 125.3,
+      "mitigation_censored": true,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793436841.728138,
+      "at_s": 0
+    },
+    {
+      "type": "blind_1",
+      "target": "gateway",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793436843.7189732,
+      "at_s": 2
+    },
+    {
+      "type": "slow_screening",
+      "target": "screening",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "payments->screening",
+        "latency_ms": 1800,
+        "jitter_ms": 0
+      },
+      "t": 1793436845.7023845,
+      "at_s": 4
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 51544,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793436851.7428894,
+      "at_s": 5
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793436851.8224783,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793436851.9036496,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793436851.9800653,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793436841.728138,
+    "t_alert": 1793436856.9800653,
+    "horizon": 1793436966.9800653,
+    "verdict_t": 1793436977.014318
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

@@ -73,36 +73,62 @@
   "result": {
     "arm": "naive_verify",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.88,
+        "evidence": "Screening p95 is 1822 ms against a 15 ms baseline, and payments logs 'fraud screening timeout via primary ... timeout_s=1.0' while gateway and payments themselves log no other errors. The probe fails at 'payments': 503 screening unavailable (timeout)."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.82,
+        "evidence": "Clearing is 'down (not answering)' and 'process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)'. Its backlog is 18 items, with first item 90 waiting after 0 attempts, so no item crashed it."
+      }
+    ],
     "actions": [
       {
-        "t": 1793426121.6766365,
+        "t": 1793454337.6444175,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793454346.7726533,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: Clearing is 'down (not answering)' and 'process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)'. Its backlog is 18 items, with first item 90 waiting after 0 attempts, so no item crashed it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
       }
     ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "failover on screening: done",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank payment journey has recovered after two faults. One check at 15 s after the fixes ran the main payment journey cleanly.",
+      "background": "The screening primary started timing out, at p95 1822 ms against a 15 ms baseline. This failed 96% of payments through payments and gateway. Separately, the clearing worker exited with code 15, 13 s before assessment, and its queue grew to 18 items.",
+      "assessment": "Screening was slow as a dependency (confidence 0.88): payments logged 'fraud screening timeout via primary ... timeout_s=1.0' and the probe got 503 screening unavailable. The incident commander failed screening over to its standby, and screening is now served by the standby. Clearing's process was down (confidence 0.82), with the first item at 0 attempts so no item crashed it; the incident commander restarted clearing, and it came back.",
+      "recommendation": "Find out why the screening primary slowed and why clearing exited with code 15, then decide when to move screening back to the primary. Confirm the 18 backlogged clearing items, starting with item 90, are processed. Ask operations to review the payments that failed during the screening timeouts for any that need retrying."
     },
-    "t_start": 1793426120.4906547,
-    "t_first_action": 1793426121.6766365,
-    "t_declared": 1793426121.7833433,
+    "t_start": 1793454336.414159,
+    "t_first_action": 1793454337.6444175,
+    "t_declared": 1793454351.3718987,
     "trace": [
       {
         "t": 0.04,
@@ -111,31 +137,31 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 37.6
+          "ms": 38.8
         }
       },
       {
-        "t": 0.13,
+        "t": 0.15,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: clearing",
         "data": {
-          "ms": 88.5
+          "ms": 116.0
         }
       },
       {
-        "t": 1.19,
+        "t": 1.23,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 1059.6
+          "ms": 1075.2
         }
       },
       {
-        "t": 1.19,
+        "t": 1.23,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -168,28 +194,28 @@
               "letter": "B",
               "component": "gateway",
               "severity": "fault",
-              "text": "p95 1039 ms (baseline 60 ms)"
+              "text": "p95 1045 ms (baseline 57 ms)"
             },
             {
               "id": "B2",
               "letter": "B",
               "component": "payments",
               "severity": "fault",
-              "text": "p95 1028 ms (baseline 46 ms)"
+              "text": "p95 1030 ms (baseline 45 ms)"
             },
             {
               "id": "B3",
               "letter": "B",
               "component": "screening",
               "severity": "fault",
-              "text": "p95 1821 ms (baseline 15 ms)"
+              "text": "p95 1822 ms (baseline 15 ms)"
             },
             {
               "id": "B4",
               "letter": "B",
               "component": "clearing",
               "severity": "fault",
-              "text": "backlog: 17 items waiting, oldest 14 s; first item 90 waiting 14 s after 0 attempt(s)"
+              "text": "backlog: 18 items waiting, oldest 14 s; first item 90 waiting 14 s after 0 attempt(s)"
             },
             {
               "id": "C1",
@@ -217,7 +243,7 @@
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments are slow: p95 1039 ms (payments itself answered in 46 ms at baseline)"
+              "text": "calls to payments are slow: p95 1044 ms (payments itself answered in 45 ms at baseline)"
             },
             {
               "id": "D3",
@@ -231,41 +257,41 @@
               "letter": "D",
               "component": "payments",
               "severity": "fault",
-              "text": "calls to screening are slow: p95 1027 ms (screening itself answered in 15 ms at baseline)"
+              "text": "calls to screening are slow: p95 1029 ms (screening itself answered in 15 ms at baseline)"
             },
             {
               "id": "E1",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by scheduler"
+              "text": "7 s ago: stop by scheduler"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by scheduler (release=4.1)"
+              "text": "7 s ago: start by scheduler (release=4.1)"
             },
             {
               "id": "E3",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by operator"
+              "text": "6 s ago: stop by operator"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by operator (release=4.1)"
+              "text": "6 s ago: start by operator (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 1.2,
+        "t": 1.24,
         "phase": "survey",
         "kind": "action",
         "name": "containment",
@@ -281,72 +307,106 @@
         }
       },
       {
-        "t": 1.24,
+        "t": 1.27,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 36.0
+          "ms": 32.6
         }
       },
       {
-        "t": 1.27,
+        "t": 1.3,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "7 log records from payments",
         "data": {
-          "ms": 33.3
+          "ms": 31.8
         }
       },
       {
-        "t": 1.28,
+        "t": 1.32,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from screening",
         "data": {
-          "ms": 10.8
+          "ms": 16.0
         }
       },
       {
-        "t": 1.29,
+        "t": 1.35,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from clearing",
         "data": {
-          "ms": 8.2
+          "ms": 29.3
         }
       },
       {
-        "t": 1.29,
+        "t": 10.36,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 9.011 s"
       },
       {
-        "t": 1.29,
+        "t": 10.99,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 14.04,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 47.8
+        }
+      },
+      {
+        "t": 14.96,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 917.5
+        }
+      },
+      {
+        "t": 14.96,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "single look: clean"
+      },
+      {
+        "t": 14.96,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 1.29,
+        "t": 20.43,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 1.29,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 5.469 s"
       }
     ],
     "calls": [
@@ -354,11 +414,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4162,
+        "output_tokens": 878,
+        "latency_s": 9.011,
+        "estimated_cost_usd": 0.034208,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -366,58 +426,72 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 937,
+        "output_tokens": 390,
+        "latency_s": 5.469,
+        "estimated_cost_usd": 0.011548,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 8,
+    "steps": 11,
     "audit": [
       {
         "event": "act",
-        "t": 1793426121.6766365,
+        "t": 1793454337.6444175,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793454346.7726533,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: Clearing is 'down (not answering)' and 'process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)'. Its backlog is 18 items, with first item 90 waiting after 0 attempts, so no item crashed it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
       }
     ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793426240.18609,
+    "recovered": true,
+    "t": 1793454455.99489,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793426210.186,
-      1793426230.186
+      1793454425.995,
+      1793454445.995
     ],
     "journeys": {
-      "n": 219,
-      "ok": 219,
+      "n": 217,
+      "ok": 217,
       "success_rate": 1.0,
-      "p95_ms": 69.0000057220459,
+      "p95_ms": 72.99995422363281,
       "payments": {
-        "n": 171,
-        "ok": 171
+        "n": 170,
+        "ok": 170
       },
       "balances": {
-        "n": 48,
-        "fresh": 48
+        "n": 47,
+        "fresh": 47
       },
-      "p95_allowed_ms": 321.0
+      "p95_allowed_ms": 319.0
     },
     "slo_ok": true,
     "integrity": {
@@ -427,24 +501,22 @@
       "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
-      "stuck_items": 975,
+      "stuck_items": 0,
       "wrongly_quarantined": 0,
       "stale_reads": 0,
       "for_operations": [],
       "harmful_quarantines": 0,
-      "ok": false
+      "ok": true
     },
-    "reasons": [
-      "975 payments waiting more than 5 s to clear"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793426107.1588242,
-      "until_t": 1793426230.18609,
+      "since_t": 1793454322.9801788,
+      "until_t": 1793454445.99489,
       "breach_seconds": 15.0,
       "failed_journeys": 38,
       "time_to_mitigate_s": 15.0,
       "mitigation_censored": false,
-      "late_clearings": 887,
+      "late_clearings": 55,
       "double_postings": 0,
       "unbalanced_payments": 0
     }
@@ -455,7 +527,7 @@
       "target": "clearing",
       "class": "process_down",
       "detail": {},
-      "t": 1793426107.1588242,
+      "t": 1793454322.9801788,
       "at_s": 0
     },
     {
@@ -467,7 +539,7 @@
         "latency_ms": 1800,
         "jitter_ms": 0
       },
-      "t": 1793426109.1286707,
+      "t": 1793454324.9353883,
       "at_s": 2
     },
     {
@@ -475,7 +547,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793426114.1728618,
+      "t": 1793454329.9919271,
       "at_s": 7
     },
     {
@@ -483,7 +555,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793426115.1857982,
+      "t": 1793454330.9945703,
       "at_s": 8
     }
   ],
@@ -491,7 +563,7 @@
   "telemetry_complete": true,
   "actions": [
     {
-      "t": 1793426121.6932836,
+      "t": 1793454337.649049,
       "params": {
         "to": "standby"
       },
@@ -500,31 +572,54 @@
       "action": "failover",
       "target": "screening",
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793454347.404593,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
     }
   ],
   "audit": [
     {
       "event": "act",
-      "t": 1793426121.6766365,
+      "t": 1793454337.6444175,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793454346.7726533,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "process_down: Clearing is 'down (not answering)' and 'process exited 1 time(s) in 15 min, last 13 s ago (exit code 15)'. Its backlog is 18 items, with first item 90 waiting after 0 attempts, so no item crashed it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
     }
   ],
   "timing": {
-    "t0": 1793426107.1588242,
-    "t_alert": 1793426120.1857982,
-    "horizon": 1793426230.1857982,
-    "verdict_t": 1793426240.2360835
+    "t0": 1793454322.9801788,
+    "t_alert": 1793454335.9945703,
+    "horizon": 1793454445.9945703,
+    "verdict_t": 1793454456.0648918
   },
   "attempt": 1,
   "purpose": "main",

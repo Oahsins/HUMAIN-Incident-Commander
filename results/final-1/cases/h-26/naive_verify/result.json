@@ -1,39 +1,81 @@
 {
   "arm": "naive_verify",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
-  "actions": [],
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "ledger",
+      "class": "lock_held",
+      "confidence": 0.95,
+      "evidence": "[B3] 'lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)'. Payments logs repeat 'ledger write failed: database is locked' and the probe fails with '503 ledger busy'."
+    },
+    {
+      "target": "gateway",
+      "class": "bad_config",
+      "confidence": 0.7,
+      "evidence": "[E1] '14 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)'. A 10-minute balance cache means the balance will not show a just-posted payment, which breaks the payment journey's last step once payments work again."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793455396.5809467,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: [B3] 'lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)'. Payments logs repeat 'ledger write failed: database is locked' and the probe fails with '503 ledger busy'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793455397.678098,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: [E1] '14 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)'. A 10-minute balance cache means the balance will not show a just-posted payment, which breaks the payment journey's last step once payments work again.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ],
   "proposed_actions": [],
   "escalation": null,
   "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "situation": "The bank payment system has recovered. The latest probe of the payment journey passes at every step.",
+    "background": "The reconciliation job held a write lock on the ledger for 11.4 s, so payments failed with 'database is locked' and '503 ledger busy'. Separately, 14 s before the fix an operator raised the gateway balance_cache_ttl_s from 0.5 to 600.0.",
+    "assessment": "The incident commander ended the reconciliation session holding the ledger lock, and payments now write again. It also reverted the gateway balance_cache_ttl_s from 600.0 to 0.5, so balances will show just-posted payments; the recovery check at 32 s was clean.",
+    "recommendation": "No further action is needed; keep monitoring the payment journey, and expect lingering symptoms only from the window before the fixes. Operations should review payments that failed during the lock, check that the interrupted reconciliation batch is rerun, and ask the operator why the cache TTL was changed."
   },
-  "t_start": 1793429866.2641456,
-  "t_first_action": null,
-  "t_declared": 1793429867.7115018,
+  "t_start": 1793455383.9250016,
+  "t_first_action": 1793455396.5809467,
+  "t_declared": 1793455415.467943,
   "trace": [
     {
-      "t": 0.03,
+      "t": 0.05,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 32.6
+        "ms": 51.8
       }
     },
     {
-      "t": 0.17,
+      "t": 0.16,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components",
       "data": {
-        "ms": 141.1
+        "ms": 112.4
       }
     },
     {
@@ -43,7 +85,7 @@
       "name": "probe",
       "summary": "payment journey failed at payments",
       "data": {
-        "ms": 1212.7
+        "ms": 1229.9
       }
     },
     {
@@ -80,21 +122,21 @@
             "letter": "B",
             "component": "gateway",
             "severity": "fault",
-            "text": "p95 1207 ms (baseline 58 ms)"
+            "text": "p95 1207 ms (baseline 64 ms)"
           },
           {
             "id": "B2",
             "letter": "B",
             "component": "payments",
             "severity": "fault",
-            "text": "p95 1200 ms (baseline 46 ms)"
+            "text": "p95 1198 ms (baseline 46 ms)"
           },
           {
             "id": "B3",
             "letter": "B",
             "component": "ledger",
             "severity": "fault",
-            "text": "lock held by session reconciliation (write) for 11.3 s: UPDATE accounts SET ... (reconciliation batch)"
+            "text": "lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)"
           },
           {
             "id": "B4",
@@ -122,7 +164,7 @@
             "letter": "D",
             "component": "gateway",
             "severity": "fault",
-            "text": "calls to payments are slow: p95 1208 ms (payments itself answered in 46 ms at baseline)"
+            "text": "calls to payments are slow: p95 1207 ms (payments itself answered in 46 ms at baseline)"
           },
           {
             "id": "E1",
@@ -136,7 +178,7 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "6 s ago: stop by operator"
+            "text": "7 s ago: stop by operator"
           },
           {
             "id": "E3",
@@ -164,26 +206,16 @@
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: stop by scheduler"
+            "text": "6 s ago: stop by scheduler"
           },
           {
             "id": "E7",
             "letter": "E",
             "component": "screening-standby",
             "severity": "info",
-            "text": "5 s ago: start by scheduler (release=4.1)"
+            "text": "6 s ago: start by scheduler (release=4.1)"
           }
         ]
-      }
-    },
-    {
-      "t": 1.41,
-      "phase": "survey",
-      "kind": "tool",
-      "name": "logs",
-      "summary": "1 log records from gateway",
-      "data": {
-        "ms": 24.7
       }
     },
     {
@@ -191,9 +223,9 @@
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
-      "summary": "7 log records from payments",
+      "summary": "1 log records from gateway",
       "data": {
-        "ms": 11.6
+        "ms": 21.9
       }
     },
     {
@@ -201,38 +233,312 @@
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
+      "summary": "7 log records from payments",
+      "data": {
+        "ms": 33.2
+      }
+    },
+    {
+      "t": 1.47,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
       "summary": "0 log records from ledger",
+      "data": {
+        "ms": 22.1
+      }
+    },
+    {
+      "t": 12.66,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 11.183 s"
+    },
+    {
+      "t": 12.75,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "release_lock",
+      "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+      "data": {
+        "target": "ledger",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 13.77,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "revert_config",
+      "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator))",
+      "data": {
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.87,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 96.0
+      }
+    },
+    {
+      "t": 16.84,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 969.5
+      }
+    },
+    {
+      "t": 16.84,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: not clean; still abnormal: gateway: 11% of requests fail (baseline 0%); payments: 12% of requests fail (baseline 0%); gateway: p95 1178 ms (baseline 64 ms) (+4 more)"
+    },
+    {
+      "t": 16.91,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 71.8
+      }
+    },
+    {
+      "t": 17.87,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 965.4
+      }
+    },
+    {
+      "t": 17.88,
+      "phase": "triage",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "7 fault findings, 16 findings in all, 8 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "31% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "A2",
+            "letter": "A",
+            "component": "payments",
+            "severity": "fault",
+            "text": "32% of requests fail (baseline 0%)"
+          },
+          {
+            "id": "B1",
+            "letter": "B",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "p95 1194 ms (baseline 64 ms)"
+          },
+          {
+            "id": "B2",
+            "letter": "B",
+            "component": "payments",
+            "severity": "fault",
+            "text": "p95 1188 ms (baseline 46 ms)"
+          },
+          {
+            "id": "B3",
+            "letter": "B",
+            "component": "ledger",
+            "severity": "fault",
+            "text": "25 failed writes in the window"
+          },
+          {
+            "id": "D1",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments fail: 34%"
+          },
+          {
+            "id": "D2",
+            "letter": "D",
+            "component": "gateway",
+            "severity": "fault",
+            "text": "calls to payments are slow: p95 1194 ms (payments itself answered in 46 ms at baseline)"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "gateway",
+            "severity": "info",
+            "text": "30 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: stop by operator"
+          },
+          {
+            "id": "E3",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: start by operator (release=4.1)"
+          },
+          {
+            "id": "E4",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: stop by scheduler"
+          },
+          {
+            "id": "E5",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "23 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E6",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "22 s ago: stop by scheduler"
+          },
+          {
+            "id": "E7",
+            "letter": "E",
+            "component": "screening-standby",
+            "severity": "info",
+            "text": "22 s ago: start by scheduler (release=4.1)"
+          },
+          {
+            "id": "E8",
+            "letter": "E",
+            "component": "ledger",
+            "severity": "info",
+            "text": "4 s ago: lock_release by incident-commander (sessions=['reconciliation'])"
+          },
+          {
+            "id": "E9",
+            "letter": "E",
+            "component": "gateway",
+            "severity": "info",
+            "text": "3 s ago: config by incident-commander (key=balance_cache_ttl_s, revert=True, from=600.0, to=0.5)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 17.89,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "1 log records from gateway",
+      "data": {
+        "ms": 14.4
+      }
+    },
+    {
+      "t": 17.91,
+      "phase": "triage",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "12 log records from payments",
       "data": {
         "ms": 24.0
       }
     },
     {
-      "t": 1.45,
+      "t": 17.94,
       "phase": "triage",
-      "kind": "model",
-      "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "kind": "tool",
+      "name": "logs",
+      "summary": "0 log records from ledger",
+      "data": {
+        "ms": 21.9
+      }
     },
     {
-      "t": 1.45,
+      "t": 29.7,
+      "phase": "triage",
+      "kind": "model",
+      "name": "reassess",
+      "summary": "claude-opus-5-5 answered in 11.761 s"
+    },
+    {
+      "t": 29.7,
+      "phase": "triage",
+      "kind": "note",
+      "name": "check",
+      "summary": "nothing new to try and the main journey passes: checking again"
+    },
+    {
+      "t": 30.79,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "8 components",
+      "data": {
+        "ms": 87.9
+      }
+    },
+    {
+      "t": 31.54,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "payment journey ok",
+      "data": {
+        "ms": 757.2
+      }
+    },
+    {
+      "t": 31.54,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "single look: clean"
+    },
+    {
+      "t": 31.54,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "recovered"
     },
     {
-      "t": 1.45,
+      "t": 36.53,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 1.45,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-opus-5-5 answered in 4.986 s"
     }
   ],
   "calls": [
@@ -240,11 +546,23 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3980,
+      "output_tokens": 1058,
+      "latency_s": 11.183,
+      "estimated_cost_usd": 0.03708,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "reassess",
+      "input_tokens": 4504,
+      "output_tokens": 1063,
+      "latency_s": 11.761,
+      "estimated_cost_usd": 0.039276,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -252,15 +570,46 @@
       "provider": "anthropic",
       "model": "claude-opus-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 1078,
+      "output_tokens": 325,
+      "latency_s": 4.986,
+      "estimated_cost_usd": 0.010812,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }
   ],
-  "steps": 6,
-  "audit": []
+  "steps": 17,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793455396.5809467,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: [B3] 'lock held by session reconciliation (write) for 11.4 s: UPDATE accounts SET ... (reconciliation batch)'. Payments logs repeat 'ledger write failed: database is locked' and the probe fails with '503 ledger busy'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793455397.678098,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: [E1] '14 s ago: config by operator (key=balance_cache_ttl_s, from=0.5, to=600.0)'. A 10-minute balance cache means the balance will not show a just-posted payment, which breaks the payment journey's last step once payments work again.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ]
 }

@@ -1,53 +1,69 @@
 {
   "arm": "abcde",
   "mode": "auto",
-  "outcome": "gave_up",
-  "root_causes": [],
+  "outcome": "escalated",
+  "root_causes": [
+    {
+      "target": "network",
+      "class": "external_outage",
+      "confidence": 0.9,
+      "evidence": "[D3] network is down (not answering), [D4] 100% of requests fail (baseline 0%), [D6] p95 2025 ms (baseline 28 ms); clearing log: \"payment network timeout; item stays pending\" (x7). The network is run by another organisation and has no allowed action."
+    }
+  ],
   "actions": [],
   "proposed_actions": [],
-  "escalation": null,
-  "sbar": {
-    "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-    "background": "No cause identified.",
-    "assessment": "No action was taken.",
-    "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+  "escalation": {
+    "components": [
+      "network"
+    ],
+    "class": "external_outage",
+    "reason": "[D3] network is down (not answering), [D4] 100% of requests fail (baseline 0%), [D6] p95 2025 ms (baseline 28 ms); clearing log: \"payment network timeout; item stays pending\" (x7). The network is run by another organisation and has no allowed action.",
+    "urgency": "now",
+    "to": "the organisation that runs network",
+    "ask": "Escalate to the organisation that runs the national payment network: it is down and failing 100% of requests. The bank cannot restart, roll back or fail over this external service. Once it recovers, clearing should drain its 110-item backlog automatically, since the items are waiting and not poisoned."
   },
-  "t_start": 1793439884.2692716,
+  "sbar": {
+    "situation": "The payment journey is failing at clearing because the external national payment network is down and not answering. Escalation to the organisation that runs the network is under way, and recovery is not confirmed.",
+    "background": "The network stopped answering and now fails 100% of requests, against a baseline of 0%. Its p95 latency is 2025 ms, against a baseline of 28 ms. Clearing logged the message \"payment network timeout; item stays pending\" seven times. Clearing is healthy but cannot send items, so its queue has grown to 110 pending. Nothing inside the bank was changed.",
+    "assessment": "The root cause is an external outage on the national payment network, with confidence 0.9. No action the bank is allowed to take can fix the network, so the incident commander escalated it to the organisation that runs it; the commander took these actions itself. The 110 pending items are waiting, not corrupted.",
+    "recommendation": "Confirm the network operator has acknowledged the escalation and track its recovery. Once the network answers again, check that clearing drains the 110-item backlog automatically. Operations should review the delayed payments and any money effects of the 110 pending items."
+  },
+  "t_start": 1793451949.1042047,
   "t_first_action": null,
-  "t_declared": 1793439889.2403195,
+  "t_declared": 1793451960.8755646,
   "trace": [
     {
-      "t": 0.05,
+      "t": 0.04,
       "phase": "survey",
       "kind": "tool",
       "name": "describe",
       "summary": "bank: 8 components",
       "data": {
-        "ms": 48.4
+        "ms": 36.7
       }
     },
     {
-      "t": 1.14,
+      "t": 1.13,
       "phase": "survey",
       "kind": "tool",
       "name": "observe",
       "summary": "8 components; down: network",
       "data": {
-        "ms": 1095.5
+        "ms": 1095.6
       }
     },
     {
-      "t": 4.96,
+      "t": 4.89,
       "phase": "survey",
       "kind": "tool",
       "name": "probe",
       "summary": "payment journey failed at clearing",
       "data": {
-        "ms": 3813.2
+        "ms": 3761.5
       }
     },
     {
-      "t": 4.96,
+      "t": 4.89,
       "phase": "survey",
       "kind": "survey",
       "name": "abcde",
@@ -80,7 +96,7 @@
             "letter": "D",
             "component": "clearing",
             "severity": "fault",
-            "text": "calls to network are slow: p95 2011 ms (network itself answered in 29 ms at baseline)"
+            "text": "calls to network are slow: p95 2025 ms (network itself answered in 28 ms at baseline)"
           },
           {
             "id": "D3",
@@ -108,7 +124,7 @@
             "letter": "D",
             "component": "network",
             "severity": "fault",
-            "text": "p95 2011 ms (baseline 29 ms) (run by another organisation)"
+            "text": "p95 2025 ms (baseline 28 ms) (run by another organisation)"
           },
           {
             "id": "E1",
@@ -142,42 +158,42 @@
       }
     },
     {
-      "t": 4.97,
+      "t": 4.92,
       "phase": "survey",
       "kind": "tool",
       "name": "logs",
       "summary": "8 log records from clearing",
       "data": {
-        "ms": 13.5
+        "ms": 24.0
       }
     },
     {
-      "t": 4.97,
+      "t": 11.77,
       "phase": "triage",
       "kind": "model",
       "name": "assess",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+      "summary": "claude-haiku-5-5 answered in 6.852 s"
     },
     {
-      "t": 4.97,
+      "t": 11.77,
+      "phase": "remediate",
+      "kind": "note",
+      "name": "escalate",
+      "summary": "escalate network (now) to the organisation that runs network"
+    },
+    {
+      "t": 11.77,
       "phase": "hand_over",
       "kind": "note",
       "name": "outcome",
-      "summary": "gave_up"
+      "summary": "escalated"
     },
     {
-      "t": 4.97,
+      "t": 15.62,
       "phase": "hand_over",
       "kind": "model",
       "name": "sbar",
-      "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-    },
-    {
-      "t": 4.97,
-      "phase": "hand_over",
-      "kind": "note",
-      "name": "sbar",
-      "summary": "handover written from the template"
+      "summary": "claude-haiku-5-5 answered in 3.847 s"
     }
   ],
   "calls": [
@@ -185,11 +201,11 @@
       "provider": "anthropic",
       "model": "claude-haiku-5-5",
       "purpose": "assess",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 3685,
+      "output_tokens": 1247,
+      "latency_s": 6.852,
+      "estimated_cost_usd": 0.000992,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     },
@@ -197,11 +213,11 @@
       "provider": "anthropic",
       "model": "claude-haiku-5-5",
       "purpose": "sbar",
-      "input_tokens": null,
-      "output_tokens": null,
-      "latency_s": 0.0,
-      "estimated_cost_usd": null,
-      "status": "failed",
+      "input_tokens": 847,
+      "output_tokens": 373,
+      "latency_s": 3.847,
+      "estimated_cost_usd": 0.000271,
+      "status": "ok",
       "error": null,
       "cost_basis": "standard API token prices; excludes hardware and other services"
     }

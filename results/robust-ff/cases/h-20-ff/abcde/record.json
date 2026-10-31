@@ -117,36 +117,102 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.9,
+        "evidence": "B3 screening p95 1822 ms (baseline 15 ms), and payments logs show 'fraud screening timeout via primary ... timeout_s=1.0'. The probe fails at 'payments': 503 screening unavailable (timeout)."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "C1 clearing down (not answering); C2 exited with exit code 15 16 s ago; B4 backlog of 32 items, first item 100 at 0 attempts. Item 100 was never attempted, so it is not poison."
+      },
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.8,
+        "evidence": "B5: 'lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)', which blocks payment postings."
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config",
+        "confidence": 0.7,
+        "evidence": "E1: config by scheduler, balance_cache_ttl_s changed from 0.5 to 600.0, 14 s ago. Balances would stay stale for 10 minutes, so the journey step 'balance shows it' will fail; this is hidden for now because payments are failing upstream."
+      }
+    ],
     "actions": [
       {
-        "t": 1793437311.306533,
+        "t": 1793451187.1457858,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1039 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793451202.0215225,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: B5: 'lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)', which blocks payment postings.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793451203.1566699,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E1: config by scheduler, balance_cache_ttl_s changed from 0.5 to 600.0, 14 s ago. Balances would stay stale for 10 minutes, so the journey step 'balance shows it' will fail; this is hidden for now because payments are failing upstream.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      },
+      {
+        "t": 1793451204.163141,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: C1 clearing down (not answering); C2 exited with exit code 15 16 s ago; B4 backlog of 32 items, first item 100 at 0 attempts. Item 100 was never attempted, so it is not poison.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
       }
     ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "failover on screening: done",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank payment journey has recovered. Two recovery checks ran the main journey and read every component's metrics, and the last two were clean, at 31 s.",
+      "background": "Primary fraud screening slowed to a p95 of 1822 ms (baseline 15 ms), so payments failed with '503 screening unavailable (timeout)'. The clearing worker exited with code 15, a reconciliation session held a write lock on the ledger, and a scheduler raised the gateway balance_cache_ttl_s from 0.5 to 600.0 s.",
+      "assessment": "The incident commander took every action itself. It restated the failover of screening to standby, and screening is now served by standby. It ended the reconciliation session holding the ledger lock, reverted gateway balance_cache_ttl_s from 600.0 to 0.5, and restarted clearing, and each of these actions succeeded.",
+      "recommendation": "Confirm payments logs now show screening target=standby rather than primary, find out why primary screening slowed, and stop the scheduler from changing balance_cache_ttl_s again. Ask operations to check that clearing processed its backlog of 32 items, starting at item 100, and that the reconciliation batch interrupted on the ledger is rerun and balances reconcile."
     },
-    "t_start": 1793437310.1030753,
-    "t_first_action": 1793437311.306533,
-    "t_declared": 1793437311.3761454,
+    "t_start": 1793451185.936775,
+    "t_first_action": 1793451187.1457858,
+    "t_declared": 1793451216.6716435,
     "trace": [
       {
         "t": 0.05,
@@ -155,7 +221,7 @@
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 49.5
+          "ms": 53.2
         }
       },
       {
@@ -165,21 +231,21 @@
         "name": "observe",
         "summary": "8 components; down: clearing",
         "data": {
-          "ms": 97.8
+          "ms": 97.0
         }
       },
       {
-        "t": 1.2,
+        "t": 1.21,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 1055.9
+          "ms": 1058.5
         }
       },
       {
-        "t": 1.2,
+        "t": 1.21,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -191,7 +257,7 @@
               "letter": "A",
               "component": "gateway",
               "severity": "fault",
-              "text": "93% of requests fail (baseline 0%)"
+              "text": "94% of requests fail (baseline 0%)"
             },
             {
               "id": "A2",
@@ -212,14 +278,14 @@
               "letter": "B",
               "component": "gateway",
               "severity": "fault",
-              "text": "p95 1046 ms (baseline 53 ms)"
+              "text": "p95 1043 ms (baseline 62 ms)"
             },
             {
               "id": "B2",
               "letter": "B",
               "component": "payments",
               "severity": "fault",
-              "text": "p95 1042 ms (baseline 44 ms)"
+              "text": "p95 1029 ms (baseline 47 ms)"
             },
             {
               "id": "B3",
@@ -240,7 +306,7 @@
               "letter": "B",
               "component": "ledger",
               "severity": "fault",
-              "text": "lock held by session reconciliation (write) for 10.5 s: UPDATE accounts SET ... (reconciliation batch)"
+              "text": "lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)"
             },
             {
               "id": "C1",
@@ -275,7 +341,7 @@
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments are slow: p95 1045 ms (payments itself answered in 44 ms at baseline)"
+              "text": "calls to payments are slow: p95 1043 ms (payments itself answered in 47 ms at baseline)"
             },
             {
               "id": "D3",
@@ -289,7 +355,7 @@
               "letter": "D",
               "component": "payments",
               "severity": "fault",
-              "text": "calls to screening are slow: p95 1039 ms (screening itself answered in 15 ms at baseline)"
+              "text": "calls to screening are slow: p95 1027 ms (screening itself answered in 15 ms at baseline)"
             },
             {
               "id": "E1",
@@ -317,34 +383,34 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by ops-maintenance"
+              "text": "6 s ago: stop by ops-maintenance"
             },
             {
               "id": "E5",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by ops-maintenance (release=4.1)"
+              "text": "6 s ago: start by ops-maintenance (release=4.1)"
             },
             {
               "id": "E6",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by operator"
+              "text": "6 s ago: stop by operator"
             },
             {
               "id": "E7",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: start by operator (release=4.1)"
+              "text": "6 s ago: start by operator (release=4.1)"
             }
           ]
         }
       },
       {
-        "t": 1.21,
+        "t": 1.23,
         "phase": "survey",
         "kind": "action",
         "name": "containment",
@@ -360,72 +426,163 @@
         }
       },
       {
-        "t": 1.22,
+        "t": 1.24,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 11.6
+          "ms": 14.6
         }
       },
       {
-        "t": 1.23,
+        "t": 1.26,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "7 log records from payments",
         "data": {
-          "ms": 9.5
+          "ms": 20.6
         }
       },
       {
-        "t": 1.24,
+        "t": 1.29,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from screening",
         "data": {
-          "ms": 11.1
+          "ms": 29.1
         }
       },
       {
-        "t": 1.27,
+        "t": 1.32,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from clearing",
         "data": {
-          "ms": 32.1
+          "ms": 32.5
         }
       },
       {
-        "t": 1.27,
+        "t": 16.08,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 14.759 s"
       },
       {
-        "t": 1.27,
+        "t": 16.22,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 17.23,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "revert_config gateway: done (gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler))",
+        "data": {
+          "target": "gateway",
+          "params": {
+            "key": "balance_cache_ttl_s"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 18.84,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 24.93,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 85.6
+        }
+      },
+      {
+        "t": 25.72,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 790.0
+        }
+      },
+      {
+        "t": 25.72,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 29.83,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 111.3
+        }
+      },
+      {
+        "t": 30.73,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 906.9
+        }
+      },
+      {
+        "t": 30.73,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 30.73,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 1.27,
+        "t": 36.2,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 1.27,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 5.46 s"
       }
     ],
     "calls": [
@@ -433,11 +590,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4350,
+        "output_tokens": 1498,
+        "latency_s": 14.759,
+        "estimated_cost_usd": 0.04736,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -445,60 +602,104 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1312,
+        "output_tokens": 416,
+        "latency_s": 5.46,
+        "estimated_cost_usd": 0.013568,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 8,
+    "steps": 15,
     "audit": [
       {
         "event": "act",
-        "t": 1793437311.306533,
+        "t": 1793451187.1457858,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1039 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793451202.0215225,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: B5: 'lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)', which blocks payment postings.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793451203.1566699,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "bad_config: E1: config by scheduler, balance_cache_ttl_s changed from 0.5 to 600.0, 14 s ago. Balances would stay stale for 10 minutes, so the journey step 'balance shows it' will fail; this is hidden for now because payments are failing upstream.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+      },
+      {
+        "event": "act",
+        "t": 1793451204.163141,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "process_down: C1 clearing down (not answering); C2 exited with exit code 15 16 s ago; B4 backlog of 32 items, first item 100 at 0 attempts. Item 100 was never attempted, so it is not poison.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
       }
     ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793437429.8018367,
+    "recovered": true,
+    "t": 1793451305.5307417,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793437399.802,
-      1793437419.802
+      1793451275.531,
+      1793451295.531
     ],
     "journeys": {
-      "n": 61,
-      "ok": 2,
-      "success_rate": 0.0328,
-      "p95_ms": null,
+      "n": 225,
+      "ok": 225,
+      "success_rate": 1.0,
+      "p95_ms": 75.99997520446777,
       "payments": {
-        "n": 49,
-        "ok": 0
+        "n": 173,
+        "ok": 173
       },
       "balances": {
-        "n": 12,
-        "fresh": 2
+        "n": 52,
+        "fresh": 52
       },
-      "p95_allowed_ms": 320.0
+      "p95_allowed_ms": 321.0
     },
-    "slo_ok": false,
+    "slo_ok": true,
     "integrity": {
       "money_conserved": true,
       "balances_match_postings": true,
@@ -506,24 +707,21 @@
       "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
-      "stuck_items": 32,
+      "stuck_items": 0,
       "wrongly_quarantined": 0,
-      "stale_reads": 10,
+      "stale_reads": 0,
       "for_operations": [],
       "harmful_quarantines": 0,
-      "ok": false
+      "ok": true
     },
-    "reasons": [
-      "59 of 61 customer journeys failed (49 payments, 10 balance reads)",
-      "32 payments waiting more than 5 s to clear"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793437294.5920773,
-      "until_t": 1793437419.8018367,
-      "breach_seconds": 125.0,
-      "failed_journeys": 409,
-      "time_to_mitigate_s": 125.2,
-      "mitigation_censored": true,
+      "since_t": 1793451170.2555625,
+      "until_t": 1793451295.5307417,
+      "breach_seconds": 35.0,
+      "failed_journeys": 97,
+      "time_to_mitigate_s": 35.0,
+      "mitigation_censored": false,
       "late_clearings": 32,
       "double_postings": 0,
       "unbalanced_payments": 0
@@ -535,7 +733,7 @@
       "target": "clearing",
       "class": "process_down",
       "detail": {},
-      "t": 1793437294.5920773,
+      "t": 1793451170.2555625,
       "at_s": 0
     },
     {
@@ -545,7 +743,7 @@
       "detail": {
         "key": "balance_cache_ttl_s"
       },
-      "t": 1793437296.5355253,
+      "t": 1793451172.2219858,
       "at_s": 2
     },
     {
@@ -557,7 +755,7 @@
         "latency_ms": 1800,
         "jitter_ms": 0
       },
-      "t": 1793437298.5524373,
+      "t": 1793451174.2301753,
       "at_s": 4
     },
     {
@@ -565,11 +763,11 @@
       "target": "ledger",
       "class": "lock_held",
       "detail": {
-        "holder_pid": 59220,
+        "holder_pid": 64828,
         "hold_s": 420.0,
         "holding": true
       },
-      "t": 1793437304.59791,
+      "t": 1793451180.2662828,
       "at_s": 5
     },
     {
@@ -577,7 +775,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793437304.6817403,
+      "t": 1793451180.335387,
       "at_s": 6
     },
     {
@@ -585,7 +783,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793437304.753301,
+      "t": 1793451180.42949,
       "at_s": 7
     },
     {
@@ -593,7 +791,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793437304.8015034,
+      "t": 1793451180.530143,
       "at_s": 8
     }
   ],
@@ -601,7 +799,7 @@
   "telemetry_complete": true,
   "actions": [
     {
-      "t": 1793437311.3102522,
+      "t": 1793451187.1623857,
       "params": {
         "to": "standby"
       },
@@ -610,31 +808,104 @@
       "action": "failover",
       "target": "screening",
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793451202.1533644,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793451203.1608016,
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "gateway",
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+    },
+    {
+      "t": 1793451204.7741213,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
     }
   ],
   "audit": [
     {
       "event": "act",
-      "t": 1793437311.306533,
+      "t": 1793451187.1457858,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1039 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1027 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793451202.0215225,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: B5: 'lock held by session reconciliation (write) for 10.6 s: UPDATE accounts SET ... (reconciliation batch)', which blocks payment postings.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793451203.1566699,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "bad_config: E1: config by scheduler, balance_cache_ttl_s changed from 0.5 to 600.0, 14 s ago. Balances would stay stale for 10 minutes, so the journey step 'balance shows it' will fail; this is hidden for now because payments are failing upstream.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by scheduler)"
+    },
+    {
+      "event": "act",
+      "t": 1793451204.163141,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "process_down: C1 clearing down (not answering); C2 exited with exit code 15 16 s ago; B4 backlog of 32 items, first item 100 at 0 attempts. Item 100 was never attempted, so it is not poison.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
     }
   ],
   "timing": {
-    "t0": 1793437294.5920773,
-    "t_alert": 1793437309.8015034,
-    "horizon": 1793437419.8015034,
-    "verdict_t": 1793437429.847076
+    "t0": 1793451170.2555625,
+    "t_alert": 1793451185.530143,
+    "horizon": 1793451295.530143,
+    "verdict_t": 1793451305.577632
   },
   "attempt": 1,
   "purpose": "main",

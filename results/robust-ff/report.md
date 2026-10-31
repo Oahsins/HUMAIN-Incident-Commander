@@ -17,13 +17,13 @@
 
 The scripted runbook uses no AI. Where it ties or wins, that is reported here first.
 
-> The runbook wins on 9/20 (95% Wilson 25.8%–65.8%) paired cases and ties on 11/20 (95% Wilson 34.2%–74.2%). Runbook wins: h-01-ff, h-03-ff, h-04-ff, h-07-ff, h-08-ff, h-15-ff, h-16-ff, h-21-ff, h-29-ff.
+> The runbook wins on 0/20 (95% Wilson 0.0%–16.1%) paired cases and ties on 10/20 (95% Wilson 29.9%–70.1%).
 
 | Family | Comparison | Endpoint | Pairs | b | c | Difference [95% CI] | p | p (adjusted) | Method |
 |---|---|---|---|---|---|---|---|---|---|
-| descriptive | ABCDE vs runbook | case success | 20 | 0 | 9 | -45 pts [-65 pts to -25 pts] | unavailable | unavailable | Paired bootstrap |
-| descriptive | ABCDE vs runbook, named held-out or blind | case success | 13 | 0 | 2 | -15 pts [-38 pts to +0 pts] | unavailable | unavailable | Paired bootstrap |
-| descriptive | ABCDE vs runbook | user-impact seconds | 20 | unavailable | unavailable | +70.2 s [+50.2 s to +89.2 s] | unavailable | unavailable | Paired bootstrap |
+| descriptive | ABCDE vs runbook | case success | 20 | 10 | 0 | +50 pts [+30 pts to +70 pts] | unavailable | unavailable | Paired bootstrap |
+| descriptive | ABCDE vs runbook, named held-out or blind | case success | 13 | 10 | 0 | +77 pts [+54 pts to +100 pts] | unavailable | unavailable | Paired bootstrap |
+| descriptive | ABCDE vs runbook | user-impact seconds | 20 | unavailable | unavailable | -9.8 s [-32.8 s to +11.5 s] | unavailable | unavailable | Paired bootstrap |
 | descriptive | runbook: condition vs main | case success | 20 | 0 | 0 | +0 pts [+0 pts to +0 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
 
 b: pairs where the endpoint is present for the first-named arm and absent for the second; c: the reverse. For case success, b counts pairs only the first arm succeeded on. For false all-clear (lower is better), b counts pairs where only the first arm made the false claim, so a larger b is worse for the first arm. Difference is first minus second: percentage points for rates, seconds for user impact. Rows without b, c or an interval (such as the Wilcoxon test on user-impact seconds) show unavailable.
@@ -34,12 +34,12 @@ Arms are compared only on identical cases. Rows marked descriptive (or with no f
 
 | Family | Comparison | Endpoint | Pairs | b | c | Difference [95% CI] | p | p (adjusted) | Method |
 |---|---|---|---|---|---|---|---|---|---|
-| descriptive | ABCDE vs runbook | case success | 20 | 0 | 9 | -45 pts [-65 pts to -25 pts] | unavailable | unavailable | Paired bootstrap |
-| descriptive | ABCDE vs runbook, named held-out or blind | case success | 13 | 0 | 2 | -15 pts [-38 pts to +0 pts] | unavailable | unavailable | Paired bootstrap |
+| descriptive | ABCDE vs runbook | case success | 20 | 10 | 0 | +50 pts [+30 pts to +70 pts] | unavailable | unavailable | Paired bootstrap |
+| descriptive | ABCDE vs runbook, named held-out or blind | case success | 13 | 10 | 0 | +77 pts [+54 pts to +100 pts] | unavailable | unavailable | Paired bootstrap |
 | descriptive | ABCDE vs ReAct | case success | 0 | 0 | 0 | unavailable [unavailable] | unavailable | unavailable | Paired bootstrap |
 | descriptive | ABCDE vs naive verification | false all-clear | 0 | 0 | 0 | unavailable [unavailable] | unavailable | unavailable | Paired bootstrap |
-| descriptive | ABCDE vs runbook | user-impact seconds | 20 | unavailable | unavailable | +70.2 s [+50.2 s to +89.2 s] | unavailable | unavailable | Paired bootstrap |
-| descriptive | abcde: condition vs main | case success | 20 | 0 | 3 | -15 pts [-30 pts to +0 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
+| descriptive | ABCDE vs runbook | user-impact seconds | 20 | unavailable | unavailable | -9.8 s [-32.8 s to +11.5 s] | unavailable | unavailable | Paired bootstrap |
+| descriptive | abcde: condition vs main | case success | 20 | 0 | 1 | -5 pts [-15 pts to +0 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
 | descriptive | noop: condition vs main | case success | 20 | 0 | 3 | -15 pts [-30 pts to +0 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
 | descriptive | oracle: condition vs main | case success | 20 | 3 | 0 | +15 pts [+0 pts to +30 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
 | descriptive | runbook: condition vs main | case success | 20 | 0 | 0 | +0 pts [+0 pts to +0 pts] | unavailable | unavailable | Paired bootstrap, paired by source_id/system/arm |
@@ -62,15 +62,15 @@ Dot = estimate; line = 95% interval. The tables below hold every number in the c
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/20 | 0% | 0%–16% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 19/20 | 95% | 76%–99% |
 | Case success (primary endpoint) | Scripted runbook (no AI) | valid cases with an observed success verdict | 9/20 | 45% | 26%–66% |
 | Case success (primary endpoint) | No-op (reference) | valid cases with an observed success verdict | 0/20 | 0% | 0%–16% |
 | Case success (primary endpoint) | Oracle (reference) | valid cases with an observed success verdict | 20/20 | 100% | 84%–100% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/18 | 0% | 0%–18% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 18/18 | 100% | 82%–100% |
 | Recovery (checker says recovered) | Scripted runbook (no AI) | fixable cases with a checker verdict | 7/18 | 39% | 20%–61% |
 | Recovery (checker says recovered) | No-op (reference) | fixable cases with a checker verdict | 0/18 | 0% | 0%–18% |
 | Recovery (checker says recovered) | Oracle (reference) | fixable cases with a checker verdict | 18/18 | 100% | 82%–100% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/17 | 0% | 0%–18% |
 | False all-clear (lower is better) | Scripted runbook (no AI) | all-clear claims with a checker verdict | 0/7 | 0% | 0%–35% |
 | False all-clear (lower is better) | No-op (reference) | all-clear claims with a checker verdict | 20/20 | 100% | 84%–100% |
 | False all-clear (lower is better) | Oracle (reference) | all-clear claims with a checker verdict | 0/18 | 0% | 0%–18% |
@@ -82,7 +82,7 @@ Dot = estimate; line = 95% interval. The tables below hold every number in the c
 | Harmful action (lower is better) | Scripted runbook (no AI) | valid cases with observed harm status | 0/20 | 0% | 0%–16% |
 | Harmful action (lower is better) | No-op (reference) | valid cases with observed harm status | 0/20 | 0% | 0%–16% |
 | Harmful action (lower is better) | Oracle (reference) | valid cases with observed harm status | 0/20 | 0% | 0%–16% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 18/20 | 90% | 70%–97% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 16/20 | 80% | 58%–92% |
 | Handover complete | Scripted runbook (no AI) | valid cases with operations handover evidence | 16/20 | 80% | 58%–92% |
 | Handover complete | No-op (reference) | valid cases with operations handover evidence | 18/20 | 90% | 70%–97% |
 | Handover complete | Oracle (reference) | valid cases with operations handover evidence | 12/20 | 60% | 39%–78% |
@@ -90,23 +90,23 @@ Dot = estimate; line = 95% interval. The tables below hold every number in the c
 | False diagnosis on healthy cases (lower is better) | Scripted runbook (no AI) | valid healthy cases | 0/0 (not estimable) | — | — |
 | False diagnosis on healthy cases (lower is better) | No-op (reference) | valid healthy cases | 0/0 (not estimable) | — | — |
 | False diagnosis on healthy cases (lower is better) | Oracle (reference) | valid healthy cases | 0/0 (not estimable) | — | — |
-| Correct escalation | ABCDE agent | valid must-escalate cases | 0/2 | 0% | 0%–66% |
+| Correct escalation | ABCDE agent | valid must-escalate cases | 2/2 | 100% | 34%–100% |
 | Correct escalation | Scripted runbook (no AI) | valid must-escalate cases | 2/2 | 100% | 34%–100% |
 | Correct escalation | No-op (reference) | valid must-escalate cases | 0/2 | 0% | 0%–66% |
 | Correct escalation | Oracle (reference) | valid must-escalate cases | 2/2 | 100% | 34%–100% |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 80/81 | 99% | 93%–100% |
 | Root-cause precision | Scripted runbook (no AI) | reported root-cause pairs after acceptable secondary pairs are ignored | 66/68 | 97% | 90%–99% |
 | Root-cause precision | No-op (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
 | Root-cause precision | Oracle (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 80/80 | 100% | 95%–100% |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/80 | 0% | 0%–5% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 80/80 | 100% | 95%–100% |
 | Root-cause recall | Scripted runbook (no AI) | labelled root-cause pairs | 66/80 | 82% | 73%–89% |
 | Root-cause recall | No-op (reference) | labelled root-cause pairs | 0/80 | 0% | 0%–5% |
 | Root-cause recall | Oracle (reference) | labelled root-cause pairs | 80/80 | 100% | 95%–100% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/8 | 0% | 0%–32% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/89 | 0% | 0%–4% |
 | Harmful-action attempts (lower is better) | Scripted runbook (no AI) | guard-audited action attempts | 0/77 | 0% | 0%–5% |
 | Harmful-action attempts (lower is better) | No-op (reference) | guard-audited action attempts | 0/0 (not estimable) | — | — |
 | Harmful-action attempts (lower is better) | Oracle (reference) | guard-audited action attempts | 0/84 | 0% | 0%–4% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 20/20 | 100% | 84%–100% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/20 | 0% | 0%–16% |
 | Mitigation still unresolved at the horizon (lower is better) | Scripted runbook (no AI) | valid cases with an observed mitigation censoring flag | 3/20 | 15% | 5%–36% |
 | Mitigation still unresolved at the horizon (lower is better) | No-op (reference) | valid cases with an observed mitigation censoring flag | 20/20 | 100% | 84%–100% |
 | Mitigation still unresolved at the horizon (lower is better) | Oracle (reference) | valid cases with an observed mitigation censoring flag | 0/20 | 0% | 0%–16% |
@@ -115,47 +115,47 @@ Dot = estimate; line = 95% interval. The tables below hold every number in the c
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 20 | 127.0 s | 125.8 s–128.2 s |
+| User-impact seconds (lower is better) | ABCDE agent | 20 | 47.0 s | 42.2 s–51.5 s |
 | User-impact seconds (lower is better) | Scripted runbook (no AI) | 20 | 56.8 s | 37.8 s–76.5 s |
 | User-impact seconds (lower is better) | No-op (reference) | 20 | 127.0 s | 126.0 s–128.0 s |
 | User-impact seconds (lower is better) | Oracle (reference) | 20 | 19.8 s | 18.5 s–21.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 20 | 124.8 s; censored 20/20 (100%; Wilson 95% 84%–100%) | 124.4 s–125.1 s |
+| Time to mitigate (lower is better) | ABCDE agent | 20 | 47.2 s; censored 0/20 (0%; Wilson 95% 0%–16%) | 42.5 s–52.0 s |
 | Time to mitigate (lower is better) | Scripted runbook (no AI) | 20 | 56.9 s; censored 3/20 (15%; Wilson 95% 5%–36%) | 38.1 s–76.6 s |
 | Time to mitigate (lower is better) | No-op (reference) | 20 | 124.8 s; censored 20/20 (100%; Wilson 95% 84%–100%) | 124.4 s–125.1 s |
 | Time to mitigate (lower is better) | Oracle (reference) | 20 | 20.0 s; censored 0/20 (0%; Wilson 95% 0%–16%) | 18.8 s–21.2 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 20 | 752.9 | 586.7–920.8 |
+| Failed user journeys per case (lower is better) | ABCDE agent | 20 | 208.6 | 166.8–251.7 |
 | Failed user journeys per case (lower is better) | Scripted runbook (no AI) | 20 | 187.7 | 138.9–241.3 |
 | Failed user journeys per case (lower is better) | No-op (reference) | 20 | 758.5 | 595.4–923.0 |
 | Failed user journeys per case (lower is better) | Oracle (reference) | 20 | 90.2 | 69.7–112.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 20 | 11,531 | 10,120–12,937 |
 | Model tokens per case | Scripted runbook (no AI) | 20 | 0 | 0–0 |
 | Model tokens per case | No-op (reference) | 20 | 0 | 0–0 |
 | Model tokens per case | Oracle (reference) | 20 | 0 | 0–0 |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model input tokens per case | ABCDE agent | 20 | 9,146 | 7,922–10,370 |
 | Model input tokens per case | Scripted runbook (no AI) | 20 | 0 | 0–0 |
 | Model input tokens per case | No-op (reference) | 20 | 0 | 0–0 |
 | Model input tokens per case | Oracle (reference) | 20 | 0 | 0–0 |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model output tokens per case | ABCDE agent | 20 | 2,386 | 2,184–2,591 |
 | Model output tokens per case | Scripted runbook (no AI) | 20 | 0 | 0–0 |
 | Model output tokens per case | No-op (reference) | 20 | 0 | 0–0 |
 | Model output tokens per case | Oracle (reference) | 20 | 0 | 0–0 |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model cost per case (USD) | ABCDE agent | 20 | $0.0843 | $0.0756–$0.0931 |
 | Model cost per case (USD) | Scripted runbook (no AI) | 20 | $0 | $0–$0 |
 | Model cost per case (USD) | No-op (reference) | 20 | $0 | $0–$0 |
 | Model cost per case (USD) | Oracle (reference) | 20 | $0 | $0–$0 |
-| Model calls per case | ABCDE agent | 20 | 2.0 | 2.0–2.0 |
+| Model calls per case | ABCDE agent | 20 | 2.8 | 2.5–3.0 |
 | Model calls per case | Scripted runbook (no AI) | 20 | 0.0 | 0.0–0.0 |
 | Model calls per case | No-op (reference) | 20 | 0.0 | 0.0–0.0 |
 | Model calls per case | Oracle (reference) | 20 | 0.0 | 0.0–0.0 |
-| Root-cause F1 | ABCDE agent | 20 | 0.00 | 0.00–0.00 |
+| Root-cause F1 | ABCDE agent | 20 | 0.99 | 0.98–1.00 |
 | Root-cause F1 | Scripted runbook (no AI) | 20 | 0.88 | 0.83–0.93 |
 | Root-cause F1 | No-op (reference) | 20 | 0.00 | 0.00–0.00 |
 | Root-cause F1 | Oracle (reference) | 20 | 1.00 | 1.00–1.00 |
-| Successful actions per case | ABCDE agent | 20 | 0.4 | 0.2–0.6 |
+| Successful actions per case | ABCDE agent | 20 | 4.5 | 4.2–4.7 |
 | Successful actions per case | Scripted runbook (no AI) | 20 | 3.3 | 3.0–3.6 |
 | Successful actions per case | No-op (reference) | 20 | 0.0 | 0.0–0.0 |
 | Successful actions per case | Oracle (reference) | 20 | 4.2 | 4.0–4.5 |
-| Wasted actions per case (lower is better) | ABCDE agent | 20 | 0.0 | 0.0–0.0 |
+| Wasted actions per case (lower is better) | ABCDE agent | 20 | 0.1 | 0.0–0.2 |
 | Wasted actions per case (lower is better) | Scripted runbook (no AI) | 20 | 0.1 | 0.0–0.2 |
 | Wasted actions per case (lower is better) | No-op (reference) | 20 | 0.0 | 0.0–0.0 |
 | Wasted actions per case (lower is better) | Oracle (reference) | 20 | 0.0 | 0.0–0.0 |
@@ -286,7 +286,7 @@ Cases: ABCDE agent n = 2, Scripted runbook (no AI) n = 2, No-op (reference) n = 
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/2 | 0% | 0%–66% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 2/2 | 100% | 34%–100% |
 | Case success (primary endpoint) | Scripted runbook (no AI) | valid cases with an observed success verdict | 2/2 | 100% | 34%–100% |
 | Case success (primary endpoint) | No-op (reference) | valid cases with an observed success verdict | 0/2 | 0% | 0%–66% |
 | Case success (primary endpoint) | Oracle (reference) | valid cases with an observed success verdict | 2/2 | 100% | 34%–100% |
@@ -314,23 +314,23 @@ Cases: ABCDE agent n = 2, Scripted runbook (no AI) n = 2, No-op (reference) n = 
 | False diagnosis on healthy cases (lower is better) | Scripted runbook (no AI) | valid healthy cases | 0/0 (not estimable) | — | — |
 | False diagnosis on healthy cases (lower is better) | No-op (reference) | valid healthy cases | 0/0 (not estimable) | — | — |
 | False diagnosis on healthy cases (lower is better) | Oracle (reference) | valid healthy cases | 0/0 (not estimable) | — | — |
-| Correct escalation | ABCDE agent | valid must-escalate cases | 0/2 | 0% | 0%–66% |
+| Correct escalation | ABCDE agent | valid must-escalate cases | 2/2 | 100% | 34%–100% |
 | Correct escalation | Scripted runbook (no AI) | valid must-escalate cases | 2/2 | 100% | 34%–100% |
 | Correct escalation | No-op (reference) | valid must-escalate cases | 0/2 | 0% | 0%–66% |
 | Correct escalation | Oracle (reference) | valid must-escalate cases | 2/2 | 100% | 34%–100% |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 8/8 | 100% | 68%–100% |
 | Root-cause precision | Scripted runbook (no AI) | reported root-cause pairs after acceptable secondary pairs are ignored | 8/10 | 80% | 49%–94% |
 | Root-cause precision | No-op (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
 | Root-cause precision | Oracle (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 8/8 | 100% | 68%–100% |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/8 | 0% | 0%–32% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 8/8 | 100% | 68%–100% |
 | Root-cause recall | Scripted runbook (no AI) | labelled root-cause pairs | 8/8 | 100% | 68%–100% |
 | Root-cause recall | No-op (reference) | labelled root-cause pairs | 0/8 | 0% | 0%–32% |
 | Root-cause recall | Oracle (reference) | labelled root-cause pairs | 8/8 | 100% | 68%–100% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/0 (not estimable) | — | — |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/8 | 0% | 0%–32% |
 | Harmful-action attempts (lower is better) | Scripted runbook (no AI) | guard-audited action attempts | 0/8 | 0% | 0%–32% |
 | Harmful-action attempts (lower is better) | No-op (reference) | guard-audited action attempts | 0/0 (not estimable) | — | — |
 | Harmful-action attempts (lower is better) | Oracle (reference) | guard-audited action attempts | 0/6 | 0% | 0%–39% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 2/2 | 100% | 34%–100% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/2 | 0% | 0%–66% |
 | Mitigation still unresolved at the horizon (lower is better) | Scripted runbook (no AI) | valid cases with an observed mitigation censoring flag | 0/2 | 0% | 0%–66% |
 | Mitigation still unresolved at the horizon (lower is better) | No-op (reference) | valid cases with an observed mitigation censoring flag | 2/2 | 100% | 34%–100% |
 | Mitigation still unresolved at the horizon (lower is better) | Oracle (reference) | valid cases with an observed mitigation censoring flag | 0/2 | 0% | 0%–66% |
@@ -339,47 +339,47 @@ Cases: ABCDE agent n = 2, Scripted runbook (no AI) n = 2, No-op (reference) n = 
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 2 | 130.0 s | 130.0 s–130.0 s |
+| User-impact seconds (lower is better) | ABCDE agent | 2 | 60.0 s | 60.0 s–60.0 s |
 | User-impact seconds (lower is better) | Scripted runbook (no AI) | 2 | 30.0 s | 30.0 s–30.0 s |
 | User-impact seconds (lower is better) | No-op (reference) | 2 | 130.0 s | 130.0 s–130.0 s |
 | User-impact seconds (lower is better) | Oracle (reference) | 2 | 20.0 s | 20.0 s–20.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 2 | 125.2 s; censored 2/2 (100%; Wilson 95% 34%–100%) | 125.2 s–125.2 s |
+| Time to mitigate (lower is better) | ABCDE agent | 2 | 60.0 s; censored 0/2 (0%; Wilson 95% 0%–66%) | 60.0 s–60.0 s |
 | Time to mitigate (lower is better) | Scripted runbook (no AI) | 2 | 30.0 s; censored 0/2 (0%; Wilson 95% 0%–66%) | 30.0 s–30.0 s |
 | Time to mitigate (lower is better) | No-op (reference) | 2 | 125.2 s; censored 2/2 (100%; Wilson 95% 34%–100%) | 125.2 s–125.3 s |
 | Time to mitigate (lower is better) | Oracle (reference) | 2 | 20.0 s; censored 0/2 (0%; Wilson 95% 0%–66%) | 20.0 s–20.0 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 2 | 1,067.5 | 1,062.0–1,073.0 |
+| Failed user journeys per case (lower is better) | ABCDE agent | 2 | 321.5 | 309.0–334.0 |
 | Failed user journeys per case (lower is better) | Scripted runbook (no AI) | 2 | 162.0 | 159.0–165.0 |
 | Failed user journeys per case (lower is better) | No-op (reference) | 2 | 1,067.0 | 1,061.0–1,073.0 |
 | Failed user journeys per case (lower is better) | Oracle (reference) | 2 | 119.0 | 116.0–122.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 2 | 14,060 | 13,875–14,246 |
 | Model tokens per case | Scripted runbook (no AI) | 2 | 0 | 0–0 |
 | Model tokens per case | No-op (reference) | 2 | 0 | 0–0 |
 | Model tokens per case | Oracle (reference) | 2 | 0 | 0–0 |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model input tokens per case | ABCDE agent | 2 | 11,292 | 11,249–11,334 |
 | Model input tokens per case | Scripted runbook (no AI) | 2 | 0 | 0–0 |
 | Model input tokens per case | No-op (reference) | 2 | 0 | 0–0 |
 | Model input tokens per case | Oracle (reference) | 2 | 0 | 0–0 |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model output tokens per case | ABCDE agent | 2 | 2,769 | 2,626–2,912 |
 | Model output tokens per case | Scripted runbook (no AI) | 2 | 0 | 0–0 |
 | Model output tokens per case | No-op (reference) | 2 | 0 | 0–0 |
 | Model output tokens per case | Oracle (reference) | 2 | 0 | 0–0 |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model cost per case (USD) | ABCDE agent | 2 | $0.1005 | $0.0975–$0.1036 |
 | Model cost per case (USD) | Scripted runbook (no AI) | 2 | $0 | $0–$0 |
 | Model cost per case (USD) | No-op (reference) | 2 | $0 | $0–$0 |
 | Model cost per case (USD) | Oracle (reference) | 2 | $0 | $0–$0 |
-| Model calls per case | ABCDE agent | 2 | 2.0 | 2.0–2.0 |
+| Model calls per case | ABCDE agent | 2 | 3.0 | 3.0–3.0 |
 | Model calls per case | Scripted runbook (no AI) | 2 | 0.0 | 0.0–0.0 |
 | Model calls per case | No-op (reference) | 2 | 0.0 | 0.0–0.0 |
 | Model calls per case | Oracle (reference) | 2 | 0.0 | 0.0–0.0 |
-| Root-cause F1 | ABCDE agent | 2 | 0.00 | 0.00–0.00 |
+| Root-cause F1 | ABCDE agent | 2 | 1.00 | 1.00–1.00 |
 | Root-cause F1 | Scripted runbook (no AI) | 2 | 0.89 | 0.89–0.89 |
 | Root-cause F1 | No-op (reference) | 2 | 0.00 | 0.00–0.00 |
 | Root-cause F1 | Oracle (reference) | 2 | 1.00 | 1.00–1.00 |
-| Successful actions per case | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
+| Successful actions per case | ABCDE agent | 2 | 4.0 | 4.0–4.0 |
 | Successful actions per case | Scripted runbook (no AI) | 2 | 4.0 | 4.0–4.0 |
 | Successful actions per case | No-op (reference) | 2 | 0.0 | 0.0–0.0 |
 | Successful actions per case | Oracle (reference) | 2 | 3.0 | 3.0–3.0 |
-| Wasted actions per case (lower is better) | ABCDE agent | 2 | 0.0 | 0.0–0.0 |
+| Wasted actions per case (lower is better) | ABCDE agent | 2 | 1.0 | 1.0–1.0 |
 | Wasted actions per case (lower is better) | Scripted runbook (no AI) | 2 | 1.0 | 1.0–1.0 |
 | Wasted actions per case (lower is better) | No-op (reference) | 2 | 0.0 | 0.0–0.0 |
 | Wasted actions per case (lower is better) | Oracle (reference) | 2 | 0.0 | 0.0–0.0 |
@@ -396,15 +396,15 @@ Cases: ABCDE agent n = 5, Scripted runbook (no AI) n = 5, No-op (reference) n = 
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/5 | 0% | 0%–43% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 5/5 | 100% | 57%–100% |
 | Case success (primary endpoint) | Scripted runbook (no AI) | valid cases with an observed success verdict | 5/5 | 100% | 57%–100% |
 | Case success (primary endpoint) | No-op (reference) | valid cases with an observed success verdict | 0/5 | 0% | 0%–43% |
 | Case success (primary endpoint) | Oracle (reference) | valid cases with an observed success verdict | 5/5 | 100% | 57%–100% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/5 | 0% | 0%–43% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 5/5 | 100% | 57%–100% |
 | Recovery (checker says recovered) | Scripted runbook (no AI) | fixable cases with a checker verdict | 5/5 | 100% | 57%–100% |
 | Recovery (checker says recovered) | No-op (reference) | fixable cases with a checker verdict | 0/5 | 0% | 0%–43% |
 | Recovery (checker says recovered) | Oracle (reference) | fixable cases with a checker verdict | 5/5 | 100% | 57%–100% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/5 | 0% | 0%–43% |
 | False all-clear (lower is better) | Scripted runbook (no AI) | all-clear claims with a checker verdict | 0/5 | 0% | 0%–43% |
 | False all-clear (lower is better) | No-op (reference) | all-clear claims with a checker verdict | 5/5 | 100% | 57%–100% |
 | False all-clear (lower is better) | Oracle (reference) | all-clear claims with a checker verdict | 0/5 | 0% | 0%–43% |
@@ -428,19 +428,19 @@ Cases: ABCDE agent n = 5, Scripted runbook (no AI) n = 5, No-op (reference) n = 
 | Correct escalation | Scripted runbook (no AI) | valid must-escalate cases | 0/0 (not estimable) | — | — |
 | Correct escalation | No-op (reference) | valid must-escalate cases | 0/0 (not estimable) | — | — |
 | Correct escalation | Oracle (reference) | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 20/20 | 100% | 84%–100% |
 | Root-cause precision | Scripted runbook (no AI) | reported root-cause pairs after acceptable secondary pairs are ignored | 20/20 | 100% | 84%–100% |
 | Root-cause precision | No-op (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
 | Root-cause precision | Oracle (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 20/20 | 100% | 84%–100% |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/20 | 0% | 0%–16% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 20/20 | 100% | 84%–100% |
 | Root-cause recall | Scripted runbook (no AI) | labelled root-cause pairs | 20/20 | 100% | 84%–100% |
 | Root-cause recall | No-op (reference) | labelled root-cause pairs | 0/20 | 0% | 0%–16% |
 | Root-cause recall | Oracle (reference) | labelled root-cause pairs | 20/20 | 100% | 84%–100% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/0 (not estimable) | — | — |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/20 | 0% | 0%–16% |
 | Harmful-action attempts (lower is better) | Scripted runbook (no AI) | guard-audited action attempts | 0/20 | 0% | 0%–16% |
 | Harmful-action attempts (lower is better) | No-op (reference) | guard-audited action attempts | 0/0 (not estimable) | — | — |
 | Harmful-action attempts (lower is better) | Oracle (reference) | guard-audited action attempts | 0/20 | 0% | 0%–16% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 5/5 | 100% | 57%–100% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/5 | 0% | 0%–43% |
 | Mitigation still unresolved at the horizon (lower is better) | Scripted runbook (no AI) | valid cases with an observed mitigation censoring flag | 0/5 | 0% | 0%–43% |
 | Mitigation still unresolved at the horizon (lower is better) | No-op (reference) | valid cases with an observed mitigation censoring flag | 5/5 | 100% | 57%–100% |
 | Mitigation still unresolved at the horizon (lower is better) | Oracle (reference) | valid cases with an observed mitigation censoring flag | 0/5 | 0% | 0%–43% |
@@ -449,43 +449,43 @@ Cases: ABCDE agent n = 5, Scripted runbook (no AI) n = 5, No-op (reference) n = 
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 5 | 126.0 s | 125.0 s–128.0 s |
+| User-impact seconds (lower is better) | ABCDE agent | 5 | 55.0 s | 52.0 s–58.0 s |
 | User-impact seconds (lower is better) | Scripted runbook (no AI) | 5 | 26.0 s | 25.0 s–28.0 s |
 | User-impact seconds (lower is better) | No-op (reference) | 5 | 126.0 s | 125.0 s–128.0 s |
 | User-impact seconds (lower is better) | Oracle (reference) | 5 | 19.0 s | 17.0 s–20.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 5 | 124.2 s; censored 5/5 (100%; Wilson 95% 57%–100%) | 123.1 s–124.9 s |
+| Time to mitigate (lower is better) | ABCDE agent | 5 | 55.0 s; censored 0/5 (0%; Wilson 95% 0%–43%) | 52.0 s–58.0 s |
 | Time to mitigate (lower is better) | Scripted runbook (no AI) | 5 | 26.0 s; censored 0/5 (0%; Wilson 95% 0%–43%) | 25.0 s–28.0 s |
 | Time to mitigate (lower is better) | No-op (reference) | 5 | 124.2 s; censored 5/5 (100%; Wilson 95% 57%–100%) | 123.1 s–124.9 s |
 | Time to mitigate (lower is better) | Oracle (reference) | 5 | 19.0 s; censored 0/5 (0%; Wilson 95% 0%–43%) | 17.0 s–20.0 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 5 | 1,035.4 | 1,010.2–1,055.8 |
+| Failed user journeys per case (lower is better) | ABCDE agent | 5 | 279.4 | 250.0–304.8 |
 | Failed user journeys per case (lower is better) | Scripted runbook (no AI) | 5 | 133.4 | 112.2–145.4 |
 | Failed user journeys per case (lower is better) | No-op (reference) | 5 | 1,035.0 | 1,009.8–1,055.2 |
 | Failed user journeys per case (lower is better) | Oracle (reference) | 5 | 110.0 | 89.0–122.8 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 5 | 13,877 | 12,716–16,022 |
 | Model tokens per case | Scripted runbook (no AI) | 5 | 0 | 0–0 |
 | Model tokens per case | No-op (reference) | 5 | 0 | 0–0 |
 | Model tokens per case | Oracle (reference) | 5 | 0 | 0–0 |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model input tokens per case | ABCDE agent | 5 | 11,255 | 10,283–13,139 |
 | Model input tokens per case | Scripted runbook (no AI) | 5 | 0 | 0–0 |
 | Model input tokens per case | No-op (reference) | 5 | 0 | 0–0 |
 | Model input tokens per case | Oracle (reference) | 5 | 0 | 0–0 |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model output tokens per case | ABCDE agent | 5 | 2,622 | 2,435–2,878 |
 | Model output tokens per case | Scripted runbook (no AI) | 5 | 0 | 0–0 |
 | Model output tokens per case | No-op (reference) | 5 | 0 | 0–0 |
 | Model output tokens per case | Oracle (reference) | 5 | 0 | 0–0 |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model cost per case (USD) | ABCDE agent | 5 | $0.0975 | $0.0898–$0.1101 |
 | Model cost per case (USD) | Scripted runbook (no AI) | 5 | $0 | $0–$0 |
 | Model cost per case (USD) | No-op (reference) | 5 | $0 | $0–$0 |
 | Model cost per case (USD) | Oracle (reference) | 5 | $0 | $0–$0 |
-| Model calls per case | ABCDE agent | 5 | 2.0 | 2.0–2.0 |
+| Model calls per case | ABCDE agent | 5 | 3.2 | 3.0–3.6 |
 | Model calls per case | Scripted runbook (no AI) | 5 | 0.0 | 0.0–0.0 |
 | Model calls per case | No-op (reference) | 5 | 0.0 | 0.0–0.0 |
 | Model calls per case | Oracle (reference) | 5 | 0.0 | 0.0–0.0 |
-| Root-cause F1 | ABCDE agent | 5 | 0.00 | 0.00–0.00 |
+| Root-cause F1 | ABCDE agent | 5 | 1.00 | 1.00–1.00 |
 | Root-cause F1 | Scripted runbook (no AI) | 5 | 1.00 | 1.00–1.00 |
 | Root-cause F1 | No-op (reference) | 5 | 0.00 | 0.00–0.00 |
 | Root-cause F1 | Oracle (reference) | 5 | 1.00 | 1.00–1.00 |
-| Successful actions per case | ABCDE agent | 5 | 0.0 | 0.0–0.0 |
+| Successful actions per case | ABCDE agent | 5 | 4.0 | 4.0–4.0 |
 | Successful actions per case | Scripted runbook (no AI) | 5 | 4.0 | 4.0–4.0 |
 | Successful actions per case | No-op (reference) | 5 | 0.0 | 0.0–0.0 |
 | Successful actions per case | Oracle (reference) | 5 | 4.0 | 4.0–4.0 |
@@ -506,15 +506,15 @@ Cases: ABCDE agent n = 12, Scripted runbook (no AI) n = 12, No-op (reference) n 
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/12 | 0% | 0%–24% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 11/12 | 92% | 65%–99% |
 | Case success (primary endpoint) | Scripted runbook (no AI) | valid cases with an observed success verdict | 1/12 | 8% | 1%–35% |
 | Case success (primary endpoint) | No-op (reference) | valid cases with an observed success verdict | 0/12 | 0% | 0%–24% |
 | Case success (primary endpoint) | Oracle (reference) | valid cases with an observed success verdict | 12/12 | 100% | 76%–100% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/12 | 0% | 0%–24% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 12/12 | 100% | 76%–100% |
 | Recovery (checker says recovered) | Scripted runbook (no AI) | fixable cases with a checker verdict | 1/12 | 8% | 1%–35% |
 | Recovery (checker says recovered) | No-op (reference) | fixable cases with a checker verdict | 0/12 | 0% | 0%–24% |
 | Recovery (checker says recovered) | Oracle (reference) | fixable cases with a checker verdict | 12/12 | 100% | 76%–100% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/11 | 0% | 0%–26% |
 | False all-clear (lower is better) | Scripted runbook (no AI) | all-clear claims with a checker verdict | 0/1 | 0% | 0%–79% |
 | False all-clear (lower is better) | No-op (reference) | all-clear claims with a checker verdict | 12/12 | 100% | 76%–100% |
 | False all-clear (lower is better) | Oracle (reference) | all-clear claims with a checker verdict | 0/12 | 0% | 0%–24% |
@@ -526,7 +526,7 @@ Cases: ABCDE agent n = 12, Scripted runbook (no AI) n = 12, No-op (reference) n 
 | Harmful action (lower is better) | Scripted runbook (no AI) | valid cases with observed harm status | 0/12 | 0% | 0%–24% |
 | Harmful action (lower is better) | No-op (reference) | valid cases with observed harm status | 0/12 | 0% | 0%–24% |
 | Harmful action (lower is better) | Oracle (reference) | valid cases with observed harm status | 0/12 | 0% | 0%–24% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 10/12 | 83% | 55%–95% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 8/12 | 67% | 39%–86% |
 | Handover complete | Scripted runbook (no AI) | valid cases with operations handover evidence | 8/12 | 67% | 39%–86% |
 | Handover complete | No-op (reference) | valid cases with operations handover evidence | 10/12 | 83% | 55%–95% |
 | Handover complete | Oracle (reference) | valid cases with operations handover evidence | 4/12 | 33% | 14%–61% |
@@ -538,19 +538,19 @@ Cases: ABCDE agent n = 12, Scripted runbook (no AI) n = 12, No-op (reference) n 
 | Correct escalation | Scripted runbook (no AI) | valid must-escalate cases | 0/0 (not estimable) | — | — |
 | Correct escalation | No-op (reference) | valid must-escalate cases | 0/0 (not estimable) | — | — |
 | Correct escalation | Oracle (reference) | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 48/49 | 98% | 89%–100% |
 | Root-cause precision | Scripted runbook (no AI) | reported root-cause pairs after acceptable secondary pairs are ignored | 34/34 | 100% | 90%–100% |
 | Root-cause precision | No-op (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
 | Root-cause precision | Oracle (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 48/48 | 100% | 93%–100% |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/48 | 0% | 0%–7% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 48/48 | 100% | 93%–100% |
 | Root-cause recall | Scripted runbook (no AI) | labelled root-cause pairs | 34/48 | 71% | 57%–82% |
 | Root-cause recall | No-op (reference) | labelled root-cause pairs | 0/48 | 0% | 0%–7% |
 | Root-cause recall | Oracle (reference) | labelled root-cause pairs | 48/48 | 100% | 93%–100% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/8 | 0% | 0%–32% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/57 | 0% | 0%–6% |
 | Harmful-action attempts (lower is better) | Scripted runbook (no AI) | guard-audited action attempts | 0/45 | 0% | 0%–8% |
 | Harmful-action attempts (lower is better) | No-op (reference) | guard-audited action attempts | 0/0 (not estimable) | — | — |
 | Harmful-action attempts (lower is better) | Oracle (reference) | guard-audited action attempts | 0/54 | 0% | 0%–7% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 12/12 | 100% | 76%–100% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/12 | 0% | 0%–24% |
 | Mitigation still unresolved at the horizon (lower is better) | Scripted runbook (no AI) | valid cases with an observed mitigation censoring flag | 3/12 | 25% | 9%–53% |
 | Mitigation still unresolved at the horizon (lower is better) | No-op (reference) | valid cases with an observed mitigation censoring flag | 12/12 | 100% | 76%–100% |
 | Mitigation still unresolved at the horizon (lower is better) | Oracle (reference) | valid cases with an observed mitigation censoring flag | 0/12 | 0% | 0%–24% |
@@ -559,43 +559,43 @@ Cases: ABCDE agent n = 12, Scripted runbook (no AI) n = 12, No-op (reference) n 
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 12 | 127.5 s | 126.2 s–128.8 s |
+| User-impact seconds (lower is better) | ABCDE agent | 12 | 41.2 s | 35.8 s–47.5 s |
 | User-impact seconds (lower is better) | Scripted runbook (no AI) | 12 | 76.2 s | 49.6 s–101.7 s |
 | User-impact seconds (lower is better) | No-op (reference) | 12 | 127.1 s | 125.8 s–128.3 s |
 | User-impact seconds (lower is better) | Oracle (reference) | 12 | 20.0 s | 17.9 s–22.1 s |
-| Time to mitigate (lower is better) | ABCDE agent | 12 | 125.0 s; censored 12/12 (100%; Wilson 95% 76%–100%) | 124.6 s–125.2 s |
+| Time to mitigate (lower is better) | ABCDE agent | 12 | 41.2 s; censored 0/12 (0%; Wilson 95% 0%–24%) | 35.8 s–47.5 s |
 | Time to mitigate (lower is better) | Scripted runbook (no AI) | 12 | 76.1 s; censored 3/12 (25%; Wilson 95% 9%–53%) | 49.6 s–101.3 s |
 | Time to mitigate (lower is better) | No-op (reference) | 12 | 125.0 s; censored 12/12 (100%; Wilson 95% 76%–100%) | 124.6 s–125.2 s |
 | Time to mitigate (lower is better) | Oracle (reference) | 12 | 20.4 s; censored 0/12 (0%; Wilson 95% 0%–24%) | 18.8 s–22.1 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 12 | 623.2 | 410.4–864.1 |
+| Failed user journeys per case (lower is better) | ABCDE agent | 12 | 166.0 | 114.5–225.0 |
 | Failed user journeys per case (lower is better) | Scripted runbook (no AI) | 12 | 222.5 | 142.2–304.3 |
 | Failed user journeys per case (lower is better) | No-op (reference) | 12 | 632.6 | 425.2–868.8 |
 | Failed user journeys per case (lower is better) | Oracle (reference) | 12 | 81.3 | 51.8–114.8 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 12 | 10,123 | 8,406–12,084 |
 | Model tokens per case | Scripted runbook (no AI) | 12 | 0 | 0–0 |
 | Model tokens per case | No-op (reference) | 12 | 0 | 0–0 |
 | Model tokens per case | Oracle (reference) | 12 | 0 | 0–0 |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model input tokens per case | ABCDE agent | 12 | 7,885 | 6,411–9,561 |
 | Model input tokens per case | Scripted runbook (no AI) | 12 | 0 | 0–0 |
 | Model input tokens per case | No-op (reference) | 12 | 0 | 0–0 |
 | Model input tokens per case | Oracle (reference) | 12 | 0 | 0–0 |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model output tokens per case | ABCDE agent | 12 | 2,238 | 1,977–2,544 |
 | Model output tokens per case | Scripted runbook (no AI) | 12 | 0 | 0–0 |
 | Model output tokens per case | No-op (reference) | 12 | 0 | 0–0 |
 | Model output tokens per case | Oracle (reference) | 12 | 0 | 0–0 |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model cost per case (USD) | ABCDE agent | 12 | $0.0763 | $0.0654–$0.0889 |
 | Model cost per case (USD) | Scripted runbook (no AI) | 12 | $0 | $0–$0 |
 | Model cost per case (USD) | No-op (reference) | 12 | $0 | $0–$0 |
 | Model cost per case (USD) | Oracle (reference) | 12 | $0 | $0–$0 |
-| Model calls per case | ABCDE agent | 12 | 2.0 | 2.0–2.0 |
+| Model calls per case | ABCDE agent | 12 | 2.5 | 2.2–2.9 |
 | Model calls per case | Scripted runbook (no AI) | 12 | 0.0 | 0.0–0.0 |
 | Model calls per case | No-op (reference) | 12 | 0.0 | 0.0–0.0 |
 | Model calls per case | Oracle (reference) | 12 | 0.0 | 0.0–0.0 |
-| Root-cause F1 | ABCDE agent | 12 | 0.00 | 0.00–0.00 |
+| Root-cause F1 | ABCDE agent | 12 | 0.99 | 0.97–1.00 |
 | Root-cause F1 | Scripted runbook (no AI) | 12 | 0.82 | 0.76–0.88 |
 | Root-cause F1 | No-op (reference) | 12 | 0.00 | 0.00–0.00 |
 | Root-cause F1 | Oracle (reference) | 12 | 1.00 | 1.00–1.00 |
-| Successful actions per case | ABCDE agent | 12 | 0.7 | 0.4–0.9 |
+| Successful actions per case | ABCDE agent | 12 | 4.8 | 4.4–5.1 |
 | Successful actions per case | Scripted runbook (no AI) | 12 | 2.8 | 2.5–3.2 |
 | Successful actions per case | No-op (reference) | 12 | 0.0 | 0.0–0.0 |
 | Successful actions per case | Oracle (reference) | 12 | 4.5 | 4.2–4.8 |
@@ -616,15 +616,15 @@ Cases: ABCDE agent n = 3, Scripted runbook (no AI) n = 3, No-op (reference) n = 
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/3 | 0% | 0%–56% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 2/3 | 67% | 21%–94% |
 | Case success (primary endpoint) | Scripted runbook (no AI) | valid cases with an observed success verdict | 1/3 | 33% | 6%–79% |
 | Case success (primary endpoint) | No-op (reference) | valid cases with an observed success verdict | 0/3 | 0% | 0%–56% |
 | Case success (primary endpoint) | Oracle (reference) | valid cases with an observed success verdict | 3/3 | 100% | 44%–100% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/3 | 0% | 0%–56% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 3/3 | 100% | 44%–100% |
 | Recovery (checker says recovered) | Scripted runbook (no AI) | fixable cases with a checker verdict | 1/3 | 33% | 6%–79% |
 | Recovery (checker says recovered) | No-op (reference) | fixable cases with a checker verdict | 0/3 | 0% | 0%–56% |
 | Recovery (checker says recovered) | Oracle (reference) | fixable cases with a checker verdict | 3/3 | 100% | 44%–100% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/2 | 0% | 0%–66% |
 | False all-clear (lower is better) | Scripted runbook (no AI) | all-clear claims with a checker verdict | 0/1 | 0% | 0%–79% |
 | False all-clear (lower is better) | No-op (reference) | all-clear claims with a checker verdict | 3/3 | 100% | 44%–100% |
 | False all-clear (lower is better) | Oracle (reference) | all-clear claims with a checker verdict | 0/3 | 0% | 0%–56% |
@@ -636,7 +636,7 @@ Cases: ABCDE agent n = 3, Scripted runbook (no AI) n = 3, No-op (reference) n = 
 | Harmful action (lower is better) | Scripted runbook (no AI) | valid cases with observed harm status | 0/3 | 0% | 0%–56% |
 | Harmful action (lower is better) | No-op (reference) | valid cases with observed harm status | 0/3 | 0% | 0%–56% |
 | Harmful action (lower is better) | Oracle (reference) | valid cases with observed harm status | 0/3 | 0% | 0%–56% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 3/3 | 100% | 44%–100% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 2/3 | 67% | 21%–94% |
 | Handover complete | Scripted runbook (no AI) | valid cases with operations handover evidence | 2/3 | 67% | 21%–94% |
 | Handover complete | No-op (reference) | valid cases with operations handover evidence | 3/3 | 100% | 44%–100% |
 | Handover complete | Oracle (reference) | valid cases with operations handover evidence | 2/3 | 67% | 21%–94% |
@@ -648,19 +648,19 @@ Cases: ABCDE agent n = 3, Scripted runbook (no AI) n = 3, No-op (reference) n = 
 | Correct escalation | Scripted runbook (no AI) | valid must-escalate cases | 0/0 (not estimable) | — | — |
 | Correct escalation | No-op (reference) | valid must-escalate cases | 0/0 (not estimable) | — | — |
 | Correct escalation | Oracle (reference) | valid must-escalate cases | 0/0 (not estimable) | — | — |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 12/12 | 100% | 76%–100% |
 | Root-cause precision | Scripted runbook (no AI) | reported root-cause pairs after acceptable secondary pairs are ignored | 10/10 | 100% | 72%–100% |
 | Root-cause precision | No-op (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
 | Root-cause precision | Oracle (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 12/12 | 100% | 76%–100% |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/12 | 0% | 0%–24% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 12/12 | 100% | 76%–100% |
 | Root-cause recall | Scripted runbook (no AI) | labelled root-cause pairs | 10/12 | 83% | 55%–95% |
 | Root-cause recall | No-op (reference) | labelled root-cause pairs | 0/12 | 0% | 0%–24% |
 | Root-cause recall | Oracle (reference) | labelled root-cause pairs | 12/12 | 100% | 76%–100% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/0 (not estimable) | — | — |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/13 | 0% | 0%–23% |
 | Harmful-action attempts (lower is better) | Scripted runbook (no AI) | guard-audited action attempts | 0/12 | 0% | 0%–24% |
 | Harmful-action attempts (lower is better) | No-op (reference) | guard-audited action attempts | 0/0 (not estimable) | — | — |
 | Harmful-action attempts (lower is better) | Oracle (reference) | guard-audited action attempts | 0/13 | 0% | 0%–23% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 3/3 | 100% | 44%–100% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/3 | 0% | 0%–56% |
 | Mitigation still unresolved at the horizon (lower is better) | Scripted runbook (no AI) | valid cases with an observed mitigation censoring flag | 0/3 | 0% | 0%–56% |
 | Mitigation still unresolved at the horizon (lower is better) | No-op (reference) | valid cases with an observed mitigation censoring flag | 3/3 | 100% | 44%–100% |
 | Mitigation still unresolved at the horizon (lower is better) | Oracle (reference) | valid cases with an observed mitigation censoring flag | 0/3 | 0% | 0%–56% |
@@ -669,43 +669,43 @@ Cases: ABCDE agent n = 3, Scripted runbook (no AI) n = 3, No-op (reference) n = 
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 3 | 125.0 s | 120.0 s–130.0 s |
+| User-impact seconds (lower is better) | ABCDE agent | 3 | 55.0 s | 50.0 s–60.0 s |
 | User-impact seconds (lower is better) | Scripted runbook (no AI) | 3 | 33.3 s | 30.0 s–40.0 s |
 | User-impact seconds (lower is better) | No-op (reference) | 3 | 126.7 s | 125.0 s–130.0 s |
 | User-impact seconds (lower is better) | Oracle (reference) | 3 | 18.3 s | 15.0 s–20.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 3 | 125.2 s; censored 3/3 (100%; Wilson 95% 44%–100%) | 125.2 s–125.3 s |
+| Time to mitigate (lower is better) | ABCDE agent | 3 | 56.7 s; censored 0/3 (0%; Wilson 95% 0%–56%) | 55.0 s–60.0 s |
 | Time to mitigate (lower is better) | Scripted runbook (no AI) | 3 | 35.0 s; censored 0/3 (0%; Wilson 95% 0%–56%) | 30.0 s–40.0 s |
 | Time to mitigate (lower is better) | No-op (reference) | 3 | 125.2 s; censored 3/3 (100%; Wilson 95% 44%–100%) | 125.2 s–125.3 s |
 | Time to mitigate (lower is better) | Oracle (reference) | 3 | 20.0 s; censored 0/3 (0%; Wilson 95% 0%–56%) | 20.0 s–20.0 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 3 | 262.0 | 258.0–268.0 |
+| Failed user journeys per case (lower is better) | ABCDE agent | 3 | 132.3 | 129.0–139.0 |
 | Failed user journeys per case (lower is better) | Scripted runbook (no AI) | 3 | 78.0 | 67.0–93.0 |
 | Failed user journeys per case (lower is better) | No-op (reference) | 3 | 262.3 | 258.0–269.0 |
 | Failed user journeys per case (lower is better) | Oracle (reference) | 3 | 36.0 | 27.0–41.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 3 | 13,524 | 11,641–17,088 |
 | Model tokens per case | Scripted runbook (no AI) | 3 | 0 | 0–0 |
 | Model tokens per case | No-op (reference) | 3 | 0 | 0–0 |
 | Model tokens per case | Oracle (reference) | 3 | 0 | 0–0 |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model input tokens per case | ABCDE agent | 3 | 10,925 | 9,439–13,750 |
 | Model input tokens per case | Scripted runbook (no AI) | 3 | 0 | 0–0 |
 | Model input tokens per case | No-op (reference) | 3 | 0 | 0–0 |
 | Model input tokens per case | Oracle (reference) | 3 | 0 | 0–0 |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model output tokens per case | ABCDE agent | 3 | 2,599 | 2,202–3,338 |
 | Model output tokens per case | Scripted runbook (no AI) | 3 | 0 | 0–0 |
 | Model output tokens per case | No-op (reference) | 3 | 0 | 0–0 |
 | Model output tokens per case | Oracle (reference) | 3 | 0 | 0–0 |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model cost per case (USD) | ABCDE agent | 3 | $0.0957 | $0.0818–$0.1218 |
 | Model cost per case (USD) | Scripted runbook (no AI) | 3 | $0 | $0–$0 |
 | Model cost per case (USD) | No-op (reference) | 3 | $0 | $0–$0 |
 | Model cost per case (USD) | Oracle (reference) | 3 | $0 | $0–$0 |
-| Model calls per case | ABCDE agent | 3 | 2.0 | 2.0–2.0 |
+| Model calls per case | ABCDE agent | 3 | 3.3 | 3.0–4.0 |
 | Model calls per case | Scripted runbook (no AI) | 3 | 0.0 | 0.0–0.0 |
 | Model calls per case | No-op (reference) | 3 | 0.0 | 0.0–0.0 |
 | Model calls per case | Oracle (reference) | 3 | 0.0 | 0.0–0.0 |
-| Root-cause F1 | ABCDE agent | 3 | 0.00 | 0.00–0.00 |
+| Root-cause F1 | ABCDE agent | 3 | 1.00 | 1.00–1.00 |
 | Root-cause F1 | Scripted runbook (no AI) | 3 | 0.90 | 0.86–1.00 |
 | Root-cause F1 | No-op (reference) | 3 | 0.00 | 0.00–0.00 |
 | Root-cause F1 | Oracle (reference) | 3 | 1.00 | 1.00–1.00 |
-| Successful actions per case | ABCDE agent | 3 | 0.0 | 0.0–0.0 |
+| Successful actions per case | ABCDE agent | 3 | 4.3 | 4.0–5.0 |
 | Successful actions per case | Scripted runbook (no AI) | 3 | 3.3 | 3.0–4.0 |
 | Successful actions per case | No-op (reference) | 3 | 0.0 | 0.0–0.0 |
 | Successful actions per case | Oracle (reference) | 3 | 4.3 | 4.0–5.0 |
@@ -1056,15 +1056,15 @@ Cases: ABCDE agent n = 20, Scripted runbook (no AI) n = 20, No-op (reference) n 
 
 | Metric | Arm | N counts | n/N | Estimate | Wilson 95% |
 |---|---|---|---|---|---|
-| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 0/20 | 0% | 0%–16% |
+| Case success (primary endpoint) | ABCDE agent | valid cases with an observed success verdict | 19/20 | 95% | 76%–99% |
 | Case success (primary endpoint) | Scripted runbook (no AI) | valid cases with an observed success verdict | 9/20 | 45% | 26%–66% |
 | Case success (primary endpoint) | No-op (reference) | valid cases with an observed success verdict | 0/20 | 0% | 0%–16% |
 | Case success (primary endpoint) | Oracle (reference) | valid cases with an observed success verdict | 20/20 | 100% | 84%–100% |
-| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 0/18 | 0% | 0%–18% |
+| Recovery (checker says recovered) | ABCDE agent | fixable cases with a checker verdict | 18/18 | 100% | 82%–100% |
 | Recovery (checker says recovered) | Scripted runbook (no AI) | fixable cases with a checker verdict | 7/18 | 39% | 20%–61% |
 | Recovery (checker says recovered) | No-op (reference) | fixable cases with a checker verdict | 0/18 | 0% | 0%–18% |
 | Recovery (checker says recovered) | Oracle (reference) | fixable cases with a checker verdict | 18/18 | 100% | 82%–100% |
-| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/0 (not estimable) | — | — |
+| False all-clear (lower is better) | ABCDE agent | all-clear claims with a checker verdict | 0/17 | 0% | 0%–18% |
 | False all-clear (lower is better) | Scripted runbook (no AI) | all-clear claims with a checker verdict | 0/7 | 0% | 0%–35% |
 | False all-clear (lower is better) | No-op (reference) | all-clear claims with a checker verdict | 20/20 | 100% | 84%–100% |
 | False all-clear (lower is better) | Oracle (reference) | all-clear claims with a checker verdict | 0/18 | 0% | 0%–18% |
@@ -1076,7 +1076,7 @@ Cases: ABCDE agent n = 20, Scripted runbook (no AI) n = 20, No-op (reference) n 
 | Harmful action (lower is better) | Scripted runbook (no AI) | valid cases with observed harm status | 0/20 | 0% | 0%–16% |
 | Harmful action (lower is better) | No-op (reference) | valid cases with observed harm status | 0/20 | 0% | 0%–16% |
 | Harmful action (lower is better) | Oracle (reference) | valid cases with observed harm status | 0/20 | 0% | 0%–16% |
-| Handover complete | ABCDE agent | valid cases with operations handover evidence | 18/20 | 90% | 70%–97% |
+| Handover complete | ABCDE agent | valid cases with operations handover evidence | 16/20 | 80% | 58%–92% |
 | Handover complete | Scripted runbook (no AI) | valid cases with operations handover evidence | 16/20 | 80% | 58%–92% |
 | Handover complete | No-op (reference) | valid cases with operations handover evidence | 18/20 | 90% | 70%–97% |
 | Handover complete | Oracle (reference) | valid cases with operations handover evidence | 12/20 | 60% | 39%–78% |
@@ -1084,23 +1084,23 @@ Cases: ABCDE agent n = 20, Scripted runbook (no AI) n = 20, No-op (reference) n 
 | False diagnosis on healthy cases (lower is better) | Scripted runbook (no AI) | valid healthy cases | 0/0 (not estimable) | — | — |
 | False diagnosis on healthy cases (lower is better) | No-op (reference) | valid healthy cases | 0/0 (not estimable) | — | — |
 | False diagnosis on healthy cases (lower is better) | Oracle (reference) | valid healthy cases | 0/0 (not estimable) | — | — |
-| Correct escalation | ABCDE agent | valid must-escalate cases | 0/2 | 0% | 0%–66% |
+| Correct escalation | ABCDE agent | valid must-escalate cases | 2/2 | 100% | 34%–100% |
 | Correct escalation | Scripted runbook (no AI) | valid must-escalate cases | 2/2 | 100% | 34%–100% |
 | Correct escalation | No-op (reference) | valid must-escalate cases | 0/2 | 0% | 0%–66% |
 | Correct escalation | Oracle (reference) | valid must-escalate cases | 2/2 | 100% | 34%–100% |
-| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
+| Root-cause precision | ABCDE agent | reported root-cause pairs after acceptable secondary pairs are ignored | 80/81 | 99% | 93%–100% |
 | Root-cause precision | Scripted runbook (no AI) | reported root-cause pairs after acceptable secondary pairs are ignored | 66/68 | 97% | 90%–99% |
 | Root-cause precision | No-op (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 0/0 (not estimable) | — | — |
 | Root-cause precision | Oracle (reference) | reported root-cause pairs after acceptable secondary pairs are ignored | 80/80 | 100% | 95%–100% |
-| Root-cause recall | ABCDE agent | labelled root-cause pairs | 0/80 | 0% | 0%–5% |
+| Root-cause recall | ABCDE agent | labelled root-cause pairs | 80/80 | 100% | 95%–100% |
 | Root-cause recall | Scripted runbook (no AI) | labelled root-cause pairs | 66/80 | 82% | 73%–89% |
 | Root-cause recall | No-op (reference) | labelled root-cause pairs | 0/80 | 0% | 0%–5% |
 | Root-cause recall | Oracle (reference) | labelled root-cause pairs | 80/80 | 100% | 95%–100% |
-| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/8 | 0% | 0%–32% |
+| Harmful-action attempts (lower is better) | ABCDE agent | guard-audited action attempts | 0/89 | 0% | 0%–4% |
 | Harmful-action attempts (lower is better) | Scripted runbook (no AI) | guard-audited action attempts | 0/77 | 0% | 0%–5% |
 | Harmful-action attempts (lower is better) | No-op (reference) | guard-audited action attempts | 0/0 (not estimable) | — | — |
 | Harmful-action attempts (lower is better) | Oracle (reference) | guard-audited action attempts | 0/84 | 0% | 0%–4% |
-| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 20/20 | 100% | 84%–100% |
+| Mitigation still unresolved at the horizon (lower is better) | ABCDE agent | valid cases with an observed mitigation censoring flag | 0/20 | 0% | 0%–16% |
 | Mitigation still unresolved at the horizon (lower is better) | Scripted runbook (no AI) | valid cases with an observed mitigation censoring flag | 3/20 | 15% | 5%–36% |
 | Mitigation still unresolved at the horizon (lower is better) | No-op (reference) | valid cases with an observed mitigation censoring flag | 20/20 | 100% | 84%–100% |
 | Mitigation still unresolved at the horizon (lower is better) | Oracle (reference) | valid cases with an observed mitigation censoring flag | 0/20 | 0% | 0%–16% |
@@ -1109,47 +1109,47 @@ Cases: ABCDE agent n = 20, Scripted runbook (no AI) n = 20, No-op (reference) n 
 
 | Metric | Arm | Cases with a value | Mean | Bootstrap 95% |
 |---|---|---|---|---|
-| User-impact seconds (lower is better) | ABCDE agent | 20 | 127.0 s | 125.8 s–128.2 s |
+| User-impact seconds (lower is better) | ABCDE agent | 20 | 47.0 s | 42.2 s–51.5 s |
 | User-impact seconds (lower is better) | Scripted runbook (no AI) | 20 | 56.8 s | 37.8 s–76.5 s |
 | User-impact seconds (lower is better) | No-op (reference) | 20 | 127.0 s | 126.0 s–128.0 s |
 | User-impact seconds (lower is better) | Oracle (reference) | 20 | 19.8 s | 18.5 s–21.0 s |
-| Time to mitigate (lower is better) | ABCDE agent | 20 | 124.8 s; censored 20/20 (100%; Wilson 95% 84%–100%) | 124.4 s–125.1 s |
+| Time to mitigate (lower is better) | ABCDE agent | 20 | 47.2 s; censored 0/20 (0%; Wilson 95% 0%–16%) | 42.5 s–52.0 s |
 | Time to mitigate (lower is better) | Scripted runbook (no AI) | 20 | 56.9 s; censored 3/20 (15%; Wilson 95% 5%–36%) | 38.1 s–76.6 s |
 | Time to mitigate (lower is better) | No-op (reference) | 20 | 124.8 s; censored 20/20 (100%; Wilson 95% 84%–100%) | 124.4 s–125.1 s |
 | Time to mitigate (lower is better) | Oracle (reference) | 20 | 20.0 s; censored 0/20 (0%; Wilson 95% 0%–16%) | 18.8 s–21.2 s |
-| Failed user journeys per case (lower is better) | ABCDE agent | 20 | 752.9 | 586.7–920.8 |
+| Failed user journeys per case (lower is better) | ABCDE agent | 20 | 208.6 | 166.8–251.7 |
 | Failed user journeys per case (lower is better) | Scripted runbook (no AI) | 20 | 187.7 | 138.9–241.3 |
 | Failed user journeys per case (lower is better) | No-op (reference) | 20 | 758.5 | 595.4–923.0 |
 | Failed user journeys per case (lower is better) | Oracle (reference) | 20 | 90.2 | 69.7–112.0 |
-| Model tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model tokens per case | ABCDE agent | 20 | 11,531 | 10,120–12,937 |
 | Model tokens per case | Scripted runbook (no AI) | 20 | 0 | 0–0 |
 | Model tokens per case | No-op (reference) | 20 | 0 | 0–0 |
 | Model tokens per case | Oracle (reference) | 20 | 0 | 0–0 |
-| Model input tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model input tokens per case | ABCDE agent | 20 | 9,146 | 7,922–10,370 |
 | Model input tokens per case | Scripted runbook (no AI) | 20 | 0 | 0–0 |
 | Model input tokens per case | No-op (reference) | 20 | 0 | 0–0 |
 | Model input tokens per case | Oracle (reference) | 20 | 0 | 0–0 |
-| Model output tokens per case | ABCDE agent | 0 | unavailable | unavailable |
+| Model output tokens per case | ABCDE agent | 20 | 2,386 | 2,184–2,591 |
 | Model output tokens per case | Scripted runbook (no AI) | 20 | 0 | 0–0 |
 | Model output tokens per case | No-op (reference) | 20 | 0 | 0–0 |
 | Model output tokens per case | Oracle (reference) | 20 | 0 | 0–0 |
-| Model cost per case (USD) | ABCDE agent | 0 | unavailable | unavailable |
+| Model cost per case (USD) | ABCDE agent | 20 | $0.0843 | $0.0756–$0.0931 |
 | Model cost per case (USD) | Scripted runbook (no AI) | 20 | $0 | $0–$0 |
 | Model cost per case (USD) | No-op (reference) | 20 | $0 | $0–$0 |
 | Model cost per case (USD) | Oracle (reference) | 20 | $0 | $0–$0 |
-| Model calls per case | ABCDE agent | 20 | 2.0 | 2.0–2.0 |
+| Model calls per case | ABCDE agent | 20 | 2.8 | 2.5–3.0 |
 | Model calls per case | Scripted runbook (no AI) | 20 | 0.0 | 0.0–0.0 |
 | Model calls per case | No-op (reference) | 20 | 0.0 | 0.0–0.0 |
 | Model calls per case | Oracle (reference) | 20 | 0.0 | 0.0–0.0 |
-| Root-cause F1 | ABCDE agent | 20 | 0.00 | 0.00–0.00 |
+| Root-cause F1 | ABCDE agent | 20 | 0.99 | 0.98–1.00 |
 | Root-cause F1 | Scripted runbook (no AI) | 20 | 0.88 | 0.83–0.93 |
 | Root-cause F1 | No-op (reference) | 20 | 0.00 | 0.00–0.00 |
 | Root-cause F1 | Oracle (reference) | 20 | 1.00 | 1.00–1.00 |
-| Successful actions per case | ABCDE agent | 20 | 0.4 | 0.2–0.6 |
+| Successful actions per case | ABCDE agent | 20 | 4.5 | 4.2–4.7 |
 | Successful actions per case | Scripted runbook (no AI) | 20 | 3.3 | 3.0–3.6 |
 | Successful actions per case | No-op (reference) | 20 | 0.0 | 0.0–0.0 |
 | Successful actions per case | Oracle (reference) | 20 | 4.2 | 4.0–4.5 |
-| Wasted actions per case (lower is better) | ABCDE agent | 20 | 0.0 | 0.0–0.0 |
+| Wasted actions per case (lower is better) | ABCDE agent | 20 | 0.1 | 0.0–0.2 |
 | Wasted actions per case (lower is better) | Scripted runbook (no AI) | 20 | 0.1 | 0.0–0.2 |
 | Wasted actions per case (lower is better) | No-op (reference) | 20 | 0.0 | 0.0–0.0 |
 | Wasted actions per case (lower is better) | Oracle (reference) | 20 | 0.0 | 0.0–0.0 |

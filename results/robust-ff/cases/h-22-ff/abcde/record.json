@@ -122,53 +122,157 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "[C1] gateway: down (not answering), and [A3] the payment journey fails at 'gateway' with 'no answer within 3.0s'. Gateway logs no errors and there is no recent change to it."
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message",
+        "confidence": 0.75,
+        "evidence": "Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). [B1] shows the first item, 95, still waiting, and [C2]/[C3] show clearing down after exiting."
+      },
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.7,
+        "evidence": "[B2] ledger: lock held by session reconciliation (write) for 11.5 s: UPDATE accounts SET ... (reconciliation batch). This blocks payment postings once traffic resumes."
+      },
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.9,
+        "evidence": "B3: screening p95 1816 ms (baseline 15 ms) and D3: 'calls to screening fail: 100%'. Payments logs show 'fraud screening timeout via primary... timeout_s=1.0'."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793451653.7421517,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: [B2] ledger: lock held by session reconciliation (write) for 11.5 s: UPDATE accounts SET ... (reconciliation batch). This blocks payment postings once traffic resumes.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793451654.837343,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 95
+        },
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). [B1] shows the first item, 95, still waiting, and [C2]/[C3] show clearing down after exiting.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 95 set aside for the operations team"
+      },
+      {
+        "t": 1793451655.8459723,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). [B1] shows the first item, 95, still waiting, and [C2]/[C3] show clearing down after exiting.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "t": 1793451658.5008645,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering), and [A3] the payment journey fails at 'gateway' with 'no answer within 3.0s'. Gateway logs no errors and there is no recent change to it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "t": 1793451681.3898346,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "dependency_slow: B3: screening p95 1816 ms (baseline 15 ms) and D3: 'calls to screening fail: 100%'. Payments logs show 'fraud screening timeout via primary... timeout_s=1.0'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      }
+    ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "item 95 was set aside from clearing's work queue",
+      "urgency": "soon",
+      "to": "the operations team",
+      "ask": "review item 95 set aside from clearing: repair and resubmit it, or close it with its customer"
     },
-    "t_start": 1793439582.116433,
-    "t_first_action": null,
-    "t_declared": 1793439586.3849707,
+    "sbar": {
+      "situation": "The bank payment system has recovered. Recovery checks were clean on two looks in a row, the last at 58 s.",
+      "background": "Four faults overlapped: the gateway stopped answering, clearing crashed on a malformed item, a reconciliation session held the ledger write lock for 11.5 s, and the primary fraud screening service slowed to p95 1816 ms against a 15 ms baseline. The screening slowdown made all payments calls to screening time out at 1.0 s, so 87% of gateway and payments requests failed.",
+      "assessment": "The incident commander took every action itself. It ended the reconciliation session holding the ledger lock, set aside poison item 95 (JSONDecodeError in clear_one) and restarted clearing with no exits since, restarted the gateway, and failed screening over to its standby; all actions completed. The gateway's cause is unclear, because it logged no errors and had no recent change.",
+      "recommendation": "Find out why the primary screening service slowed and why the gateway went down before you move screening back from standby. The operations team has the escalation for clearing item 95 and must repair and resubmit it or close it with its customer. They should also review the payments that failed during the outage and the reconciliation batch that was ended mid-run."
+    },
+    "t_start": 1793451639.7363632,
+    "t_first_action": 1793451653.7421517,
+    "t_declared": 1793451697.3718698,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 34.1
+          "ms": 35.3
         }
       },
       {
-        "t": 1.15,
+        "t": 1.18,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components; down: gateway, clearing",
         "data": {
-          "ms": 1117.3
+          "ms": 1148.6
         }
       },
       {
-        "t": 4.19,
+        "t": 4.21,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at gateway",
         "data": {
-          "ms": 3039.4
+          "ms": 3026.1
         }
       },
       {
-        "t": 4.19,
+        "t": 4.21,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -180,14 +284,14 @@
               "letter": "A",
               "component": "payments",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 11.5/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 11.3/s), less work from its callers"
             },
             {
               "id": "A2",
               "letter": "A",
               "component": "screening",
               "severity": "info",
-              "text": "traffic 0.0/s (baseline 9.3/s), less work from its callers"
+              "text": "traffic 0.0/s (baseline 9.1/s), less work from its callers"
             },
             {
               "id": "A3",
@@ -257,14 +361,14 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: stop by ops-maintenance"
+              "text": "7 s ago: stop by ops-maintenance"
             },
             {
               "id": "E4",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "6 s ago: start by ops-maintenance (release=4.1)"
+              "text": "7 s ago: start by ops-maintenance (release=4.1)"
             }
           ]
         }
@@ -276,7 +380,7 @@
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 27.5
+          "ms": 11.3
         }
       },
       {
@@ -286,46 +390,456 @@
         "name": "logs",
         "summary": "2 log records from clearing",
         "data": {
-          "ms": 29.0
+          "ms": 28.7
         }
       },
       {
-        "t": 4.27,
+        "t": 4.25,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "0 log records from ledger",
         "data": {
-          "ms": 20.8
+          "ms": 1.7
         }
       },
       {
-        "t": 4.27,
+        "t": 14.01,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 9.753 s"
       },
       {
-        "t": 4.27,
+        "t": 14.1,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock ledger: done (ended lock-holding session(s): reconciliation)",
+        "data": {
+          "target": "ledger",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.11,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "quarantine",
+        "summary": "quarantine clearing: done (clearing item 95 set aside for the operations team)",
+        "data": {
+          "target": "clearing",
+          "params": {
+            "item": 95
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 16.76,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart clearing: done (clearing restarted)",
+        "data": {
+          "target": "clearing",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 19.45,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 25.55,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 102.3
+        }
+      },
+      {
+        "t": 26.59,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1040.6
+        }
+      },
+      {
+        "t": 26.59,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: gateway: 94% of requests fail (baseline 0%); payments: 94% of requests fail (baseline 0%); payments: payment journey fails at step 'payments': 503 screening unavailable (timeout) (+6 more)"
+      },
+      {
+        "t": 30.7,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 105.1
+        }
+      },
+      {
+        "t": 31.74,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1040.6
+        }
+      },
+      {
+        "t": 31.74,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: not clean (0 of 2 in a row); still abnormal: gateway: 76% of requests fail (baseline 0%); payments: 76% of requests fail (baseline 0%); payments: payment journey fails at step 'payments': 503 screening unavailable (timeout) (+7 more)"
+      },
+      {
+        "t": 31.81,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 68.0
+        }
+      },
+      {
+        "t": 32.85,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey failed at payments",
+        "data": {
+          "ms": 1043.2
+        }
+      },
+      {
+        "t": 32.85,
+        "phase": "triage",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "10 fault findings, 20 findings in all, 8 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "87% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "87% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "payments",
+              "severity": "fault",
+              "text": "payment journey fails at step 'payments': 503 screening unavailable (timeout)"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "p95 1041 ms (baseline 62 ms)"
+            },
+            {
+              "id": "B2",
+              "letter": "B",
+              "component": "payments",
+              "severity": "fault",
+              "text": "p95 1030 ms (baseline 47 ms)"
+            },
+            {
+              "id": "B3",
+              "letter": "B",
+              "component": "screening",
+              "severity": "fault",
+              "text": "p95 1816 ms (baseline 15 ms)"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "clearing",
+              "severity": "info",
+              "text": "process exited 1 time(s) in 15 min, last 47 s ago (exit code 1); none since the action taken on it 17 s ago"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments fail: 87%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "gateway",
+              "severity": "fault",
+              "text": "calls to payments are slow: p95 1041 ms (payments itself answered in 47 ms at baseline)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening fail: 100%"
+            },
+            {
+              "id": "D4",
+              "letter": "D",
+              "component": "payments",
+              "severity": "fault",
+              "text": "calls to screening are slow: p95 1028 ms (screening itself answered in 15 ms at baseline)"
+            },
+            {
+              "id": "D5",
+              "letter": "D",
+              "component": "clearing",
+              "severity": "info",
+              "text": "1 item(s) already set aside"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "37 s ago: stop by pipeline"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "37 s ago: start by pipeline (release=4.1)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "37 s ago: stop by ops-maintenance"
+            },
+            {
+              "id": "E4",
+              "letter": "E",
+              "component": "screening-standby",
+              "severity": "info",
+              "text": "37 s ago: start by ops-maintenance (release=4.1)"
+            },
+            {
+              "id": "E5",
+              "letter": "E",
+              "component": "ledger",
+              "severity": "info",
+              "text": "18 s ago: lock_release by incident-commander (sessions=['reconciliation'])"
+            },
+            {
+              "id": "E6",
+              "letter": "E",
+              "component": "clearing",
+              "severity": "info",
+              "text": "17 s ago: quarantine by incident-commander (item=95)"
+            },
+            {
+              "id": "E7",
+              "letter": "E",
+              "component": "clearing",
+              "severity": "info",
+              "text": "16 s ago: restart by incident-commander (release=3.2)"
+            },
+            {
+              "id": "E8",
+              "letter": "E",
+              "component": "gateway",
+              "severity": "info",
+              "text": "13 s ago: restart by incident-commander (release=2.0)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 32.86,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "2 log records from gateway",
+        "data": {
+          "ms": 15.1
+        }
+      },
+      {
+        "t": 32.89,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "8 log records from payments",
+        "data": {
+          "ms": 24.6
+        }
+      },
+      {
+        "t": 32.9,
+        "phase": "triage",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from screening",
+        "data": {
+          "ms": 11.9
+        }
+      },
+      {
+        "t": 41.65,
+        "phase": "triage",
+        "kind": "model",
+        "name": "reassess",
+        "summary": "claude-opus-5-5 answered in 8.752 s"
+      },
+      {
+        "t": 41.68,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "failover",
+        "summary": "failover screening: done (screening now served by its standby)",
+        "data": {
+          "target": "screening",
+          "params": {
+            "to": "standby"
+          },
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 46.79,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 111.7
+        }
+      },
+      {
+        "t": 47.72,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 931.2
+        }
+      },
+      {
+        "t": 47.72,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: screening: p95 1816 ms (baseline 15 ms)"
+      },
+      {
+        "t": 51.77,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 45.8
+        }
+      },
+      {
+        "t": 52.67,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 897.3
+        }
+      },
+      {
+        "t": 52.67,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 56.74,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 73.1
+        }
+      },
+      {
+        "t": 57.64,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 894.1
+        }
+      },
+      {
+        "t": 57.64,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 57.64,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 4.27,
+        "t": 62.78,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 4.27,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 5.142 s"
       }
     ],
     "calls": [
@@ -333,11 +847,23 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 3791,
+        "output_tokens": 1018,
+        "latency_s": 9.753,
+        "estimated_cost_usd": 0.035524,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "reassess",
+        "input_tokens": 4476,
+        "output_tokens": 831,
+        "latency_s": 8.752,
+        "estimated_cost_usd": 0.034524,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -345,43 +871,118 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1320,
+        "output_tokens": 408,
+        "latency_s": 5.142,
+        "estimated_cost_usd": 0.01344,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 6,
-    "audit": []
+    "steps": 26,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793451653.7421517,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "lock_held: [B2] ledger: lock held by session reconciliation (write) for 11.5 s: UPDATE accounts SET ... (reconciliation batch). This blocks payment postings once traffic resumes.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "event": "act",
+        "t": 1793451654.837343,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 95
+        },
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). [B1] shows the first item, 95, still waiting, and [C2]/[C3] show clearing down after exiting.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing item 95 set aside for the operations team"
+      },
+      {
+        "event": "act",
+        "t": 1793451655.8459723,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). [B1] shows the first item, 95, still waiting, and [C2]/[C3] show clearing down after exiting.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "clearing restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793451658.5008645,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "process_down: [C1] gateway: down (not answering), and [A3] the payment journey fails at 'gateway' with 'no answer within 3.0s'. Gateway logs no errors and there is no recent change to it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      },
+      {
+        "event": "act",
+        "t": 1793451681.3898346,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "dependency_slow: B3: screening p95 1816 ms (baseline 15 ms) and D3: 'calls to screening fail: 100%'. Payments logs show 'fraud screening timeout via primary... timeout_s=1.0'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "screening now served by its standby"
+      }
+    ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793439701.7999117,
+    "recovered": true,
+    "t": 1793451759.3469388,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793439671.8,
-      1793439691.8
+      1793451729.347,
+      1793451749.347
     ],
     "journeys": {
-      "n": 39,
-      "ok": 0,
-      "success_rate": 0.0,
-      "p95_ms": null,
+      "n": 223,
+      "ok": 223,
+      "success_rate": 1.0,
+      "p95_ms": 74.00012016296387,
       "payments": {
-        "n": 29,
-        "ok": 0
+        "n": 172,
+        "ok": 172
       },
       "balances": {
-        "n": 10,
-        "fresh": 0
+        "n": 51,
+        "fresh": 51
       },
-      "p95_allowed_ms": 328.0
+      "p95_allowed_ms": 324.0
     },
-    "slo_ok": false,
+    "slo_ok": true,
     "integrity": {
       "money_conserved": true,
       "balances_match_postings": true,
@@ -389,25 +990,28 @@
       "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
-      "stuck_items": 14,
+      "stuck_items": 0,
       "wrongly_quarantined": 0,
-      "stale_reads": 10,
-      "for_operations": [],
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "set_aside",
+          "item": 95,
+          "payment_id": "batch-017"
+        }
+      ],
       "harmful_quarantines": 0,
-      "ok": false
+      "ok": true
     },
-    "reasons": [
-      "39 of 39 customer journeys failed (29 payments, 10 balance reads)",
-      "14 payments waiting more than 5 s to clear"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793439566.5830336,
-      "until_t": 1793439691.7999117,
-      "breach_seconds": 130.0,
-      "failed_journeys": 258,
-      "time_to_mitigate_s": 125.2,
-      "mitigation_censored": true,
-      "late_clearings": 14,
+      "since_t": 1793451624.1473188,
+      "until_t": 1793451749.3469388,
+      "breach_seconds": 60.0,
+      "failed_journeys": 129,
+      "time_to_mitigate_s": 60.0,
+      "mitigation_censored": false,
+      "late_clearings": 13,
       "double_postings": 0,
       "unbalanced_payments": 0
     }
@@ -420,7 +1024,7 @@
       "detail": {
         "item": 95
       },
-      "t": 1793439566.5830336,
+      "t": 1793451624.1473188,
       "at_s": 0
     },
     {
@@ -428,7 +1032,7 @@
       "target": "gateway",
       "class": "process_down",
       "detail": {},
-      "t": 1793439568.5877948,
+      "t": 1793451626.1751232,
       "at_s": 2
     },
     {
@@ -440,7 +1044,7 @@
         "latency_ms": 1800,
         "jitter_ms": 0
       },
-      "t": 1793439570.5997045,
+      "t": 1793451628.153259,
       "at_s": 4
     },
     {
@@ -448,11 +1052,11 @@
       "target": "ledger",
       "class": "lock_held",
       "detail": {
-        "holder_pid": 55528,
+        "holder_pid": 2276,
         "hold_s": 420.0,
         "holding": true
       },
-      "t": 1793439576.640258,
+      "t": 1793451634.2000818,
       "at_s": 5
     },
     {
@@ -460,7 +1064,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793439576.705645,
+      "t": 1793451634.2688894,
       "at_s": 6
     },
     {
@@ -468,19 +1072,144 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793439576.7993898,
+      "t": 1793451634.3466568,
       "at_s": 7
     }
   ],
   "injection_complete": true,
   "telemetry_complete": true,
-  "actions": [],
-  "audit": [],
+  "actions": [
+    {
+      "t": 1793451653.835516,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793451654.8435452,
+      "params": {
+        "item": 95
+      },
+      "ok": true,
+      "refused": false,
+      "action": "quarantine",
+      "target": "clearing",
+      "detail": "clearing item 95 set aside for the operations team"
+    },
+    {
+      "t": 1793451656.4986107,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    },
+    {
+      "t": 1793451659.182274,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "gateway",
+      "detail": "gateway restarted"
+    },
+    {
+      "t": 1793451681.414861,
+      "params": {
+        "to": "standby"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "failover",
+      "target": "screening",
+      "detail": "screening now served by its standby"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793451653.7421517,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "lock_held: [B2] ledger: lock held by session reconciliation (write) for 11.5 s: UPDATE accounts SET ... (reconciliation batch). This blocks payment postings once traffic resumes.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793451654.837343,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 95
+      },
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). [B1] shows the first item, 95, still waiting, and [C2]/[C3] show clearing down after exiting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 95 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793451655.8459723,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "poison_message: Clearing crashed with 'JSONDecodeError: Expecting property name enclosed in double quotes' in clear_one at self.parse(item). [B1] shows the first item, 95, still waiting, and [C2]/[C3] show clearing down after exiting.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793451658.5008645,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "process_down: [C1] gateway: down (not answering), and [A3] the payment journey fails at 'gateway' with 'no answer within 3.0s'. Gateway logs no errors and there is no recent change to it.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793451681.3898346,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "dependency_slow: B3: screening p95 1816 ms (baseline 15 ms) and D3: 'calls to screening fail: 100%'. Payments logs show 'fraud screening timeout via primary... timeout_s=1.0'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    }
+  ],
   "timing": {
-    "t0": 1793439566.5830336,
-    "t_alert": 1793439581.7993898,
-    "horizon": 1793439691.7993898,
-    "verdict_t": 1793439701.849394
+    "t0": 1793451624.1473188,
+    "t_alert": 1793451639.3466568,
+    "horizon": 1793451749.3466568,
+    "verdict_t": 1793451759.410725
   },
   "attempt": 1,
   "purpose": "main",

@@ -74,69 +74,104 @@
   "result": {
     "arm": "abcde",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.85,
+        "evidence": "[B3] screening p95 1822 ms (baseline 15 ms) and payments logs 'fraud screening timeout via primary ... timeout_s=1.0'; the probe fails at 'payments': 503 screening unavailable (timeout)."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.6,
+        "evidence": "[D5] ledger data check failed: duplicate payments = 15, appearing right after [E1] the payments deploy from 1.3 to 1.5 fourteen seconds ago, alongside 'response could not be completed'."
+      }
+    ],
     "actions": [
       {
-        "t": 1793430894.426178,
+        "t": 1793449972.3653452,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1033 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793449985.3446813,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "bad_release: [D5] ledger data check failed: duplicate payments = 15, appearing right after [E1] the payments deploy from 1.3 to 1.5 fourteen seconds ago, alongside 'response could not be completed'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
       }
     ],
     "proposed_actions": [],
-    "escalation": null,
-    "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "failover on screening: done",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+    "escalation": {
+      "components": [
+        "ledger"
+      ],
+      "class": "bad_release",
+      "reason": "[D5] ledger data check failed: duplicate payments = 15, appearing right after [E1] the payments deploy from 1.3 to 1.5 fourteen seconds ago, alongside 'response could not be completed'.",
+      "urgency": "now",
+      "to": "the on-call engineer",
+      "ask": "Finance and operations must review and reconcile the 15 duplicate payments through the proper process. The incident commander must not edit, reverse or refund postings."
     },
-    "t_start": 1793430893.232941,
-    "t_first_action": 1793430894.426178,
-    "t_declared": 1793430894.5032976,
+    "sbar": {
+      "situation": "Payments has recovered after two fixes. The last two recovery checks, ending at 28 s, were both clean. The ledger still holds 15 duplicate payments, and this has been escalated to the ledger on-call engineer.",
+      "background": "Payments was deployed from 1.3 to 1.5 about fourteen seconds before diagnosis, and 15 duplicate payments appeared in the ledger right after it. At the same time, the screening primary slowed to a p95 of 1822 ms against a 15 ms baseline. Payments times out after 1.0 s, so about 96% of requests failed with 503 screening unavailable.",
+      "assessment": "Root causes are a slow screening primary (confidence 0.85) and the payments 1.5 release, which likely caused the duplicates (confidence 0.6). The incident commander itself failed screening over to screening-standby, which is now serving traffic. It also rolled payments back from 1.5 to 1.3, and both actions completed.",
+      "recommendation": "Make sure the ledger on-call engineer has picked up the escalation, so finance and operations can reconcile the 15 duplicate payments through the proper process. Do not edit, reverse or refund any postings. Investigate the slow screening primary and the payments 1.5 release before failing back or redeploying."
+    },
+    "t_start": 1793449971.2027607,
+    "t_first_action": 1793449972.3653452,
+    "t_declared": 1793449998.9991105,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 29.5
+          "ms": 36.0
         }
       },
       {
-        "t": 0.14,
+        "t": 0.12,
         "phase": "survey",
         "kind": "tool",
         "name": "observe",
         "summary": "8 components",
         "data": {
-          "ms": 109.7
+          "ms": 84.2
         }
       },
       {
-        "t": 1.19,
+        "t": 1.16,
         "phase": "survey",
         "kind": "tool",
         "name": "probe",
         "summary": "payment journey failed at payments",
         "data": {
-          "ms": 1053.7
+          "ms": 1042.1
         }
       },
       {
-        "t": 1.19,
+        "t": 1.16,
         "phase": "survey",
         "kind": "survey",
         "name": "abcde",
@@ -169,21 +204,21 @@
               "letter": "B",
               "component": "gateway",
               "severity": "fault",
-              "text": "p95 1044 ms (baseline 50 ms)"
+              "text": "p95 1042 ms (baseline 57 ms)"
             },
             {
               "id": "B2",
               "letter": "B",
               "component": "payments",
               "severity": "fault",
-              "text": "p95 1029 ms (baseline 44 ms)"
+              "text": "p95 1033 ms (baseline 45 ms)"
             },
             {
               "id": "B3",
               "letter": "B",
               "component": "screening",
               "severity": "fault",
-              "text": "p95 1815 ms (baseline 15 ms)"
+              "text": "p95 1822 ms (baseline 15 ms)"
             },
             {
               "id": "D1",
@@ -197,7 +232,7 @@
               "letter": "D",
               "component": "gateway",
               "severity": "fault",
-              "text": "calls to payments are slow: p95 1044 ms (payments itself answered in 44 ms at baseline)"
+              "text": "calls to payments are slow: p95 1042 ms (payments itself answered in 45 ms at baseline)"
             },
             {
               "id": "D3",
@@ -211,7 +246,7 @@
               "letter": "D",
               "component": "payments",
               "severity": "fault",
-              "text": "calls to screening are slow: p95 1029 ms (screening itself answered in 15 ms at baseline)"
+              "text": "calls to screening are slow: p95 1033 ms (screening itself answered in 15 ms at baseline)"
             },
             {
               "id": "D5",
@@ -225,14 +260,14 @@
               "letter": "E",
               "component": "payments",
               "severity": "info",
-              "text": "13 s ago: deploy by pipeline (from=1.3, to=1.5)"
+              "text": "14 s ago: deploy by pipeline (from=1.3, to=1.5)"
             },
             {
               "id": "E2",
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "7 s ago: stop by ops-maintenance"
+              "text": "8 s ago: stop by ops-maintenance"
             },
             {
               "id": "E3",
@@ -246,7 +281,7 @@
               "letter": "E",
               "component": "screening-standby",
               "severity": "info",
-              "text": "5 s ago: stop by scheduler"
+              "text": "6 s ago: stop by scheduler"
             },
             {
               "id": "E5",
@@ -259,7 +294,7 @@
         }
       },
       {
-        "t": 1.21,
+        "t": 1.18,
         "phase": "survey",
         "kind": "action",
         "name": "containment",
@@ -275,72 +310,140 @@
         }
       },
       {
-        "t": 1.23,
+        "t": 1.19,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from gateway",
         "data": {
-          "ms": 18.5
+          "ms": 11.2
         }
       },
       {
-        "t": 1.24,
+        "t": 1.2,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "9 log records from payments",
         "data": {
-          "ms": 11.6
+          "ms": 12.8
         }
       },
       {
-        "t": 1.25,
+        "t": 1.22,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "1 log records from screening",
         "data": {
-          "ms": 11.2
+          "ms": 13.3
         }
       },
       {
-        "t": 1.27,
+        "t": 1.22,
         "phase": "survey",
         "kind": "tool",
         "name": "logs",
         "summary": "0 log records from ledger",
         "data": {
-          "ms": 16.5
+          "ms": 1.9
         }
       },
       {
-        "t": 1.27,
+        "t": 14.14,
         "phase": "triage",
         "kind": "model",
         "name": "assess",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 12.921 s"
       },
       {
-        "t": 1.27,
+        "t": 14.83,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback payments: done (payments 1.5 -> 1.3)",
+        "data": {
+          "target": "payments",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 16.83,
+        "phase": "remediate",
+        "kind": "note",
+        "name": "escalate",
+        "summary": "escalate ledger (now) to the on-call engineer"
+      },
+      {
+        "t": 21.92,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 87.2
+        }
+      },
+      {
+        "t": 22.8,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 883.6
+        }
+      },
+      {
+        "t": 22.8,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 26.87,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 69.7
+        }
+      },
+      {
+        "t": 27.8,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 925.8
+        }
+      },
+      {
+        "t": 27.8,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 27.8,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "escalated"
       },
       {
-        "t": 1.27,
+        "t": 32.66,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 1.27,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.865 s"
       }
     ],
     "calls": [
@@ -348,11 +451,11 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "assess",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 4110,
+        "output_tokens": 1196,
+        "latency_s": 12.921,
+        "estimated_cost_usd": 0.04036,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -360,65 +463,79 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 1088,
+        "output_tokens": 426,
+        "latency_s": 4.865,
+        "estimated_cost_usd": 0.012872,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 8,
+    "steps": 13,
     "audit": [
       {
         "event": "act",
-        "t": 1793430894.426178,
+        "t": 1793449972.3653452,
         "action": "failover",
         "target": "screening",
         "params": {
           "to": "standby"
         },
-        "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
+        "reason": "calls to screening are slow (p95 1033 ms) and the main journey fails",
         "sent": true,
         "ok": true,
         "refused": false,
         "refused_reason": null,
         "declined": false,
         "detail": "screening now served by its standby"
+      },
+      {
+        "event": "act",
+        "t": 1793449985.3446813,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "bad_release: [D5] ledger data check failed: duplicate payments = 15, appearing right after [E1] the payments deploy from 1.3 to 1.5 fourteen seconds ago, alongside 'response could not be completed'.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "payments 1.5 -> 1.3"
       }
     ]
   },
   "checker": {
-    "recovered": false,
-    "t": 1793431012.971144,
+    "recovered": true,
+    "t": 1793450090.827027,
     "window_s": 20.0,
     "lag_s": 10.0,
     "window": [
-      1793430982.971,
-      1793431002.971
+      1793450060.827,
+      1793450080.827
     ],
     "journeys": {
-      "n": 198,
-      "ok": 198,
+      "n": 221,
+      "ok": 221,
       "success_rate": 1.0,
-      "p95_ms": 424.9999523162842,
+      "p95_ms": 64.00012969970703,
       "payments": {
-        "n": 151,
-        "ok": 151
+        "n": 162,
+        "ok": 162
       },
       "balances": {
-        "n": 47,
-        "fresh": 47
+        "n": 59,
+        "fresh": 59
       },
-      "p95_allowed_ms": 316.0
+      "p95_allowed_ms": 315.0
     },
-    "slo_ok": false,
+    "slo_ok": true,
     "integrity": {
       "money_conserved": true,
       "balances_match_postings": true,
       "unbalanced_payments": 0,
-      "double_postings": 227,
+      "double_postings": 0,
       "ghost_payments": 0,
       "lost_payments": 0,
       "stuck_items": 0,
@@ -429,8 +546,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-01-000009",
           "payment_ids": [
-            "73c0dfce38294ce1",
-            "10c1458e73874573"
+            "6b3849d1a16c45ec",
+            "634709db67b045e8"
           ],
           "copies": 2
         },
@@ -438,8 +555,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-01-000010",
           "payment_ids": [
-            "8ad7a58f4d284ab1",
-            "9cd92fe1da9c4afd"
+            "68a187654cee4142",
+            "12b5b06d35014b39"
           ],
           "copies": 2
         },
@@ -447,8 +564,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-01-000011",
           "payment_ids": [
-            "201f433033cb4bbe",
-            "6ccae9153af2424c"
+            "e5e38ba291aa43a4",
+            "b4500e75305c436e"
           ],
           "copies": 2
         },
@@ -456,251 +573,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-01-000012",
           "payment_ids": [
-            "c3626ce7081840a4",
-            "3d996bed18674fc8"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000013",
-          "payment_ids": [
-            "2d37fd81bd304d71",
-            "b73d4db717714902"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000014",
-          "payment_ids": [
-            "91e7c21298484239",
-            "e10ed721d5814109"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000015",
-          "payment_ids": [
-            "2c012270f2bc4b4d",
-            "c30cff8434d441fe"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000016",
-          "payment_ids": [
-            "0fac93e5e3a64607",
-            "2b1ff842bfcb4789"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000017",
-          "payment_ids": [
-            "cc69c3beca3f4739",
-            "a9e1995226254e3d"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000018",
-          "payment_ids": [
-            "8609d73ed3134d33",
-            "96df7925cf3a4174"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000019",
-          "payment_ids": [
-            "5441d78acdaf4723",
-            "e50e36f56b154a5a"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000020",
-          "payment_ids": [
-            "42a204e7537e4f60",
-            "cce5ee665f564474"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000021",
-          "payment_ids": [
-            "8423d80976704e80",
-            "0d10af2b7d40452a"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000022",
-          "payment_ids": [
-            "8da52433080342cd",
-            "69df8116179b4de5"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000023",
-          "payment_ids": [
-            "bc0ebe2496154517",
-            "ee5ef9851e3647ad"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000024",
-          "payment_ids": [
-            "919eeae832c540bc",
-            "f68fb46ae6bf418d"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000025",
-          "payment_ids": [
-            "ff6fe633fe734049",
-            "2fd211f137a2477a"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000026",
-          "payment_ids": [
-            "ddcfbe108b8846f0",
-            "8108f7a50e9044d5"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000027",
-          "payment_ids": [
-            "00a08efb2a1645cf",
-            "396728ee7066445f"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000028",
-          "payment_ids": [
-            "a5c90e44aace40cf",
-            "bab66c71fd764cf7"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000029",
-          "payment_ids": [
-            "cf4f381ab4f44cbc",
-            "8a6d00a172064a15"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000030",
-          "payment_ids": [
-            "b35083b3bafa4a80",
-            "70d67cfd85174b5c"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000031",
-          "payment_ids": [
-            "757bdb9f9b954567",
-            "d9f30f52a5b64524"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000032",
-          "payment_ids": [
-            "fb26af925a0244a0",
-            "0ef3d30428924d31"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000033",
-          "payment_ids": [
-            "81de407e577640ea",
-            "7570e916180c4532"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000034",
-          "payment_ids": [
-            "752f01e38897486a",
-            "ec37b4b857b440a6"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000035",
-          "payment_ids": [
-            "acab2ca352c94485",
-            "481d55ae48314863"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000036",
-          "payment_ids": [
-            "e6560682298f4ee9",
-            "313eb3127812424f"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000037",
-          "payment_ids": [
-            "bf98b17506864b7d",
-            "e516044f477b4e6b"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000038",
-          "payment_ids": [
-            "4d3c26d1e872423b",
-            "06189d89492f48c2"
-          ],
-          "copies": 2
-        },
-        {
-          "kind": "posted_twice",
-          "end_to_end_id": "cust-01-000039",
-          "payment_ids": [
-            "b57333950bcf4026",
-            "42959225b81843f5"
+            "48b4e527fb3a4ff5",
+            "8f183ad19ef849c3"
           ],
           "copies": 2
         },
@@ -708,8 +582,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-02-000005",
           "payment_ids": [
-            "0d40f62bb48840fc",
-            "0ee8c5e18e4e4e79"
+            "ff6f46b030ff4021",
+            "5766208e1b7343b1"
           ],
           "copies": 2
         },
@@ -717,8 +591,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-02-000008",
           "payment_ids": [
-            "bcbf8e6a3ca04dde",
-            "49b713d1621a4659"
+            "230e227c77dd4128",
+            "029e03d680554ba0"
           ],
           "copies": 2
         },
@@ -726,8 +600,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-02-000009",
           "payment_ids": [
-            "93d9c560d45b4240",
-            "bf3d77d4831c4c4c"
+            "f231f1902f3e4633",
+            "e1429f03e839485b"
           ],
           "copies": 2
         },
@@ -735,8 +609,8 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-02-000010",
           "payment_ids": [
-            "61fb531c305442c8",
-            "64ae5a5527fe4c0b"
+            "d4bb9573997b4113",
+            "1d9dcd46ee4744aa"
           ],
           "copies": 2
         },
@@ -744,154 +618,394 @@
           "kind": "posted_twice",
           "end_to_end_id": "cust-02-000011",
           "payment_ids": [
-            "f70c467f304d462a",
-            "8291784cf52c48ea"
+            "4f4d7cf5780e4d7b",
+            "62ebeded7b354f66"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000012",
+          "end_to_end_id": "cust-03-000005",
           "payment_ids": [
-            "9cb2c64e3c6644ae",
-            "a96a6cda9e514905"
+            "63c7f6b465cb4a13",
+            "8228a0b7ff9f497f"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000013",
+          "end_to_end_id": "cust-03-000008",
           "payment_ids": [
-            "ee674601ab724be3",
-            "97a68a5ff5414937"
+            "5080922b4ed24611",
+            "ca89c74e4e33406b"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000014",
+          "end_to_end_id": "cust-03-000009",
           "payment_ids": [
-            "bb662a579e5d404b",
-            "5b297f06fd2c4c93"
+            "65af00436bdf417c",
+            "3d35318fb2ee4bd7"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000015",
+          "end_to_end_id": "cust-03-000010",
           "payment_ids": [
-            "0aae67b1de1f42c6",
-            "9c111e3e57fc40da"
+            "c87c5712a85842b0",
+            "15860843eb464423"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000016",
+          "end_to_end_id": "cust-03-000011",
           "payment_ids": [
-            "a27e94abf75340e0",
-            "a855ff4921304d1f"
+            "24c65a8499954dc9",
+            "e4459f1a408e4378"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000017",
+          "end_to_end_id": "cust-04-000005",
           "payment_ids": [
-            "c7e296aaf3b7451b",
-            "6385e03a1b1f40b2"
+            "245e41f3840c44b0",
+            "f1af8ec5f05548ab"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000018",
+          "end_to_end_id": "cust-04-000008",
           "payment_ids": [
-            "1ec957a763954356",
-            "74b4b1b1293a401a"
+            "add2236d0cb8471d",
+            "f110c6f707b44a74"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000019",
+          "end_to_end_id": "cust-04-000009",
           "payment_ids": [
-            "8d5d90712a784e81",
-            "8dcb710b46ff45ff"
+            "9cebd941ae7a4c8d",
+            "05188026b1624931"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000020",
+          "end_to_end_id": "cust-04-000010",
           "payment_ids": [
-            "d054c41e13754113",
-            "2ec0cb9e4ec84c5e"
+            "364424b4dec34a05",
+            "d54a6ada29ec48ac"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000021",
+          "end_to_end_id": "cust-04-000011",
           "payment_ids": [
-            "e892b195433d4ce0",
-            "3ae1077ba4754213"
+            "cb6e389feb5145ed",
+            "125ed0f3ddd54ec9"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000022",
+          "end_to_end_id": "cust-04-000012",
           "payment_ids": [
-            "0644907df52843de",
-            "565e38f168cf4fd9"
+            "3b8b171d3f8a47a8",
+            "114493fceb374fd5"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000023",
+          "end_to_end_id": "cust-05-000006",
           "payment_ids": [
-            "c6ff205532ba470a",
-            "52aa2eac29e54fd3"
+            "71f4dd5bde044a16",
+            "3b5b9e77cd114841"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000024",
+          "end_to_end_id": "cust-05-000009",
           "payment_ids": [
-            "acf03ba52d984e2a",
-            "ad7a437fa34b4851"
+            "4d967a0b972748d7",
+            "9bf309d3d9fa4b6b"
           ],
           "copies": 2
         },
         {
           "kind": "posted_twice",
-          "end_to_end_id": "cust-02-000025",
+          "end_to_end_id": "cust-05-000010",
           "payment_ids": [
-            "706bde5e69144122",
-            "e146d2c1d3d94100"
+            "b3c6406707424688",
+            "1858da7449ba4a02"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000011",
+          "payment_ids": [
+            "c5577510f5374495",
+            "8d322b0f11e74f91"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000007",
+          "payment_ids": [
+            "3c3d4940c7c44eb4",
+            "1ed6ff9af22745b8"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000008",
+          "payment_ids": [
+            "7b3a338dd2f641d0",
+            "365751e69d594bb6"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000009",
+          "payment_ids": [
+            "c30d98da96204e88",
+            "a8fe9f5d78194abc"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000010",
+          "payment_ids": [
+            "2d3d1a4ef7704971",
+            "4445151ad88c4a21"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000008",
+          "payment_ids": [
+            "6d2b85c28a5044b8",
+            "eda14dda6a524a11"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000009",
+          "payment_ids": [
+            "b12427f44f784e1d",
+            "c81c9133ac4149aa"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000010",
+          "payment_ids": [
+            "6adec2fcbb7646c8",
+            "bea3a609478949f2"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000011",
+          "payment_ids": [
+            "f4c8d5ad0985494c",
+            "dc9171eaa0a24e95"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000006",
+          "payment_ids": [
+            "e95fe93c70694e2b",
+            "8daef51acd944367"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000009",
+          "payment_ids": [
+            "90d08e178dd94ce2",
+            "d16c68bc09f74217"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000010",
+          "payment_ids": [
+            "f44f1143485f4e45",
+            "e3f2da9b2b6d4d2c"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000011",
+          "payment_ids": [
+            "aeca41d9653d4288",
+            "df4d965cbb0746ea"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000012",
+          "payment_ids": [
+            "b70f549c68b24c5d",
+            "e420dd1528df46fd"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000006",
+          "payment_ids": [
+            "fb603be3547945fe",
+            "622869ac5de44e22"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000009",
+          "payment_ids": [
+            "f3adbb7826cd4738",
+            "3ed27b871f074052"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000010",
+          "payment_ids": [
+            "c7f14fb425194467",
+            "f9fbafa756594b5f"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000011",
+          "payment_ids": [
+            "e8cda8b768e246e4",
+            "11165d872eba49b5"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000012",
+          "payment_ids": [
+            "3f15a975fca74ab6",
+            "b92272c066904d83"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000013",
+          "payment_ids": [
+            "4d0eb281a4d746bf",
+            "c9043f6409954e77"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000008",
+          "payment_ids": [
+            "61e271b76b3f4d85",
+            "3e1aab7674434f41"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000009",
+          "payment_ids": [
+            "d15a610cc76748ab",
+            "30ad9a68612246b5"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000010",
+          "payment_ids": [
+            "dabeb2eacf9f42a3",
+            "3553475bdcce428c"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000005",
+          "payment_ids": [
+            "b005993620144a56",
+            "0831b22e8fe8463e"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000008",
+          "payment_ids": [
+            "cfad992e42374aba",
+            "ce472670f5f8464f"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000009",
+          "payment_ids": [
+            "ccb55480e2df4968",
+            "bbfc3a35320e4f89"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000010",
+          "payment_ids": [
+            "7f6f16767d9c4c9c",
+            "a89eda2ff1504138"
           ],
           "copies": 2
         }
       ],
       "harmful_quarantines": 0,
-      "ok": false
+      "ok": true
     },
-    "reasons": [
-      "payment p95 425 ms is above 316 ms",
-      "227 payments posted twice"
-    ],
+    "reasons": [],
     "impact": {
-      "since_t": 1793430880.5801713,
-      "until_t": 1793431002.971144,
+      "since_t": 1793449958.4178307,
+      "until_t": 1793450080.827027,
       "breach_seconds": 15.0,
       "failed_journeys": 40,
       "time_to_mitigate_s": 15.0,
       "mitigation_censored": false,
       "late_clearings": 0,
-      "double_postings": 883,
+      "double_postings": 93,
       "unbalanced_payments": 0
     }
   },
@@ -903,7 +1017,7 @@
       "detail": {
         "release": "1.5"
       },
-      "t": 1793430880.5801713,
+      "t": 1793449958.4178307,
       "at_s": 0
     },
     {
@@ -915,7 +1029,7 @@
         "latency_ms": 1800,
         "jitter_ms": 0
       },
-      "t": 1793430881.9088962,
+      "t": 1793449959.7592115,
       "at_s": 2
     },
     {
@@ -923,7 +1037,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793430885.966783,
+      "t": 1793449963.8306875,
       "at_s": 6
     },
     {
@@ -931,7 +1045,7 @@
       "target": null,
       "class": null,
       "detail": {},
-      "t": 1793430887.9709513,
+      "t": 1793449965.8264804,
       "at_s": 8
     }
   ],
@@ -939,7 +1053,7 @@
   "telemetry_complete": true,
   "actions": [
     {
-      "t": 1793430894.4436138,
+      "t": 1793449972.381191,
       "params": {
         "to": "standby"
       },
@@ -948,31 +1062,54 @@
       "action": "failover",
       "target": "screening",
       "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793449986.0297916,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "payments",
+      "detail": "payments 1.5 -> 1.3"
     }
   ],
   "audit": [
     {
       "event": "act",
-      "t": 1793430894.426178,
+      "t": 1793449972.3653452,
       "action": "failover",
       "target": "screening",
       "params": {
         "to": "standby"
       },
-      "reason": "calls to screening are slow (p95 1029 ms) and the main journey fails",
+      "reason": "calls to screening are slow (p95 1033 ms) and the main journey fails",
       "sent": true,
       "ok": true,
       "refused": false,
       "refused_reason": null,
       "declined": false,
       "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793449985.3446813,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "bad_release: [D5] ledger data check failed: duplicate payments = 15, appearing right after [E1] the payments deploy from 1.3 to 1.5 fourteen seconds ago, alongside 'response could not be completed'.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
     }
   ],
   "timing": {
-    "t0": 1793430880.5801713,
-    "t_alert": 1793430892.9709513,
-    "horizon": 1793431002.9709513,
-    "verdict_t": 1793431013.0542657
+    "t0": 1793449958.4178307,
+    "t_alert": 1793449970.8264804,
+    "horizon": 1793450080.8264804,
+    "verdict_t": 1793450090.881271
   },
   "attempt": 1,
   "purpose": "main",

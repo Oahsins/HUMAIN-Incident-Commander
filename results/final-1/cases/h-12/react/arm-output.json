@@ -2,58 +2,257 @@
   "result": {
     "arm": "react",
     "mode": "auto",
-    "outcome": "gave_up",
-    "root_causes": [],
-    "actions": [],
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.85,
+        "evidence": "The gateway was not answering at 0 CPU, with no release or config change and no error logs. After a restart, latency and errors match baseline and the payment probe passes end to end."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793453898.366691,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is down with no errors logged and no recent changes, so the process has most likely stopped; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ],
     "proposed_actions": [],
     "escalation": null,
     "sbar": {
-      "situation": "Recovery was not confirmed: the incident commander could not complete its assessment.",
-      "background": "No cause identified.",
-      "assessment": "No action was taken.",
-      "recommendation": "Check the system yourself before declaring it recovered. Review any money or data effects with the operations team."
+      "situation": "The bank payment service has recovered. The gateway is answering again, and two recovery checks in a row came back clean, the last at 34 seconds.",
+      "background": "The gateway process stopped and was not answering, sitting at 0 CPU. There was no release, no config change and no error logs; the standby screening restart by ops-maintenance was routine and played no part, since standby carries no traffic.",
+      "assessment": "Root cause is the gateway process being down (confidence 0.85). The incident commander restarted the gateway itself, and after that latency and errors matched baseline and the payment probe passed end to end.",
+      "recommendation": "Find out why the gateway process stopped, since no logs or changes explain it, and watch for it happening again. Nothing was escalated, and no money or data effects were found for operations to review."
     },
-    "t_start": 1793424775.1693869,
-    "t_first_action": null,
-    "t_declared": 1793424775.2028503,
+    "t_start": 1793453888.8656883,
+    "t_first_action": 1793453898.366691,
+    "t_declared": 1793453923.2422645,
     "trace": [
       {
-        "t": 0.03,
+        "t": 0.04,
         "phase": "survey",
         "kind": "tool",
         "name": "describe",
         "summary": "bank: 8 components",
         "data": {
-          "ms": 33.3
+          "ms": 35.6
         }
       },
       {
-        "t": 0.03,
+        "t": 2.73,
         "phase": "triage",
         "kind": "model",
         "name": "react",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
+        "summary": "claude-opus-5-5 answered in 2.693 s"
       },
       {
-        "t": 0.03,
+        "t": 2.73,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: Start by observing all components to see symptoms and recent changes."
+      },
+      {
+        "t": 3.86,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components; down: gateway",
+        "data": {
+          "ms": 1133.6
+        }
+      },
+      {
+        "t": 6.84,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.972 s"
+      },
+      {
+        "t": 6.84,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "logs: Gateway is not answering with no release or config change; check its logs to tell a crash from resource exhaustion."
+      },
+      {
+        "t": 6.87,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "1 log records from gateway",
+        "data": {
+          "ms": 33.4
+        }
+      },
+      {
+        "t": 9.5,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 2.632 s"
+      },
+      {
+        "t": 9.5,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "act: Gateway is down with no errors logged and no recent changes, so the process has most likely stopped; restart it."
+      },
+      {
+        "t": 10.2,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart gateway: done (gateway restarted)",
+        "data": {
+          "target": "gateway",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 13.76,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 3.56 s"
+      },
+      {
+        "t": 13.76,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "probe: Gateway is restarted; probe the main journey to confirm it works and to reveal any hidden faults further along."
+      },
+      {
+        "t": 14.7,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 942.1
+        }
+      },
+      {
+        "t": 18.71,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 4.009 s"
+      },
+      {
+        "t": 18.71,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "observe: The probe passes, but the total of 939 ms is close to the limit, so observe metrics now that traffic flows to check for hidden faults downstream."
+      },
+      {
+        "t": 18.82,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 106.2
+        }
+      },
+      {
+        "t": 24.29,
+        "phase": "triage",
+        "kind": "model",
+        "name": "react",
+        "summary": "claude-opus-5-5 answered in 5.469 s"
+      },
+      {
+        "t": 24.29,
+        "phase": "triage",
+        "kind": "note",
+        "name": "react",
+        "summary": "done: All components match their baselines with no errors, the queue is draining and the ledger is consistent, so the gateway crash was the only fault. The standby restart was routine maintenance."
+      },
+      {
+        "t": 28.38,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 89.7
+        }
+      },
+      {
+        "t": 29.46,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 1084.8
+        }
+      },
+      {
+        "t": 29.46,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 33.52,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "8 components",
+        "data": {
+          "ms": 54.8
+        }
+      },
+      {
+        "t": 34.38,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "payment journey ok",
+        "data": {
+          "ms": 859.7
+        }
+      },
+      {
+        "t": 34.38,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 34.38,
         "phase": "hand_over",
         "kind": "note",
         "name": "outcome",
-        "summary": "gave_up"
+        "summary": "recovered"
       },
       {
-        "t": 0.03,
+        "t": 39.26,
         "phase": "hand_over",
         "kind": "model",
         "name": "sbar",
-        "summary": "model call failed: ANTHROPIC_API_KEY is not set."
-      },
-      {
-        "t": 0.03,
-        "phase": "hand_over",
-        "kind": "note",
-        "name": "sbar",
-        "summary": "handover written from the template"
+        "summary": "claude-opus-5-5 answered in 4.886 s"
       }
     ],
     "calls": [
@@ -61,11 +260,71 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "react",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 2725,
+        "output_tokens": 88,
+        "latency_s": 2.693,
+        "estimated_cost_usd": 0.01266,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4401,
+        "output_tokens": 149,
+        "latency_s": 2.972,
+        "estimated_cost_usd": 0.020584,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4522,
+        "output_tokens": 105,
+        "latency_s": 2.632,
+        "estimated_cost_usd": 0.020188,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 4670,
+        "output_tokens": 104,
+        "latency_s": 3.56,
+        "estimated_cost_usd": 0.02076,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 5015,
+        "output_tokens": 156,
+        "latency_s": 4.009,
+        "estimated_cost_usd": 0.02318,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "react",
+        "input_tokens": 6860,
+        "output_tokens": 337,
+        "latency_s": 5.469,
+        "estimated_cost_usd": 0.03418,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       },
@@ -73,17 +332,32 @@
         "provider": "anthropic",
         "model": "claude-opus-5-5",
         "purpose": "sbar",
-        "input_tokens": null,
-        "output_tokens": null,
-        "latency_s": 0.0,
-        "estimated_cost_usd": null,
-        "status": "failed",
+        "input_tokens": 728,
+        "output_tokens": 261,
+        "latency_s": 4.886,
+        "estimated_cost_usd": 0.008132,
+        "status": "ok",
         "error": null,
         "cost_basis": "standard API token prices; excludes hardware and other services"
       }
     ],
-    "steps": 1,
-    "audit": []
+    "steps": 10,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793453898.366691,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "Gateway is down with no errors logged and no recent changes, so the process has most likely stopped; restart it.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "gateway restarted"
+      }
+    ]
   },
   "error": null
 }
