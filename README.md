@@ -35,24 +35,41 @@ Every table is in [Full results](#full-results) below.
 
 ## Quick start
 
-You need Python 3.11 or later, on Windows or Linux. If you'd rather not install anything, the Codespaces link above sets everything up and opens the incident console in your browser.
+You need Python 3.11 or later. I've tested it on Windows and Linux. If you'd rather not install anything, the Codespaces link above sets everything up and opens the incident console in your browser.
+
+First make a virtual environment and install the requirements. On Linux or macOS:
 
 ```
-pip install -r requirements.txt -r requirements-eval.txt
-python run.py demo           # about a minute: starts a fresh bank, injects 2 faults, runs the agent, prints the checker's verdict, stops the bank
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt -r requirements-eval.txt
+```
+
+On Windows, in PowerShell:
+
+```
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt -r requirements-eval.txt
+```
+
+If PowerShell won't run the activate script, run `Set-ExecutionPolicy -Scope Process Bypass` first.
+
+Then run the demo. It takes about a minute: it starts a fresh bank, injects 2 faults, runs the agent, prints the checker's verdict and stops the bank.
+
+```
+python run.py demo
 ```
 
 The demo works without an API key. It then replays the model's answers from a recorded run of the frozen agent (`replays/demo-frozen.jsonl`), and says so first. The bank, the actions and the checks still run live. Only the model's answers are replayed, which is why the handover quotes the recorded run's times. With `ANTHROPIC_API_KEY` set, it runs live. Keys are only read from environment variables, never from files.
 
 The other commands:
 
-```
-python run.py preflight      # laptop checks: Python, packages, model key, free ports, disk space
-python run.py up             # starts the bank (port base 8900) and its test customers
-python run.py status         # every component and its health
-python run.py check          # the checker's verdict (wait about 20 s after up)
-python run.py down           # stops the bank if one is still running
-```
+- `python run.py preflight` runs the laptop checks: Python, packages, model key, free ports and disk space.
+- `python run.py up` starts the bank (port base 8900) and its test customers.
+- `python run.py status` shows every component and its health.
+- `python run.py check` gives the checker's verdict. Wait about 20 s after `up`, or about 30 s after the agent finishes, or it can say NOT RECOVERED after a good fix.
+- `python run.py down` stops the bank if one is still running.
 
 Without a key, `preflight` reports FAIL for the provider key and exits 1. That's expected, and the rest still works. `requirements-eval.txt` adds matplotlib, which `preflight` checks and the evaluation's charts and tests need.
 
