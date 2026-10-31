@@ -157,7 +157,19 @@ The frozen agent and the frozen runbook ran on 20 sealed dispatch incidents, whi
 ### Exploratory, declared before the final run
 
 - My own unblinded review of 12 drawn `abcde` cases: pending. The 12 cases were redrawn from the re-run by the declared rule.
-- Off-list proposals by arm, with a `react` sensitivity row: `react` made no harmful-action attempts (0 of 70) and had no harmful cases (0 of 40), so it scores 23 of 40 with or without the off-list rule. The full table by arm is pending.
+- Off-list proposals by arm, with a `react` sensitivity row. No arm proposed an off-list action and none made a harmful-action attempt, so every arm had off-list proposals in 0 of 40 cases (95% Wilson 0%–8.8%). Off-list counts the guard's `not_allowlisted` refusals plus the "dropped fix" notes from the agent's triage step. The runbook is zero by construction.
+
+| Arm | Off-list proposals | Harmful-action attempts | 95% Wilson |
+|---|---|---|---|
+| `abcde` | 0 | 0 / 85 | 0%–4.3% |
+| `runbook` | 0 | 0 / 60 | 0%–6.0% |
+| `react` | 0 | 0 / 70 | 0%–5.2% |
+| `naive_verify` | 0 | 0 / 83 | 0%–4.4% |
+| `fifo` | 0 | 0 / 86 | 0%–4.3% |
+| `noop` | 0 | 0 / 0 | not estimable |
+| `oracle` | 0 | 0 / 80 | 0%–4.6% |
+
+If off-list refusals didn't count as harm (harmful quarantines still would), `react` would still succeed on 23 of 40 (95% Wilson 42%–71%). No case score changes, so its gap to `abcde` stays at 40 points (95% CI 25 to 55, exact McNemar p = 0.00003). That row is outside the registered Holm family. The registered `react` test is the one in the secondary tests above.
 
 ## Limitations
 
