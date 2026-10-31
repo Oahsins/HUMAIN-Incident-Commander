@@ -352,8 +352,9 @@ C6  The final run (prepare at the freeze, Fri about 18:30-19:00; it runs
     - Omar starts the run in his own PowerShell window, not inside Codex, with
       the command block from the follow-up prompts (a 5-try auto-resume loop).
       Check that it started; progress: Get-Content results\final.log -Tail 20.
-    - At Sat 11:00, if the main exam is incomplete, stop the robustness subset
-      and report the completed paired cases as n of N.
+    - The run did not start on Fri night. It started Sat at 07:28 with the
+      core40 cut in full and runs to its end, about 12:45, so the old Sat
+      11:00 stop no longer applies (DECISIONS.md, 31 Oct).
     - After the final run: commit the sealed files at their original paths with
       git add -f, in a pull request from codex/reveal, beside the final run's
       per-case evidence.
@@ -364,6 +365,10 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       incidents (scenarios/transfer/dispatch.jsonl) from the dispatch adapter and
       control interfaces only. At least 2 fault types should show symptoms that
       no bank practice fault shows. Use only made-up callers and addresses.
+    - The final run overlaps C7 on the laptop until about 12:45. Until it ends,
+      start at most one dispatch copy at a time: the final run's three bank
+      copies are judged on timing, and GO/NO-GO 3's "3 copies without
+      interference" had no dispatch copy beside them.
     - Among the 20, include at least one incident of each of these three shapes
       (agreed on 30 Oct before freeze-1, CONTRACT.md section 8), through any
       channel docs/DISPATCH.md lists, with the component, mechanism, class and
@@ -395,12 +400,15 @@ C7  Dispatch faults for the transfer test (Sat 09:00-12:00)
       --port-base 9100, then python run.py down --port-base 9100, and the same
       for 9200 and 9300. If a base will not start, run on 8100, 8200 and 8300
       instead (--port-bases 8100,8200,8300; free once the bank runs end).
-    - The run (Sat 12:00-13:10, about 65 minutes): python run.py eval --split
+    - The run (Sat after the final run and the dispatch soak, about
+      13:15-14:25, about 65 minutes): python run.py eval --split
       transfer --final --arms abcde,runbook,noop,oracle --copies 3 --name
       transfer-1 (the frozen agent and the frozen runbook, with noop and oracle
-      for validity, on port bases 9100, 9200 and 9300). Stop at 14:15 whatever its state. Run the first 10
-      incidents first: those 10 are never cut. Report the agent hash beside
-      the results.
+      for validity, on port bases 9100, 9200 and 9300). Stop 2 h 15 min after it starts (about 15:30) whatever its state. Run the first 10
+      incidents first: those 10 are never cut. Report the agent hash and the
+      baseline hash beside the results: a transfer run's freeze check compares
+      only the agent hash, and the runbook arm is the baseline group
+      (55082984be2bb92b... at freeze-1, and still on main on Sat morning).
     - If an organiser system replaces dispatch as the transfer test, do the same
       for it: its faults and 20 sealed incidents, from its adapter and control.
 
@@ -473,7 +481,8 @@ customers paying nonstop). Use the words "system" or "target system", never
 - Your clone: %USERPROFILE%\Documents\HUMAIN-IC-baseline (Omar made it). Never open
   %USERPROFILE%\Documents\HUMAIN-sealed\, the sealed paths
   (scenarios/heldout/ except SEALED.json, targets/bank/faults/heldout/) or
-  Session A's clones until the final run ends (see the Sat 12:00 prompt).
+  Session A's clones until the final run ends (see Saturday's prompt for
+  when the final run has ended).
 
 5. WORKING RULES
 - Windows first: PowerShell, a venv, Python 3.11+. No Linux-only tools, no Docker.
@@ -754,7 +763,7 @@ Paste these into the named session when the time comes. On Friday morning the da
   ```
 
   For the core40 cut, add `--limit 40` to the final-1 line and delete the robust-v2 and robust-xs lines. Check progress with `Get-Content results\final.log -Tail 20`.
-- **Sat 09:00, Session A:** "Start C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, with at least one incident of each of the three shapes C7 lists, seal them, push only scenarios/transfer/SEALED.json, and report."
-- **Sat 11:00, Session A:** "If the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N."
-- **Sat 12:00, Session B:** "The final run is over, so you may now open %USERPROFILE%\Documents\HUMAIN-final; change nothing there outside results/. In that folder run `python run.py eval --report final-1`, then `--report robust-ff --against final-1` (and the same for robust-v2, robust-xs and robust-ms), with n/N, intervals, and where the runbook ties or wins. Then make the off-list table and its react sensitivity row exactly as DECISIONS.md defines them (30 Oct, the two exploratory analyses, item 2), labelled exploratory. Send Omar the tables for Claude." **Session A:** "Run the transfer test (C7), then open the codex/reveal pull request with the sealed files."
+- **Sat, as soon as pull request #28 is merged (no need to wait for 09:00), Session A:** "Start C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, with at least one incident of each of the three shapes C7 lists, seal them, push only scenarios/transfer/SEALED.json, and report. The final run is going on this laptop until about 12:45: until it ends, start at most one dispatch copy at a time."
+- **Sat 11:00, Session A:** none. The final run started late (Sat 07:28, core40 cut in full) and runs to its end, about 12:45, so the old 11:00 stop no longer applies.
+- **Sat, once the final run has ended (about 12:45), Session B:** "The final run is over, so you may now open %USERPROFILE%\Documents\HUMAIN-final; change nothing there outside results/. In that folder run `python run.py eval --report final-1`, then `--report robust-ff --against final-1` (and the same for robust-ms; robust-v2 and robust-xs were not run), with n/N, intervals, and where the runbook ties or wins. Then make the off-list table and its react sensitivity row exactly as DECISIONS.md defines them (30 Oct, the two exploratory analyses, item 2), labelled exploratory. Send Omar the tables for Claude." **Session A, after the 10-minute dispatch soak (about 13:15):** "Run the transfer test (C7), then open the codex/reveal pull request with the sealed files."
 - **Sat 16:00, Session A:** "Scan the full git history for secrets and report. After Omar makes the repository public, clean-clone pass 2: `$env:GIT_TERMINAL_PROMPT=0; git -c credential.helper= clone https://github.com/Oahsins/HUMAIN-Incident-Commander ic-clean`, follow the README exactly, run `python run.py demo`, then run it again in the same window with the key unset (`Remove-Item Env:ANTHROPIC_API_KEY`, which affects only that window): it must print 'REPLAY of a recorded run (no API key found)' and replay replays/demo-frozen.jsonl. Report anything that fails." Repeat the check at 18:00.
