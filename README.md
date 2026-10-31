@@ -4,14 +4,14 @@ An AI incident commander for HUMAIN's Future AI Builders hackathon (Challenge 1:
 
 **In 60 seconds**
 - **What it is:** an agent that surveys every component of a failing system in a fixed order before fixing anything. It fixes upstream faults first, then the most harmful, using six bounded actions. It hands over with an SBAR, or escalates to a person.
-- **Result:** [FILL: the headline sentence from fill-values.md, the same one used on the slides and the project page]
-- **See it:** [the 3-minute video]([FILL: video link]) · [the slides]([FILL: slides link]) · or run `python run.py demo`, which needs no API key
+- **Result:** On 40 sealed incidents it had never seen, the agent succeeded on 39 of 40 and a scripted runbook on 19 of 40 (paired test, p < 0.001). On the blind fault type, which neither had practised: 5 of 5 against 2 of 5.
+- **See it:** run `python run.py demo`, which needs no API key. The 3-minute video and the slides are linked here at submission.
 
 It keeps a failing multi-service system running using the method emergency medicine uses for several injuries at once. It surveys every component in a fixed ABCDE order (Access, Bottlenecks, Capacity, Dependencies, Events) before fixing anything, triages the faults by customer impact against time to fix, remediates with six bounded actions only (four can be undone, two lose no committed data), verifies recovery over a sustained window, and hands over with an SBAR, or escalates to a person when no safe action fixes the fault. A safety wrapper refuses any action outside the allowlist, and an independent checker decides whether the system really recovered, mainly from the customers' own log, which the agent never sees, and a full read of the ledger.
 
 The agent is portable: it needs only a 5-function adapter (describe, observe, logs, probe, act). So far it has been tested on two systems, both built on the same kit. A test system also supplies a control layer for fault injection and a checker. The main test system is a small bank around a double-entry ledger. The transfer test runs the frozen agent on dispatch, an emergency-dispatch system built after the freeze ([docs/DISPATCH.md](docs/DISPATCH.md)).
 
-> **Status (31 Oct 2026):** built, frozen and measured. The agent, the bank, the runbook and the scorer were frozen at the `freeze-1` tag on 30 Oct; their hashes are in the [decision log](DECISIONS.md). The final run used the pre-registered core40 cut of the sealed exam, and the transfer run used 20 sealed dispatch incidents. Work started on 29 Oct, before the event, and is disclosed here. The commit history shows the dates.
+> **Status (31 Oct 2026):** built, frozen and measured. The agent, the bank, the runbook and the scorer were frozen at the `freeze-1` tag on 30 Oct; their hashes are in the [decision log](DECISIONS.md). The final run used the pre-registered core40 cut of the sealed exam, and the transfer run used 20 sealed dispatch incidents. Its AI arms (`abcde`, `react`, `naive_verify`, `fifo`), and `abcde` in the four-faults and model-swap runs, first ran without the model key, so none of their model calls reached the provider. As CONTRACT section 11 requires for a model-provider failure, they are re-run on the same cases and seeds from the same frozen code; the decision was logged before any re-run result existed ([decision log](DECISIONS.md), 31 Oct). The runbook, `noop` and `oracle` make no model calls and keep their first runs. Cells marked "running" wait for a re-run that had not finished when this README was last updated (15:54 Riyadh, 31 Oct). Work started on 29 Oct, before the event, and is disclosed here. The commit history shows the dates.
 
 ## How it was built
 
@@ -40,50 +40,48 @@ python run.py down           # stops the bank if one is still running
 
 ## Results
 
-**[FILL after the final run: replace every [FILL] from `results/final-1/report.md`, `results/robust-ff/report.md`, `results/robust-ms/report.md` and `results/transfer-1/report.md`, then delete this line.]**
-
 Every result comes from the frozen code, scored by the independent checker, never by the agent's own claim. Every rate is n/N with a 95% Wilson interval. N is 40 minus exclusions for the main exam, and 20 minus exclusions for each robustness condition and for the transfer run. Arms are compared only by paired tests on identical cases, as the analysis plan fixed before the freeze ([CONTRACT section 16](docs/CONTRACT.md)). Where the scripted runbook ties or wins, that is reported too. The full reports hold every arm, metric, stratum and exclusion: [main exam](results/final-1/report.md), [four faults](results/robust-ff/report.md), [model swap](results/robust-ms/report.md), [transfer](results/transfer-1/report.md).
 
 ### Main exam: 40 sealed incidents (core40), 7 arms
 
-The incidents were written by a separate Codex session and sealed 39 minutes before the agent's code first reached GitHub (seal 1 in [pull request #6](https://github.com/Oahsins/HUMAIN-Incident-Commander/pull/6), opened at 01:44 Riyadh on 30 Oct; the agent's first commit, [448b19d](https://github.com/Oahsins/HUMAIN-Incident-Commander/commit/448b19d91e9c35159d8e8b269c649a6b0bc9e5f5), is from 02:23). By design, three of the four new fault types (poison payment, stale balances, double posting) were named in the plan the agent was built from, and its prompt describes their fault classes; only the blind type was never named to the agent's builder. Of the full 60, 40 contain a named type, 8 the blind type and 5 practice faults only (`scenarios/heldout/SEALED.json`). As designed ([CONTRACT section 14](docs/CONTRACT.md)), there are 13 single cases, 17 two-fault cases and 10 three-fault cases. The 13 single cases include 4 healthy cases with no fault and 4 that must be escalated. [FILL] cases were excluded by the pre-registered validity rule ([FILL: reasons]).
+The incidents were written by a separate Codex session and sealed 39 minutes before the agent's code first reached GitHub (seal 1 in [pull request #6](https://github.com/Oahsins/HUMAIN-Incident-Commander/pull/6), opened at 01:44 Riyadh on 30 Oct; the agent's first commit, [448b19d](https://github.com/Oahsins/HUMAIN-Incident-Commander/commit/448b19d91e9c35159d8e8b269c649a6b0bc9e5f5), is from 02:23). By design, three of the four new fault types (poison payment, stale balances, double posting) were named in the plan the agent was built from, and its prompt describes their fault classes; only the blind type was never named to the agent's builder. Of the full 60, 40 contain a named type, 8 the blind type and 5 practice faults only (`scenarios/heldout/SEALED.json`). As designed ([CONTRACT section 14](docs/CONTRACT.md)), there are 13 single cases, 17 two-fault cases and 10 three-fault cases. The 13 single cases include 4 healthy cases with no fault and 4 that must be escalated. No case was excluded by the pre-registered validity rule.
 
 | Arm | What it is | Case success | 95% Wilson |
 |---|---|---|---|
-| `abcde` | The full agent | [FILL] / [FILL] | [FILL] |
-| `runbook` | A scripted runbook, no AI | [FILL] / [FILL] | [FILL] |
-| `react` | A free-form baseline, not a one-part ablation: same model, tools and guard; no fixed survey, ordering, coverage check or off-list filter | [FILL] / [FILL] | [FILL] |
-| `naive_verify` | The full agent, but "errors stopped" counts as recovered | [FILL] / [FILL] | [FILL] |
-| `fifo` | The full agent, fixing faults in the order found | [FILL] / [FILL] | [FILL] |
-| `noop` | Does nothing (validity check) | [FILL] / [FILL] | [FILL] |
-| `oracle` | Applies the labelled fixes (validity check) | [FILL] / [FILL] | [FILL] |
+| `abcde` | The full agent | 39 / 40 | 87%–100% |
+| `runbook` | A scripted runbook, no AI | 19 / 40 | 33%–63% |
+| `react` | A free-form baseline, not a one-part ablation: same model, tools and guard; no fixed survey, ordering, coverage check or off-list filter | running | running |
+| `naive_verify` | The full agent, but "errors stopped" counts as recovered | running | running |
+| `fifo` | The full agent, fixing faults in the order found | running | running |
+| `noop` | Does nothing (validity check) | 4 / 40 | 4%–23% |
+| `oracle` | Applies the labelled fixes (validity check) | 36 / 40 | 77%–96% |
 
 **Primary comparison.** The comparison is `abcde` against `runbook` on case success, with an exact two-sided McNemar test on all valid cases.
-- b = [FILL]
-- c = [FILL]
-- Difference: [FILL] points (95% paired bootstrap [FILL])
-- p = [FILL]
+- b = 20
+- c = 0
+- Difference: +50 points (95% paired bootstrap +35 to +65)
+- p < 0.001
 
 **Secondary comparisons** (Holm-adjusted as one family):
 
 | Comparison | Endpoint | b | c | Difference [95% CI] | p (adjusted) |
 |---|---|---|---|---|---|
-| `abcde` vs `runbook`, cases with a named held-out or blind fault | Case success | [FILL] | [FILL] | [FILL] | [FILL] |
-| `abcde` vs `react` | Case success | [FILL] | [FILL] | [FILL] | [FILL] |
-| `abcde` vs `naive_verify` | False all-clear | [FILL] | [FILL] | [FILL] | [FILL] |
-| `abcde` vs `runbook` | User-impact seconds (Wilcoxon) | - | - | [FILL] | [FILL] |
+| `abcde` vs `runbook`, cases with a named held-out or blind fault | Case success | running | running | running | running |
+| `abcde` vs `react` | Case success | running | running | running | running |
+| `abcde` vs `naive_verify` | False all-clear | running | running | running | running |
+| `abcde` vs `runbook` | User-impact seconds (Wilcoxon) | - | - | running | running |
 
 In the primary and secondary comparisons, b counts the cases only `abcde` succeeded on and c the cases only the other arm succeeded on, and each difference is `abcde` minus the other arm. False all-clear is the exception, because lower is better: there b counts the cases where only `abcde` gave a false all-clear, so a larger b or a positive difference counts against `abcde`. The Wilcoxon test gives no b, c or difference.
 
-**Where the runbook ties or wins:** [FILL, from the report's headline section].
+**Where the runbook ties or wins:** The runbook wins on 0/40 (95% Wilson 0.0%–8.8%) paired cases and ties on 20/40 (95% Wilson 35.2%–64.8%).
 
 **By fault type** (descriptive, case success, from the report's registered strata). The runbook's six rules were written for the practice fault types only.
 
 | Cases | `abcde` | `runbook` | `react` |
 |---|---|---|---|
-| Practice fault types only | [FILL] / [FILL] | [FILL] / [FILL] | [FILL] / [FILL] |
-| A named held-out type | [FILL] / [FILL] | [FILL] / [FILL] | [FILL] / [FILL] |
-| The blind type | [FILL] / [FILL] | [FILL] / [FILL] | [FILL] / [FILL] |
+| Practice fault types only | 4 / 4 | 4 / 4 | running |
+| A named held-out type | 25 / 26 | 5 / 26 | running |
+| The blind type | 5 / 5 | 2 / 5 | running |
 
 ### Robustness: robust20, descriptive
 
@@ -91,9 +89,9 @@ Two more pre-registered conditions, a changed log format and an extra service, w
 
 | Condition | Arm | Success | Paired change vs the main run |
 |---|---|---|---|
-| Four faults at once | `abcde` | [FILL] / [FILL] | [FILL] |
-| Four faults at once | `runbook` | [FILL] / [FILL] | [FILL] |
-| Model swap (Claude Haiku 5.5, not tuned on) | `abcde` | [FILL] / [FILL] | [FILL] |
+| Four faults at once | `abcde` | running | running |
+| Four faults at once | `runbook` | running | running |
+| Model swap (Claude Haiku 5.5, not tuned on) | `abcde` | running | running |
 
 Each change is in points, paired case by case with the main run: a negative change is a drop under the condition.
 
@@ -103,13 +101,13 @@ The frozen agent and the frozen runbook ran on 20 sealed dispatch incidents, whi
 
 | Arm | Success | 95% Wilson |
 |---|---|---|
-| `abcde` | [FILL] / [FILL] | [FILL] |
-| `runbook` | [FILL] / [FILL] | [FILL] |
+| `abcde` | 13 / 20 | 43%–82% |
+| `runbook` | 9 / 20 | 26%–66% |
 
 ### Exploratory, declared before the final run
 
-- **Omar's own unblinded review of 12 drawn `abcde` cases (exploratory):** [FILL].
-- **Off-list proposals by arm, with a `react` sensitivity row:** [FILL].
+- **Omar's own unblinded review of 12 drawn `abcde` cases (exploratory):** pending; the 12 cases are redrawn from the re-run by the declared rule.
+- **Off-list proposals by arm, with a `react` sensitivity row:** running (it needs `react`'s re-run).
 
 ## Limitations
 
