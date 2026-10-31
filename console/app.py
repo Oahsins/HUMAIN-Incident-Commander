@@ -26,6 +26,7 @@ ROOT = os.path.dirname(HERE)
 CASES_FILE = os.path.join(ROOT, "scenarios", "dev", "dev.jsonl")
 DISPATCH_FILE = os.path.join(ROOT, "scenarios", "dev", "dispatch-practice.jsonl")
 SCENARIOS = {"bank": "scenarios/dev/dev.jsonl", "dispatch": "scenarios/dev/dispatch-practice.jsonl"}
+PRACTICE_INJECT = "practice/inject.py"   # `run.py inject` plus the practice faults in practice/<system>/
 KEY_VAR = "ANTHROPIC_API_KEY"
 MODES = ("auto", "confirm", "advise")
 SET_MODES = ("auto", "advise")   # confirm asks before every action, so it runs one case at a time
@@ -95,9 +96,11 @@ class Job:
                     while time.time() < end and not self.stopped:
                         time.sleep(0.2)
                 else:
-                    code = self._command(step[1], quiet=step[0] == "quiet")
-                    if code != 0 and step[1][0] in ("up", "inject"):
-                        self.emit(f"`run.py {step[1][0]}` failed, so the run stops here", "error")
+                    script = PRACTICE_INJECT if step[0] == "practice" else True
+                    code = self._command(step[1], quiet=step[0] == "quiet", script=script)
+                    if code != 0 and (step[0] == "practice" or step[1][0] in ("up", "inject")):
+                        name = PRACTICE_INJECT if step[0] == "practice" else f"run.py {step[1][0]}"
+                        self.emit(f"`{name}` failed, so the run stops here", "error")
                         self.stopped = True
             if self.stopped:
                 failed = any(line["kind"] == "error" for line in self.lines)
@@ -115,9 +118,11 @@ class Job:
             self.env = None   # drop the key as soon as the run ends
 
     def _command(self, args, quiet=False, script=True):
-        cmd = [sys.executable, "-u"] + ([os.path.join(ROOT, "run.py")] if script else []) + args
+        """script: True runs run.py, a relative path runs that file, False runs python with args alone."""
+        shown = "run.py" if script is True else (script or "")
+        cmd = [sys.executable, "-u"] + ([os.path.join(ROOT, shown)] if shown else []) + args
         if not quiet:
-            self.emit("$ python " + ("run.py " if script else "") + " ".join(args), "cmd")
+            self.emit("$ python " + (shown + " " if shown else "") + " ".join(args), "cmd")
         self.proc = subprocess.Popen(cmd, cwd=ROOT, env=self.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT)
         buf = b""
@@ -165,7 +170,9 @@ def plan(case_id, mode, port_base, system="bank"):
     return [
         ("quiet", ["down", *pb]),
         ("run", ["up", *pb]),
-        ("run", ["inject", *pb, "--scenario", SCENARIOS[system], "--id", case_id]),
+        # dispatch's practice faults live outside Session A's folder; practice/inject.py finds them
+        ("run", ["inject", *pb, "--scenario", SCENARIOS[system], "--id", case_id]) if system == "bank"
+        else ("practice", [*pb, "--scenario", SCENARIOS[system], "--id", case_id]),
         ("wait", ALERT_DELAY_S, f"the alert fires in {ALERT_DELAY_S} s; nobody tells the agent what broke"),
         ("run", ["agent", *pb, "--mode", mode]),
         ("wait", CHECK_WAIT_S, f"waiting {CHECK_WAIT_S} s for a clean checker window (every customer retry finished)"),

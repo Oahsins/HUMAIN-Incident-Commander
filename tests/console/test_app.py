@@ -25,19 +25,38 @@ def test_cases_match_the_practice_set():
     assert {c["system"] for c in cases} == {"bank", "dispatch"}
 
 
+practice_spec = importlib.util.spec_from_file_location("practice_inject", os.path.join(ROOT, "practice", "inject.py"))
+practice = importlib.util.module_from_spec(practice_spec)
+practice_spec.loader.exec_module(practice)
+
+
 def test_dispatch_practice_faults_load_and_are_not_exam_types():
     from ic import inject
     for case in (c for c in app.load_cases() if c["system"] == "dispatch"):
         for fault in case["faults"]:
             assert fault["type"].startswith("practice_")      # never shadows a sealed exam type
-            assert inject.load("dispatch", fault["type"]).TYPE == fault["type"]
+            assert practice.load("dispatch", fault["type"]).TYPE == fault["type"]
+            with pytest.raises(KeyError):                    # the frozen loader never sees them
+                inject.load("dispatch", fault["type"])
+            with pytest.raises(KeyError):                    # and they never load for a sealed run
+                practice.load("dispatch", fault["type"], allow_sealed=True)
+
+
+def test_practice_wrapper_leaves_every_other_fault_to_the_frozen_loader():
+    from ic import inject
+    assert practice.FROZEN_LOAD is inject.load
+    assert practice.load("bank", "crash").TYPE == inject.load("bank", "crash").TYPE
+    with pytest.raises(SystemExit):
+        practice.main(["--sealed", "--scenario", "scenarios/dev/dispatch-practice.jsonl", "--id", "dsp-01"])
+    assert inject.load is practice.FROZEN_LOAD
 
 
 def test_dispatch_plans_name_the_system_everywhere():
     steps = app.plan("dsp-01", "auto", 27400, "dispatch")
     for step in steps:
-        if step[0] in ("run", "quiet"):
+        if step[0] in ("run", "quiet", "practice"):
             assert step[1][step[1].index("--system") + 1] == "dispatch"
+    assert steps[2][0] == "practice" and app.PRACTICE_INJECT == "practice/inject.py"
     inject_args = steps[2][1]
     assert inject_args[inject_args.index("--scenario") + 1] == "scenarios/dev/dispatch-practice.jsonl"
 
