@@ -229,7 +229,7 @@ details .key{font-size:13px;margin-top:6px}
 @media (max-width:980px){.run{grid-template-columns:minmax(0,1fr)}.side{position:static;max-height:none}.panes2{grid-template-columns:minmax(0,1fr)}}
 </style></head><body>
 <header class="top"><div class="wrap">
-  <div class="brand"><h1>ABCDE Incident Commander</h1><span class="sub">Run the frozen agent on a live test bank</span></div>
+  <div class="brand"><h1>ABCDE Incident Commander</h1><span class="sub">Run the frozen agent on a live test bank or dispatch centre</span></div>
   <span class="pill muted" id="keystate">checking for a model key…</span>
 </div></header>
 
@@ -244,11 +244,12 @@ details .key{font-size:13px;margin-top:6px}
     <span class="eyebrow" id="pick-title">1 · Choose an incident</span>
     <button type="button" class="case demo" data-id="demo" aria-pressed="true"><b>Two-fault demo</b><span class="kind">no key needed · replay</span><span>A pipeline change cuts the transfer limit and fraud screening slows down.</span></button>
     <div class="seg" role="group" aria-label="Filter incidents" id="filter">
-      <button type="button" data-f="all" aria-pressed="true">All 32</button>
+      <button type="button" data-f="all" aria-pressed="true" id="f-all">All</button>
       <button type="button" data-f="single" aria-pressed="false">One fault</button>
       <button type="button" data-f="multi" aria-pressed="false">Two or more</button>
       <button type="button" data-f="escalate" aria-pressed="false">Must escalate</button>
       <button type="button" data-f="healthy" aria-pressed="false">Healthy</button>
+      <button type="button" data-f="dispatch" aria-pressed="false">Dispatch</button>
     </div>
     <div class="settools" id="settools" hidden>
       <button type="button" class="btn" id="pickall">Pick all shown</button>
@@ -290,7 +291,7 @@ details .key{font-size:13px;margin-top:6px}
     </div>
 
     <div class="pane board" id="board" hidden>
-      <h2>Scoreboard <span class="eyebrow" id="board-sub">one fresh bank per case</span></h2>
+      <h2>Scoreboard <span class="eyebrow" id="board-sub">one fresh copy per case</span></h2>
       <div class="sum"><span id="board-sum" class="help"></span><button type="button" class="btn" id="follow" hidden>Follow the live case</button></div>
       <div class="tbl"><table><thead><tr><th>#</th><th>Case</th><th>Answer key</th><th>Now</th><th>Agent</th><th>Actions sent</th><th>Checker</th></tr></thead><tbody id="board-rows"></tbody></table></div>
       <p class="help" style="margin:0">Click a row to see that case below. For must-escalate cases and in advise mode the checker should read not recovered: nothing safe was sent. The official scores come from the evaluation harness (<code>python run.py eval</code>), not this table.</p>
@@ -332,7 +333,7 @@ details .key{font-size:13px;margin-top:6px}
       </div>
       <div class="pane check">
         <h2>Independent checker <span class="eyebrow">scores the customers' own logs</span></h2>
-        <div id="check"><p class="empty">Separate code that decides whether the bank really recovered.</p></div>
+        <div id="check"><p class="empty">Separate code that decides whether the system really recovered.</p></div>
       </div>
     </div>
 
@@ -377,7 +378,9 @@ function seg(id, key, attr) {
 seg("filter", "filter", "f"); seg("mode", "mode", "m"); seg("what", "what", "w");
 $("#pickall").addEventListener("click", () => { shownCases().forEach(c => st.set.add(c.id)); drawPicker(); });
 $("#clearset").addEventListener("click", () => { st.set.clear(); drawPicker(); });
-const shownCases = () => INFO.cases.filter(c => st.filter === "all" || kindOf(c) === st.filter);
+const shownCases = () => INFO.cases.filter(c => st.filter === "all" || (st.filter === "dispatch" ? c.system === "dispatch" : c.system !== "dispatch" && kindOf(c) === st.filter));
+const kindLabel = c => (c.system === "dispatch" ? "dispatch · " : "") + KIND[kindOf(c)];
+const sysOf = id => { const c = INFO.cases.find(x => x.id === id); return c && c.system === "dispatch" ? "dispatch centre" : "bank"; };
 $(".case.demo").addEventListener("click", () => { st.id = "demo"; drawPicker(); });
 function needsKey() {
   if (INFO.key_in_env || st.what === "selftest") return false;
@@ -397,7 +400,7 @@ function drawPicker() {
   $("#selftest-help").hidden = !self;
   $("#pick-title").textContent = set ? "1 · Tick the incidents to run" : "1 · Choose an incident";
   const list = shownCases();
-  $("#cases").innerHTML = list.map(c => `<button type="button" class="case" aria-pressed="${set ? st.set.has(c.id) : c.id === st.id}" data-id="${c.id}"><b>${c.id}</b><span class="kind">${KIND[kindOf(c)]}</span><span>${esc(c.notes.replace(/^[a-z ]+: /, ""))}</span></button>`).join("");
+  $("#cases").innerHTML = list.map(c => `<button type="button" class="case" aria-pressed="${set ? st.set.has(c.id) : c.id === st.id}" data-id="${c.id}"><b>${c.id}</b><span class="kind">${kindLabel(c)}</span><span>${esc(c.notes.replace(/^[a-z ]+: /, ""))}</span></button>`).join("");
   document.querySelectorAll("#cases .case").forEach(b => b.addEventListener("click", () => {
     if (set) { st.set.has(b.dataset.id) ? st.set.delete(b.dataset.id) : st.set.add(b.dataset.id); } else st.id = b.dataset.id;
     drawPicker();
@@ -406,13 +409,13 @@ function drawPicker() {
   if (set) {
     const n = st.set.size, mins = Math.max(1, Math.round(n * SET_CASE_S / 60));
     const ids = INFO.cases.map(c => c.id).filter(id => st.set.has(id));
-    $("#chosen").innerHTML = n ? `<b>${n} case${n > 1 ? "s" : ""} picked · about ${mins} min</b><div class="faults">${esc(ids.join(", "))}</div><div class="help">They run one after another, each on a fresh bank, and fill the scoreboard as they finish.</div>`
+    $("#chosen").innerHTML = n ? `<b>${n} case${n > 1 ? "s" : ""} picked · about ${mins} min</b><div class="faults">${esc(ids.join(", "))}</div><div class="help">They run one after another, each on a fresh copy of its system, and fill the scoreboard as they finish.</div>`
       : `<div class="help">Tick practice incidents above, or use a filter and press Pick all shown. Each takes about a minute.</div>`;
   } else if (st.id === "demo") {
     $("#chosen").innerHTML = `<b class="mono">demo</b><div>The incident from the filmed demo: two faults at once. With no key the model's answers are replayed from a recorded run; the bank, faults, actions, rechecks and checker run live.</div>`;
   } else {
     const c = INFO.cases.find(x => x.id === st.id);
-    $("#chosen").innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="mono">${c.id}</b><span class="kind">${KIND[kindOf(c)]}${c.decoys ? " · " + c.decoys + " harmless decoy" + (c.decoys > 1 ? "s" : "") : ""}</span></div>
+    $("#chosen").innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="mono">${c.id}</b><span class="kind">${kindLabel(c)}${c.decoys ? " · " + c.decoys + " harmless decoy" + (c.decoys > 1 ? "s" : "") : ""}</span></div>
       <div>${esc(c.notes)}</div><div class="faults">faults: ${c.faults.length ? esc(c.faults.map(faultStr).join(" + ")) : "none (busy but healthy)"}</div>
       <details><summary>Show the answer key</summary><div class="key">${esc(expectOf(c))}</div></details>`;
   }
@@ -481,7 +484,8 @@ function parse(src = lines) {
       if (/impact since the first fault/.test(t)) {
         const num = k => { const m = t.match(new RegExp("'" + k + "': ([\\d.]+|None)")); return m ? m[1] : null; };
         s.impact = {failed: num("failed_journeys"), ttm: num("time_to_mitigate_s"), censored: /'mitigation_censored': True/.test(t), doubles: num("double_postings"),
-                    unbalanced: num("unbalanced_payments"), late: num("late_clearings")};
+                    unbalanced: num("unbalanced_payments"), late: num("late_clearings"), calls: num("calls_dropped"),
+                    dupes: num("duplicate_incidents"), doubleSent: num("incidents_double_sent")};
       }
     }
     if (/^REPLAY/.test(t)) s.replay = true;
@@ -513,20 +517,21 @@ function draw() {
   }
   const s = parse(src);
   const el = ((performance.now() - tStart) / 1000);
-  let state = "Ready", col = "var(--muted)", cap = "Pick an incident and press Run. The bank starts fresh, the faults are injected, and the agent gets only an alert.";
+  const SYS = sysOf(runCase);
+  let state = "Ready", col = "var(--muted)", cap = "Pick an incident and press Run. The system starts fresh, the faults are injected, and the agent gets only an alert.";
   if (runCase) {
     if (s.checker) { const ok = /^RECOVERED/.test(s.checker); state = "Checker: " + (ok ? "recovered" : "not recovered"); col = ok ? "var(--ok)" : "var(--crit)";
-      cap = ok ? "The checker scored a clean window of every customer's journeys." : "The bank did not recover in the checker's window" + (s.reasons.length ? ": " + s.reasons.join("; ") + "." : "."); }
+      cap = ok ? "The checker scored a clean window of every customer's journeys." : "The " + SYS + " did not recover in the checker's window" + (s.reasons.length ? ": " + s.reasons.join("; ") + "." : "."); }
     else if (s.outcome) { state = "Agent: " + s.outcome.word.toLowerCase(); col = s.outcome.word === "RECOVERED" || s.outcome.word === "NO_INCIDENT" ? "var(--ok)" : "var(--warn)";
       cap = "The agent has handed over. The checker now waits for a clean 20 s window of customer journeys."; }
     else if (s.steps.some(x => x.phase === "verify")) { state = "Verifying"; col = "var(--accent)"; cap = "Recovery needs two clean rechecks in a row."; }
     else if (s.alert) { state = "Responding"; col = "var(--accent)"; cap = "The agent surveys every component before it fixes anything."; }
     else if (s.injected) { state = "Incident"; col = "var(--crit)"; cap = "Faults injected. The alert fires in 5 s; nobody tells the agent what broke."; }
-    else { state = "Starting"; col = "var(--muted)"; cap = "Starting a fresh bank and its 20 simulated customers (about 10 s)."; }
-    if (js === "stopped") { state = "Stopped"; col = "var(--muted)"; cap = "You stopped the run. The test bank is shut down."; }
+    else { state = "Starting"; col = "var(--muted)"; cap = SYS === "bank" ? "Starting a fresh bank and its 20 simulated customers (about 10 s)." : "Starting a fresh dispatch centre with its simulated callers and units (about 10 s)."; }
+    if (js === "stopped") { state = "Stopped"; col = "var(--muted)"; cap = "You stopped the run. The test " + SYS + " is shut down."; }
     if (js === "error") { state = "Error"; col = "var(--crit)"; cap = "The console hit an error. See the terminal below."; }
   }
-  if (runMode === "advise" && s.checker && !/^RECOVERED/.test(s.checker)) cap += " Expected in advise mode: the agent sends no action, so the bank stays broken until a person carries out its plan.";
+  if (runMode === "advise" && s.checker && !/^RECOVERED/.test(s.checker)) cap += " Expected in advise mode: the agent sends no action, so the " + SYS + " stays broken until a person carries out its plan.";
   if (runCase && runCase !== "demo") {
     const c = INFO.cases.find(x => x.id === runCase);
     if (c && c.escalate && s.checker && !/^RECOVERED/.test(s.checker)) cap += " For this case that is expected: no safe action fixes it, so the right answer is to escalate.";
@@ -547,7 +552,7 @@ function draw() {
   $("#abcde").classList.toggle("lit", !!ab);
   $("#abcde-t").textContent = ab ? ab.text : "Primary survey: access, bottlenecks, capacity, dependencies, events";
   $("#steps").innerHTML = s.steps.map((x, i) => `<li class="${i === s.steps.length - 1 && !done ? "new" : ""}"><span class="t num">${x.rel.toFixed(1)}s</span><span class="ph-tag">${esc(x.phase.replace("_", " "))}</span><span class="what"><b>${esc(GLOSS[x.name] || x.name)}</b><code>${esc(x.text)}</code></span></li>`).join("")
-    || `<li class="empty" style="display:block">${runCase ? (s.injected ? "Waiting for the alert…" : "The bank is starting…") : "The agent's steps appear here as they happen."}</li>`;
+    || `<li class="empty" style="display:block">${runCase ? (s.injected ? "Waiting for the alert…" : "The " + SYS + " is starting…") : "The agent's steps appear here as they happen."}</li>`;
   const sl = $("#steps"); sl.scrollTop = sl.scrollHeight;
 
   const acts = s.steps.filter(x => ACTIONS.includes(x.name));
@@ -585,13 +590,14 @@ function draw() {
     $("#check").innerHTML = `<div class="verdict ${ok ? "ok" : "bad"}">CHECKER: ${esc(ok ? "RECOVERED" : "NOT RECOVERED")}</div>
       ${s.reasons.length ? `<div class="help">${s.reasons.map(esc).join("<br>")}</div>` : ""}
       ${im ? `<div class="stats">
-        <div class="stat"><b>${esc(im.failed ?? "–")}</b><span>customer journeys failed since the first fault</span></div>
+        <div class="stat"><b>${esc(im.failed ?? "–")}</b><span>${SYS === "bank" ? "customer" : "emergency-call"} journeys failed since the first fault</span></div>
         <div class="stat"><b>${im.censored ? "not yet" : im.ttm && im.ttm !== "None" ? esc((+im.ttm).toFixed(0)) + " s" : "–"}</b><span>${im.censored ? "mitigated within the window" : "time to mitigate"}</span></div>
-        <div class="stat"><b>${esc(im.doubles ?? "–")} · ${esc(im.unbalanced ?? "–")}</b><span>double postings · unbalanced payments</span></div>
-        <div class="stat"><b>${esc(im.late ?? "–")}</b><span>late clearings</span></div></div>` : ""}
-      <div class="help">The checker is separate code. It scores every simulated customer's own log and the ledger, not the agent's report.</div>`;
+        ${SYS === "bank" ? `<div class="stat"><b>${esc(im.doubles ?? "–")} · ${esc(im.unbalanced ?? "–")}</b><span>double postings · unbalanced payments</span></div>
+        <div class="stat"><b>${esc(im.late ?? "–")}</b><span>late clearings</span></div>` : `<div class="stat"><b>${esc(im.calls ?? "–")}</b><span>emergency calls dropped</span></div>
+        <div class="stat"><b>${esc(im.dupes ?? "–")} · ${esc(im.doubleSent ?? "–")}</b><span>duplicate incidents · incidents sent twice</span></div>`}</div>` : ""}
+      <div class="help">${SYS === "bank" ? "The checker is separate code. It scores every simulated customer's own log and the ledger, not the agent's report." : "The checker is separate code. It scores every simulated caller's own log and the dispatch records, not the agent's report."}</div>`;
   } else if (s.outcome) $("#check").innerHTML = `<p class="empty">Waiting for every customer retry to finish, then scoring a clean 20 s window (about 31 s).</p>`;
-  else $("#check").innerHTML = `<p class="empty">Separate code that decides whether the bank really recovered.</p>`;
+  else $("#check").innerHTML = `<p class="empty">Separate code that decides whether the ${SYS} really recovered.</p>`;
 }
 
 function layout() {
@@ -664,6 +670,7 @@ fetch("/api/info").then(r => r.json()).then(info => {
   INFO = info;
   $("#keystate").textContent = info.key_in_env ? "model key found in the environment" : "no model key: the demo runs as a replay";
   $("#keystate").className = "pill " + (info.key_in_env ? "ok" : "muted");
+  $("#f-all").textContent = "All " + info.cases.length;
   drawPicker(); draw();
   fetch("/api/events?since=0").then(r => r.json()).then(ev => { if (ev.state === "running") { const m = ev.meta || {}; runKind = m.kind || "one"; runCases = m.cases || []; runMode = m.mode || "auto"; runCase = runKind === "set" ? runCases[0] : runKind === "selftest" ? "selftest" : (m.case || "demo"); tStart = performance.now(); setRunning(true); poll(); } });
 });

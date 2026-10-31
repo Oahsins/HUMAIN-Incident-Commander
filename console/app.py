@@ -24,6 +24,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CASES_FILE = os.path.join(ROOT, "scenarios", "dev", "dev.jsonl")
+DISPATCH_FILE = os.path.join(ROOT, "scenarios", "dev", "dispatch-practice.jsonl")
+SCENARIOS = {"bank": "scenarios/dev/dev.jsonl", "dispatch": "scenarios/dev/dispatch-practice.jsonl"}
 KEY_VAR = "ANTHROPIC_API_KEY"
 MODES = ("auto", "confirm", "advise")
 SET_MODES = ("auto", "advise")   # confirm asks before every action, so it runs one case at a time
@@ -34,14 +36,17 @@ CHECK_WAIT_S = 31      # the checker's 20 s window ends 10 s before the verdict,
 
 def load_cases():
     cases = []
-    with open(CASES_FILE, encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
+    for path in (CASES_FILE, DISPATCH_FILE):
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            lines = [line for line in handle if line.strip()]
+        for line in lines:
             case = json.loads(line)
             target = case["target"]
             cases.append({
                 "id": case["id"],
+                "system": case["input"].get("system", "bank"),
                 "faults": [{"type": f["type"], "params": f["params"]} for f in case["input"]["faults"]
                            if f["type"] != "benign"],
                 "decoys": sum(1 for f in case["input"]["faults"] if f["type"] == "benign"),
@@ -151,14 +156,16 @@ class Job:
             self.proc.terminate()
 
 
-def plan(case_id, mode, port_base):
+def plan(case_id, mode, port_base, system="bank"):
     pb = ["--port-base", str(port_base)]
     if case_id == "demo":
         return [("run", ["demo", *pb, "--mode", mode])]
+    if system != "bank":
+        pb = pb + ["--system", system]
     return [
         ("quiet", ["down", *pb]),
         ("run", ["up", *pb]),
-        ("run", ["inject", *pb, "--scenario", "scenarios/dev/dev.jsonl", "--id", case_id]),
+        ("run", ["inject", *pb, "--scenario", SCENARIOS[system], "--id", case_id]),
         ("wait", ALERT_DELAY_S, f"the alert fires in {ALERT_DELAY_S} s; nobody tells the agent what broke"),
         ("run", ["agent", *pb, "--mode", mode]),
         ("wait", CHECK_WAIT_S, f"waiting {CHECK_WAIT_S} s for a clean checker window (every customer retry finished)"),
@@ -167,12 +174,13 @@ def plan(case_id, mode, port_base):
     ]
 
 
-def plan_set(case_ids, mode, port_base):
-    """Several practice cases, one after another, each on a fresh bank."""
+def plan_set(case_ids, mode, port_base, systems=None):
+    """Several practice cases, one after another, each on a fresh copy of its system."""
+    systems = systems or {}
     steps = []
     for i, case_id in enumerate(case_ids):
         steps.append(("case", f"{case_id} ({i + 1} of {len(case_ids)})"))
-        steps += plan(case_id, mode, port_base)
+        steps += plan(case_id, mode, port_base, systems.get(case_id, "bank"))
     return steps
 
 
@@ -273,12 +281,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(400, {"error": "Advise mode needs a model key: the recorded replay comes "
                                                      "from a run that acted, so its handover would not fit."})
             if many is not None:
-                app["job"] = Job(plan_set(many, mode, app["port_base"]), env,
+                systems = {c["id"]: c["system"] for c in app["cases"]}
+                app["job"] = Job(plan_set(many, mode, app["port_base"], systems), env,
                                  f"a set of {len(many)} cases, mode {mode}", app["port_base"],
                                  {"kind": "set", "cases": many, "mode": mode})
                 return self._send(200, {"ok": True})
             label = ("the two-fault demo" if case_id == "demo" else case_id) + f", mode {mode}"
-            app["job"] = Job(plan(case_id, mode, app["port_base"]), env, label, app["port_base"],
+            system = next((c["system"] for c in app["cases"] if c["id"] == case_id), "bank")
+            app["job"] = Job(plan(case_id, mode, app["port_base"], system), env, label, app["port_base"],
                              {"kind": "one", "case": case_id, "mode": mode})
             return self._send(200, {"ok": True})
         if self.path == "/api/answer":

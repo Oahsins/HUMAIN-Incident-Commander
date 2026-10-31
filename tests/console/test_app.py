@@ -15,11 +15,31 @@ spec.loader.exec_module(app)
 
 
 def test_cases_match_the_practice_set():
-    with open(app.CASES_FILE, encoding="utf-8") as handle:
-        ids = [json.loads(line)["id"] for line in handle if line.strip()]
+    ids = []
+    for path in (app.CASES_FILE, app.DISPATCH_FILE):
+        with open(path, encoding="utf-8") as handle:
+            ids += [json.loads(line)["id"] for line in handle if line.strip()]
     cases = app.load_cases()
     assert [c["id"] for c in cases] == ids
     assert all(f["type"] != "benign" for c in cases for f in c["faults"])
+    assert {c["system"] for c in cases} == {"bank", "dispatch"}
+
+
+def test_dispatch_practice_faults_load_and_are_not_exam_types():
+    from ic import inject
+    for case in (c for c in app.load_cases() if c["system"] == "dispatch"):
+        for fault in case["faults"]:
+            assert fault["type"].startswith("practice_")      # never shadows a sealed exam type
+            assert inject.load("dispatch", fault["type"]).TYPE == fault["type"]
+
+
+def test_dispatch_plans_name_the_system_everywhere():
+    steps = app.plan("dsp-01", "auto", 27400, "dispatch")
+    for step in steps:
+        if step[0] in ("run", "quiet"):
+            assert step[1][step[1].index("--system") + 1] == "dispatch"
+    inject_args = steps[2][1]
+    assert inject_args[inject_args.index("--scenario") + 1] == "scenarios/dev/dispatch-practice.jsonl"
 
 
 def test_plans_only_call_run_py_commands():
