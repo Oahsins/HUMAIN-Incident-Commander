@@ -60,7 +60,7 @@ Without a key, `preflight` reports FAIL for the provider key and exits 1. That's
 
 Run `python console/app.py`, then open http://127.0.0.1:8088. Pick one of the 32 practice incidents and a mode (auto, confirm or advise), press Run, and watch the frozen agent's survey, actions, rechecks, handover and the checker's verdict come in live. It drives the same `run.py` commands as above.
 
-The same page can also run a set of ticked cases one after another (auto or advise), filling a scoreboard with the agent's outcome, the actions it sent and the checker's verdict. Its Self-test button runs the repository's own tests (`python -m pytest -q`, about a minute, no key).
+The same page can also run a set of ticked cases one after another (auto or advise), filling a scoreboard with the agent's outcome, the actions it sent and the checker's verdict. Its Self-test button runs the repository's own tests (`python -m pytest -q`, about a minute, no key). A Dispatch filter adds three practice incidents on the second system (`scenarios/dev/dispatch-practice.jsonl`, added on 31 Oct and not part of any exam).
 
 The two-fault demo runs without a key, as a replay. Every other case needs an Anthropic key, typed into the page or set as `ANTHROPIC_API_KEY`. The key goes only to that run and is never saved.
 
