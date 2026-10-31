@@ -1,0 +1,588 @@
+{
+  "case": {
+    "id": "t-12",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310012,
+      "faults": [
+        {
+          "type": "sealed_7",
+          "at_s": 0,
+          "params": {
+            "target": "cad",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_10",
+          "at_s": 2,
+          "params": {
+            "target": "dispatcher",
+            "variant": "v5"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 4,
+          "params": {
+            "target": "cad",
+            "variant": "v2"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "dispatcher",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "dispatcher",
+            "params": {}
+          }
+        },
+        {
+          "target": "cad",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "cad",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "dispatcher",
+        "class": "process_down",
+        "confidence": 0.9,
+        "evidence": "[C1] dispatcher: down (not answering); [B1] 30 items waiting, 0.0 processed/s. Dispatcher has had no recent release or config change."
+      },
+      {
+        "target": "cad",
+        "class": "bad_release",
+        "confidence": 0.75,
+        "evidence": "[D1] data check failed: possible duplicate incidents = 20, which follows [E1] deploy 11 s ago from 3.4 to 3.5. CAD links repeat calls to their open incident, and that is what is failing."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793445148.9835958,
+        "action": "rollback",
+        "target": "cad",
+        "params": {},
+        "reason": "bad_release: [D1] data check failed: possible duplicate incidents = 20, which follows [E1] deploy 11 s ago from 3.4 to 3.5. CAD links repeat calls to their open incident, and that is what is failing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "cad 3.5 -> 3.4"
+      },
+      {
+        "t": 1793445151.7289836,
+        "action": "restart",
+        "target": "dispatcher",
+        "params": {},
+        "reason": "process_down: [C1] dispatcher: down (not answering); [B1] 30 items waiting, 0.0 processed/s. Dispatcher has had no recent release or config change.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "dispatcher restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Dispatch has recovered. The incident commander confirmed this with three recovery checks, and the last two in a row were clean at 32 s.",
+      "background": "CAD was deployed from release 3.4 to 3.5 about 11 s before the duplicate incidents appeared. The dispatcher process went down separately, with no recent release or config change.",
+      "assessment": "The dispatcher was down, with 30 items waiting and none processed, so no units were committed; the incident commander restarted it, and the restart succeeded. CAD 3.5 created about 20 possible duplicate incidents instead of linking repeat calls to their open incident; the incident commander rolled CAD back from 3.5 to 3.4, and the rollback succeeded.",
+      "recommendation": "Find out why the dispatcher went down, and keep CAD on 3.4 until the call-linking fault in 3.5 is fixed. Operations should review the 20 possible duplicate incidents and merge them, and check that the 30 backlogged dispatcher items were processed and their units committed."
+    },
+    "t_start": 1793445137.0796719,
+    "t_first_action": 1793445148.9835958,
+    "t_declared": 1793445169.1924212,
+    "trace": [
+      {
+        "t": 0.05,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "dispatch: 9 components",
+        "data": {
+          "ms": 45.7
+        }
+      },
+      {
+        "t": 1.15,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components; down: dispatcher",
+        "data": {
+          "ms": 1100.4
+        }
+      },
+      {
+        "t": 3.8,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey failed at dispatcher",
+        "data": {
+          "ms": 2654.8
+        }
+      },
+      {
+        "t": 3.8,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "4 fault findings, 7 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "alerting",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 1.8/s), less work from its callers"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "dispatcher",
+              "severity": "fault",
+              "text": "emergency_call journey fails at step 'dispatcher': no unit committed within 2.5 s"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "dispatcher",
+              "severity": "fault",
+              "text": "backlog: 30 items waiting, oldest 8 s, 0.0 processed/s"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "dispatcher",
+              "severity": "fault",
+              "text": "down (not answering)"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "cad",
+              "severity": "fault",
+              "text": "data check failed: possible duplicate incidents = 20"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "cad",
+              "severity": "info",
+              "text": "11 s ago: deploy by operator (from=3.4, to=3.5)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "cad",
+              "severity": "info",
+              "text": "7 s ago: config by pipeline (key=write_timeout_ms, from=1000, to=2000)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 3.81,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "27 log records from dispatcher",
+        "data": {
+          "ms": 12.4
+        }
+      },
+      {
+        "t": 3.84,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "58 log records from cad",
+        "data": {
+          "ms": 24.8
+        }
+      },
+      {
+        "t": 11.9,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 8.065 s"
+      },
+      {
+        "t": 12.65,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "rollback cad: done (cad 3.5 -> 3.4)",
+        "data": {
+          "target": "cad",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.34,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "restart dispatcher: done (dispatcher restarted)",
+        "data": {
+          "target": "dispatcher",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 22.44,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 101.9
+        }
+      },
+      {
+        "t": 23.02,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 585.0
+        }
+      },
+      {
+        "t": 23.02,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: dispatcher: backlog: 20 items waiting, oldest 30 s, 7.5 processed/s; cad: data check failed: possible duplicate incidents = 6"
+      },
+      {
+        "t": 27.14,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 119.4
+        }
+      },
+      {
+        "t": 27.48,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 336.0
+        }
+      },
+      {
+        "t": 27.48,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 31.59,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 109.1
+        }
+      },
+      {
+        "t": 32.11,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 522.5
+        }
+      },
+      {
+        "t": 32.11,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 32.11,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 37.19,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 5.075 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 3669,
+        "output_tokens": 766,
+        "latency_s": 8.065,
+        "estimated_cost_usd": 0.029996,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 878,
+        "output_tokens": 342,
+        "latency_s": 5.075,
+        "estimated_cost_usd": 0.010352,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 13,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793445148.9835958,
+        "action": "rollback",
+        "target": "cad",
+        "params": {},
+        "reason": "bad_release: [D1] data check failed: possible duplicate incidents = 20, which follows [E1] deploy 11 s ago from 3.4 to 3.5. CAD links repeat calls to their open incident, and that is what is failing.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "cad 3.5 -> 3.4"
+      },
+      {
+        "event": "act",
+        "t": 1793445151.7289836,
+        "action": "restart",
+        "target": "dispatcher",
+        "params": {},
+        "reason": "process_down: [C1] dispatcher: down (not answering); [B1] 30 items waiting, 0.0 processed/s. Dispatcher has had no recent release or config change.",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "dispatcher restarted"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": true,
+    "slo_ok": true,
+    "t": 1793445256.6144361,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793445226.614,
+      1793445246.614
+    ],
+    "journeys": {
+      "n": 44,
+      "ok": 44,
+      "success_rate": 1.0,
+      "p95_ms": 36.1,
+      "p90_ms": 26.5,
+      "p95_allowed_ms": 286.5,
+      "by_source": {
+        "normal": {
+          "n": 44,
+          "ok": 44
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 0,
+      "failures": {}
+    },
+    "integrity": {
+      "ok": true,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793445128.301635,
+      "until_t": 1793445246.6144361,
+      "breach_seconds": 30.0,
+      "failed_journeys": 64,
+      "time_to_mitigate_s": 30.0,
+      "mitigation_censored": false,
+      "told_without_incident": 0,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 0.0,
+      "calls_dropped": 0,
+      "duplicate_incidents": 21,
+      "incidents_double_sent": 0
+    },
+    "reasons": []
+  },
+  "manifest": [
+    {
+      "type": "sealed_7",
+      "target": "cad",
+      "class": "bad_release",
+      "detail": {
+        "release": "3.5"
+      },
+      "t": 1793445128.301635,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_10",
+      "target": "dispatcher",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793445129.6123955,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "cad",
+        "key": "write_timeout_ms",
+        "value": 2000
+      },
+      "t": 1793445131.6138601,
+      "at_s": 4
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793445149.7271225,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "cad",
+      "detail": "cad 3.5 -> 3.4"
+    },
+    {
+      "t": 1793445152.4140222,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "dispatcher",
+      "detail": "dispatcher restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793445148.9835958,
+      "action": "rollback",
+      "target": "cad",
+      "params": {},
+      "reason": "bad_release: [D1] data check failed: possible duplicate incidents = 20, which follows [E1] deploy 11 s ago from 3.4 to 3.5. CAD links repeat calls to their open incident, and that is what is failing.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "cad 3.5 -> 3.4"
+    },
+    {
+      "event": "act",
+      "t": 1793445151.7289836,
+      "action": "restart",
+      "target": "dispatcher",
+      "params": {},
+      "reason": "process_down: [C1] dispatcher: down (not answering); [B1] 30 items waiting, 0.0 processed/s. Dispatcher has had no recent release or config change.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "dispatcher restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793445128.301635,
+    "t_alert": 1793445136.6138601,
+    "horizon": 1793445246.6138601,
+    "verdict_t": 1793445256.67796
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9300,
+  "error": null
+}

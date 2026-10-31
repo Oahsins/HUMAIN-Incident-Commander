@@ -1,0 +1,323 @@
+{
+  "case": {
+    "id": "h-27",
+    "input": {
+      "system": "bank",
+      "seed": 260027,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "crash",
+          "at_s": 2,
+          "params": {
+            "target": "screening"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "screening",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "screening",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "oracle",
+  "result": {
+    "arm": "oracle",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "process_down"
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message"
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793429374.1506495,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "screening restarted"
+      },
+      {
+        "t": 1793429377.7811306,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 96
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing item 96 set aside for the operations team"
+      },
+      {
+        "t": 1793429378.8088686,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Labelled fixes applied as a validity control.",
+      "background": "Fixes came from scenario labels and the injection manifest.",
+      "assessment": "recovered",
+      "recommendation": "Use the independent checker verdict."
+    },
+    "t_start": 1793429374.117457,
+    "t_first_action": 1793429374.1506495,
+    "t_declared": 1793429382.4460425,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793429493.8467937,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793429463.847,
+      1793429483.847
+    ],
+    "journeys": {
+      "n": 221,
+      "ok": 221,
+      "success_rate": 1.0,
+      "p95_ms": 65.00005722045898,
+      "payments": {
+        "n": 168,
+        "ok": 168
+      },
+      "balances": {
+        "n": 53,
+        "fresh": 53
+      },
+      "p95_allowed_ms": 321.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "set_aside",
+          "item": 96,
+          "payment_id": "batch-017"
+        }
+      ],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793429362.7940788,
+      "until_t": 1793429483.8467937,
+      "breach_seconds": 15.0,
+      "failed_journeys": 20,
+      "time_to_mitigate_s": 15.0,
+      "mitigation_censored": false,
+      "late_clearings": 14,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 96
+      },
+      "t": 1793429362.7940788,
+      "at_s": 0
+    },
+    {
+      "type": "crash",
+      "target": "screening",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793429364.8361728,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793429368.8463006,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793429374.7791724,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "screening",
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793429377.8072224,
+      "params": {
+        "item": 96
+      },
+      "ok": true,
+      "refused": false,
+      "action": "quarantine",
+      "target": "clearing",
+      "detail": "clearing item 96 set aside for the operations team"
+    },
+    {
+      "t": 1793429379.44427,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793429374.1506495,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793429377.7811306,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 96
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 96 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793429378.8088686,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793429362.7940788,
+    "t_alert": 1793429373.8463006,
+    "horizon": 1793429483.8463006,
+    "verdict_t": 1793429493.9142663
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

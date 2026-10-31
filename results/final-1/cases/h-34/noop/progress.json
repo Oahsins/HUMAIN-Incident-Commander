@@ -1,0 +1,188 @@
+{
+  "case": {
+    "id": "h-34",
+    "input": {
+      "system": "bank",
+      "seed": 260034,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "stale_balances",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 4,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "noop",
+  "result": {
+    "arm": "noop",
+    "mode": "auto",
+    "outcome": "harness_error",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "",
+      "background": "",
+      "assessment": "",
+      "recommendation": ""
+    },
+    "t_start": 1793433250.7169707,
+    "t_first_action": null,
+    "t_declared": 1793433250.716971,
+    "trace": [],
+    "calls": []
+  },
+  "checker": null,
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 91
+      },
+      "t": 1793433264.190191,
+      "at_s": 0
+    },
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793433266.202928,
+      "at_s": 2
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 74544,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793433273.2526681,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793433273.3342855,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793433273.4136164,
+      "at_s": 7
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": false,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793433264.190191,
+    "t_alert": 1793433278.4136164,
+    "horizon": 1793433388.4136164
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

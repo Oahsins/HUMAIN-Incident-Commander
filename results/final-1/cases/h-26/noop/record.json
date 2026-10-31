@@ -1,0 +1,218 @@
+{
+  "case": {
+    "id": "h-26",
+    "input": {
+      "system": "bank",
+      "seed": 260026,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "stale_balances",
+          "at_s": 0,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 2,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "noop",
+  "result": {
+    "arm": "noop",
+    "mode": "auto",
+    "outcome": "no_incident",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "No intervention control.",
+      "background": "No observations or actions.",
+      "assessment": "Recovery is decided by the independent checker.",
+      "recommendation": "Retain the checker verdict."
+    },
+    "t_start": 1793430165.4046972,
+    "t_first_action": null,
+    "t_declared": 1793430165.4046972,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793430285.0960968,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793430255.096,
+      1793430275.096
+    ],
+    "journeys": {
+      "n": 61,
+      "ok": 1,
+      "success_rate": 0.0164,
+      "p95_ms": null,
+      "payments": {
+        "n": 50,
+        "ok": 0
+      },
+      "balances": {
+        "n": 11,
+        "fresh": 1
+      },
+      "p95_allowed_ms": 317.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 1,
+      "wrongly_quarantined": 0,
+      "stale_reads": 10,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "60 of 61 customer journeys failed (50 payments, 10 balance reads)",
+      "1 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793430152.0319417,
+      "until_t": 1793430275.0960968,
+      "breach_seconds": 125.0,
+      "failed_journeys": 403,
+      "time_to_mitigate_s": 123.1,
+      "mitigation_censored": true,
+      "late_clearings": 1,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793430152.0319417,
+      "at_s": 0
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 75800,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793430159.081576,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430159.1470742,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430159.2242954,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430160.0959163,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793430152.0319417,
+    "t_alert": 1793430165.0959163,
+    "horizon": 1793430275.0959163,
+    "verdict_t": 1793430285.144327
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

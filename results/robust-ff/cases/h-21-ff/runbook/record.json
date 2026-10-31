@@ -1,0 +1,774 @@
+{
+  "case": {
+    "id": "h-21-ff",
+    "input": {
+      "system": "bank",
+      "seed": 260021,
+      "condition": "four_faults",
+      "faults": [
+        {
+          "type": "crash",
+          "at_s": 0,
+          "params": {
+            "target": "screening"
+          }
+        },
+        {
+          "type": "double_posting",
+          "at_s": 2,
+          "params": {
+            "target": "payments",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "crash",
+          "at_s": 4,
+          "params": {
+            "target": "clearing"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 5,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "screening",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "screening",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "clearing",
+            "params": {}
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "payments",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    },
+    "source_id": "h-21"
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.8,
+        "evidence": "A held lock is blocking writes."
+      },
+      {
+        "target": "screening",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.8,
+        "evidence": "A changed release coincides with local failures."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793435666.8173637,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "A held lock is blocking writes.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793435670.013224,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "screening restarted"
+      },
+      {
+        "t": 1793435673.8521097,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "A changed release coincides with local failures.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "payments 1.5 -> 1.3"
+      },
+      {
+        "t": 1793435682.34036,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The runbook ended with recovered.",
+      "background": "Surveyed 8 components; attempted 4 bounded actions.",
+      "assessment": "ledger: lock_held; screening: process_down; payments: bad_release; clearing: process_down",
+      "recommendation": "Continue monitoring the system."
+    },
+    "t_start": 1793435665.615095,
+    "t_first_action": 1793435666.8173637,
+    "t_declared": 1793435698.903271,
+    "trace": [
+      {
+        "t": 0.04693961143493652,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.16873741149902344,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.2021005153656006,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.202265977859497,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A held lock is blocking writes."
+      },
+      {
+        "t": 1.2813684940338135,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 1.281388282775879,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "A held lock is blocking writes."
+      },
+      {
+        "t": 3.3479764461517334,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 4.39797830581665,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 4.398124933242798,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 5.054899454116821,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 5.054919958114624,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 8.185748815536499,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 8.236776351928711,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 8.237011909484863,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A changed release coincides with local failures."
+      },
+      {
+        "t": 8.916143655776978,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 8.916157484054565,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "A changed release coincides with local failures."
+      },
+      {
+        "t": 13.027085781097412,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 16.725139617919922,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 16.72526240348816,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 17.359604358673096,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 17.359615325927734,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 20.462616682052612,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 21.37697458267212,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 21.3770911693573,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 1; checking a ten-second window."
+      },
+      {
+        "t": 26.482664346694946,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 27.44102168083191,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 27.441136837005615,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 2; checking a ten-second window."
+      },
+      {
+        "t": 32.53721237182617,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 33.28805994987488,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 33.28817296028137,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 3; checking a ten-second window."
+      },
+      {
+        "t": 33.28818917274475,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with recovered."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793435785.3139749,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793435755.314,
+      1793435775.314
+    ],
+    "journeys": {
+      "n": 236,
+      "ok": 236,
+      "success_rate": 1.0,
+      "p95_ms": 70.9998607635498,
+      "payments": {
+        "n": 171,
+        "ok": 171
+      },
+      "balances": {
+        "n": 65,
+        "fresh": 65
+      },
+      "p95_allowed_ms": 322.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000009",
+          "payment_ids": [
+            "6e5279fdfceb4b08",
+            "d16c133dd645469e"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-03-000008",
+          "payment_ids": [
+            "7ecb621c7a944a96",
+            "d7e5f18c8c3f40da"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-03-000009",
+          "payment_ids": [
+            "4796fa720c464369",
+            "282928c2e98c46c0"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-04-000009",
+          "payment_ids": [
+            "6b38bd5dcdf74f9e",
+            "b5b625b0cfca4ec7"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000008",
+          "payment_ids": [
+            "c49aa91ebdeb481e",
+            "9417e4b56eac4247"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000009",
+          "payment_ids": [
+            "18e83c458b6348af",
+            "6f0e814a30b84225"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000009",
+          "payment_ids": [
+            "8eca847492094ab6",
+            "4b672b49da6241a9"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000008",
+          "payment_ids": [
+            "5b9478cf4f6a407c",
+            "16571ebc64ec4768"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000009",
+          "payment_ids": [
+            "a706caa0a6734dac",
+            "45affe4e9ebd4b26"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000008",
+          "payment_ids": [
+            "bcae20ed5e8b4f50",
+            "c40405cf51614d69"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000009",
+          "payment_ids": [
+            "62eb13107e4c4e60",
+            "8da3a66154f94888"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000009",
+          "payment_ids": [
+            "1513917dffb54cc8",
+            "d4f42c4f8e5c4344"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-14-000008",
+          "payment_ids": [
+            "fec33986a8164010",
+            "44e180737aa641dc"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-14-000009",
+          "payment_ids": [
+            "1a4ad7529c644f94",
+            "5025107725b34119"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000008",
+          "payment_ids": [
+            "6ea4d332ddc2424e",
+            "1596cdbcfdba47b7"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-17-000008",
+          "payment_ids": [
+            "31f411ac3f1e4a57",
+            "cef34d21e4e24592"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-17-000009",
+          "payment_ids": [
+            "3109c085dcfa49af",
+            "9c506eff63164fe9"
+          ],
+          "copies": 2
+        }
+      ],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793435650.2558715,
+      "until_t": 1793435775.3139749,
+      "breach_seconds": 20.0,
+      "failed_journeys": 56,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 85,
+      "double_postings": 17,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "crash",
+      "target": "screening",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793435650.2558715,
+      "at_s": 0
+    },
+    {
+      "type": "double_posting",
+      "target": "payments",
+      "class": "bad_release",
+      "detail": {
+        "release": "1.5"
+      },
+      "t": 1793435652.8985746,
+      "at_s": 2
+    },
+    {
+      "type": "crash",
+      "target": "clearing",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793435654.2493482,
+      "at_s": 4
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 49112,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793435660.2496457,
+      "at_s": 5
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793435660.3133473,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793435666.8939886,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793435670.6676238,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "screening",
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793435674.529462,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "payments",
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "t": 1793435682.9728446,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793435666.8173816,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "A held lock is blocking writes.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793435670.0132456,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793435673.8521247,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "A changed release coincides with local failures.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "event": "act",
+      "t": 1793435682.3403738,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793435650.2558715,
+    "t_alert": 1793435665.3133473,
+    "horizon": 1793435775.3133473,
+    "verdict_t": 1793435785.3688176
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

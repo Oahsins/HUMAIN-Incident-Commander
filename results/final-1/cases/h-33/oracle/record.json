@@ -1,0 +1,692 @@
+{
+  "case": {
+    "id": "h-33",
+    "input": {
+      "system": "bank",
+      "seed": 260033,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "double_posting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "stale_balances",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 4,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "payments",
+            "params": {}
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "oracle",
+  "result": {
+    "arm": "oracle",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held"
+      },
+      {
+        "target": "payments",
+        "class": "bad_release"
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config"
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793431594.4143186,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793431595.5274122,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "payments 1.5 -> 1.3"
+      },
+      {
+        "t": 1793431600.2096956,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Labelled fixes applied as a validity control.",
+      "background": "Fixes came from scenario labels and the injection manifest.",
+      "assessment": "recovered",
+      "recommendation": "Use the independent checker verdict."
+    },
+    "t_start": 1793431594.382112,
+    "t_first_action": 1793431594.4143186,
+    "t_declared": 1793431601.2422163,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793431714.0846868,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793431684.085,
+      1793431704.085
+    ],
+    "journeys": {
+      "n": 212,
+      "ok": 212,
+      "success_rate": 1.0,
+      "p95_ms": 73.00019264221191,
+      "payments": {
+        "n": 170,
+        "ok": 170
+      },
+      "balances": {
+        "n": 42,
+        "fresh": 42
+      },
+      "p95_allowed_ms": 320.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-01-000008",
+          "payment_ids": [
+            "ca9933396bf0489f",
+            "236d44a11f0e4eff"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000007",
+          "payment_ids": [
+            "834f6a12af3140cf",
+            "6847505b879e4c9e"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000008",
+          "payment_ids": [
+            "2130b97ff3b545e9",
+            "9df81307c61242d6"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000010",
+          "payment_ids": [
+            "6876e05dd2df4086",
+            "51a14aeceeba4aa8"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-03-000005",
+          "payment_ids": [
+            "c6c9e09bfcc14524",
+            "aae085e95eda47fb"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-04-000007",
+          "payment_ids": [
+            "6b6081b8ccef4d95",
+            "0361b0feaadf42af"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-04-000008",
+          "payment_ids": [
+            "80dd717591be4479",
+            "96484f1e82f44d55"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-04-000010",
+          "payment_ids": [
+            "c541d2386cbb4df4",
+            "aad0a2a1eadf4f78"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000006",
+          "payment_ids": [
+            "a4086bbbf162474c",
+            "04bbf1b3dc814b00"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000008",
+          "payment_ids": [
+            "8f8b598c8a08484d",
+            "5866171cee944c87"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000006",
+          "payment_ids": [
+            "b1c3154a9944494d",
+            "c681d49c58704fc5"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000007",
+          "payment_ids": [
+            "17498b9ae53c494f",
+            "781709e7889d4dc2"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000009",
+          "payment_ids": [
+            "66910533b9704528",
+            "f71268b731e84806"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000006",
+          "payment_ids": [
+            "8877a70a796c41c4",
+            "f6d491a50ad54380"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000006",
+          "payment_ids": [
+            "f9920fec79414755",
+            "4f129542099e4951"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000006",
+          "payment_ids": [
+            "d705eb51b003415e",
+            "3355dc4e12d54b06"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000008",
+          "payment_ids": [
+            "f449ccd0fd4c4d39",
+            "a7836ecddb1c47e3"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000007",
+          "payment_ids": [
+            "c1ebb281e0ef4db4",
+            "d23bf21454214986"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000008",
+          "payment_ids": [
+            "7004593cc8f04e53",
+            "3066b8ae3b684b58"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000010",
+          "payment_ids": [
+            "db3a9989c9b04bb2",
+            "ed8bcd8c035d44fc"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000006",
+          "payment_ids": [
+            "52f4eb6c014a4d3c",
+            "839fd140a51c441f"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000007",
+          "payment_ids": [
+            "80e69a00719d44f0",
+            "8bf54d4c98734ec3"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000009",
+          "payment_ids": [
+            "24fe64e2bd014dde",
+            "cf3eb2e1e00c4ae2"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000005",
+          "payment_ids": [
+            "6427e8fdb46947b3",
+            "59141e0f36c74602"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000006",
+          "payment_ids": [
+            "461061e438764c38",
+            "58f22ca4380b4ad7"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000008",
+          "payment_ids": [
+            "a295696af4b74063",
+            "52c136ffc43a46bc"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-13-000005",
+          "payment_ids": [
+            "5cb056488da94f1e",
+            "f2e0a59423d54e19"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-14-000005",
+          "payment_ids": [
+            "f9cdda2ec67c4e45",
+            "596a88084bd34a28"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000005",
+          "payment_ids": [
+            "4451e3e6af114bfa",
+            "2fa9b042abb149b3"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000007",
+          "payment_ids": [
+            "b077e5484c444a64",
+            "7c70b891e6e44ccc"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-16-000005",
+          "payment_ids": [
+            "dec3124ac9fe4f99",
+            "f2c3d0fd34b04322"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-16-000006",
+          "payment_ids": [
+            "85ec28073fad4599",
+            "203edddea2644fa8"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-16-000008",
+          "payment_ids": [
+            "5106535ff786432a",
+            "c7a4e72421c94cb1"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-17-000005",
+          "payment_ids": [
+            "84496a43a702484e",
+            "cbfb13a2265c49fb"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-18-000006",
+          "payment_ids": [
+            "6b710f3e83984009",
+            "568d78c9300e489a"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-18-000007",
+          "payment_ids": [
+            "d75f4a12cfad4d8b",
+            "5082b2fe6bdd4aaf"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-18-000009",
+          "payment_ids": [
+            "7cd944bfe6494a5c",
+            "d1f5a052c0c14b2f"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-19-000005",
+          "payment_ids": [
+            "5156c57b57564b7f",
+            "dd1164b0ae6c4478"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-20-000006",
+          "payment_ids": [
+            "9e5ec3e98b2b4212",
+            "533026911482481d"
+          ],
+          "copies": 2
+        }
+      ],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793431580.6434515,
+      "until_t": 1793431704.0846868,
+      "breach_seconds": 20.0,
+      "failed_journeys": 55,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 4,
+      "double_postings": 39,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "double_posting",
+      "target": "payments",
+      "class": "bad_release",
+      "detail": {
+        "release": "1.5"
+      },
+      "t": 1793431580.6434515,
+      "at_s": 0
+    },
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793431581.9683278,
+      "at_s": 2
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 77996,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793431589.0064056,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793431589.084071,
+      "at_s": 7
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793431594.525374,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793431596.2073216,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "payments",
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "t": 1793431600.2384765,
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "gateway",
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793431594.4143186,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793431595.5274122,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    },
+    {
+      "event": "act",
+      "t": 1793431600.2096956,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    }
+  ],
+  "timing": {
+    "t0": 1793431580.6434515,
+    "t_alert": 1793431594.084071,
+    "horizon": 1793431704.084071,
+    "verdict_t": 1793431714.160476
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

@@ -1,0 +1,378 @@
+{
+  "case": {
+    "id": "h-38",
+    "input": {
+      "system": "bank",
+      "seed": 260038,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "bad_setting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "crash",
+          "at_s": 2,
+          "params": {
+            "target": "screening"
+          }
+        },
+        {
+          "type": "stale_balances",
+          "at_s": 4,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "screening",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "screening",
+            "params": {}
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "oracle",
+  "result": {
+    "arm": "oracle",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "screening",
+        "class": "process_down"
+      },
+      {
+        "target": "payments",
+        "class": "bad_config"
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config"
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793433741.3014858,
+        "action": "restart",
+        "target": "screening",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "screening restarted"
+      },
+      {
+        "t": 1793433744.9439785,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793433745.9600308,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Labelled fixes applied as a validity control.",
+      "background": "Fixes came from scenario labels and the injection manifest.",
+      "assessment": "recovered",
+      "recommendation": "Use the independent checker verdict."
+    },
+    "t_start": 1793433741.2686186,
+    "t_first_action": 1793433741.3014858,
+    "t_declared": 1793433746.9690695,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793433860.9559426,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793433830.956,
+      1793433850.956
+    ],
+    "journeys": {
+      "n": 229,
+      "ok": 229,
+      "success_rate": 1.0,
+      "p95_ms": 75.00004768371582,
+      "payments": {
+        "n": 175,
+        "ok": 175
+      },
+      "balances": {
+        "n": 54,
+        "fresh": 54
+      },
+      "p95_allowed_ms": 320.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793433727.9156976,
+      "until_t": 1793433850.9559426,
+      "breach_seconds": 20.0,
+      "failed_journeys": 156,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793433727.9156976,
+      "at_s": 0
+    },
+    {
+      "type": "crash",
+      "target": "screening",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793433729.9551022,
+      "at_s": 2
+    },
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793433731.8985288,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793433733.9638867,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793433734.9846077,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793433735.9553425,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793433741.9417777,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "screening",
+      "detail": "screening restarted"
+    },
+    {
+      "t": 1793433744.9499335,
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "payments",
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793433745.9662528,
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "gateway",
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793433741.3014858,
+      "action": "restart",
+      "target": "screening",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793433744.9439785,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793433745.9600308,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by ops-maintenance)"
+    }
+  ],
+  "timing": {
+    "t0": 1793433727.9156976,
+    "t_alert": 1793433740.9553425,
+    "horizon": 1793433850.9553425,
+    "verdict_t": 1793433861.0040588
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

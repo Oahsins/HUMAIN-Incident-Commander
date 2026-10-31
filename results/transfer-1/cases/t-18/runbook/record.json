@@ -1,0 +1,564 @@
+{
+  "case": {
+    "id": "t-18",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310018,
+      "faults": [
+        {
+          "type": "sealed_10",
+          "at_s": 0,
+          "params": {
+            "target": "cad",
+            "variant": "v6"
+          }
+        },
+        {
+          "type": "sealed_10",
+          "at_s": 2,
+          "params": {
+            "target": "unit-sync",
+            "variant": "v4"
+          }
+        },
+        {
+          "type": "sealed_10",
+          "at_s": 4,
+          "params": {
+            "target": "dispatcher",
+            "variant": "v2"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 6,
+          "params": {
+            "target": "call-handling",
+            "variant": "v3"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "dispatcher",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "dispatcher",
+            "params": {
+              "key": "ack_timeout_s"
+            }
+          }
+        },
+        {
+          "target": "unit-sync",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "unit-sync",
+            "params": {
+              "key": "batch_size"
+            }
+          }
+        },
+        {
+          "target": "cad",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "cad",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "cad",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      },
+      {
+        "target": "call-handling",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "A setting change coincides with degraded service."
+      },
+      {
+        "target": "unit-sync",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "A setting change coincides with degraded service."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793446743.7981658,
+        "action": "restart",
+        "target": "cad",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "cad restarted"
+      },
+      {
+        "t": 1793446749.452083,
+        "action": "revert_config",
+        "target": "call-handling",
+        "params": {
+          "key": "rollover_s"
+        },
+        "reason": "A setting change coincides with degraded service.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "call-handling rollover_s restored from 3.0 to 2.5 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793446753.6775815,
+        "action": "revert_config",
+        "target": "unit-sync",
+        "params": {
+          "key": "batch_size"
+        },
+        "reason": "A setting change coincides with degraded service.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The runbook ended with recovered.",
+      "background": "Surveyed 9 components; attempted 3 bounded actions.",
+      "assessment": "cad: process_down; call-handling: bad_config; unit-sync: bad_config",
+      "recommendation": "Continue monitoring the system."
+    },
+    "t_start": 1793446742.3892264,
+    "t_first_action": 1793446743.7981658,
+    "t_declared": 1793446767.4552543,
+    "trace": [
+      {
+        "t": 0.04192399978637695,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.12174797058105469,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.4088134765625,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.4089367389678955,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 2.0801336765289307,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 2.0801477432250977,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 5.1592302322387695,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 7.062727928161621,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 7.062854290008545,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 7.077067613601685,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 7.077083110809326,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 9.2051522731781,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.288181066513062,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.288352489471436,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 11.295687437057495,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 11.29569697380066,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 13.398723125457764,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 13.902413845062256,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 13.902565479278564,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 1; checking a ten-second window."
+      },
+      {
+        "t": 19.002737522125244,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 19.464178800582886,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 19.46428155899048,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 2; checking a ten-second window."
+      },
+      {
+        "t": 24.520370721817017,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 25.065927028656006,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 25.06602454185486,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 3; checking a ten-second window."
+      },
+      {
+        "t": 25.06603693962097,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with recovered."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "slo_ok": true,
+    "t": 1793446861.946095,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793446831.946,
+      1793446851.946
+    ],
+    "journeys": {
+      "n": 51,
+      "ok": 51,
+      "success_rate": 1.0,
+      "p95_ms": 36.6,
+      "p90_ms": 36.3,
+      "p95_allowed_ms": 287.5,
+      "by_source": {
+        "normal": {
+          "n": 51,
+          "ok": 51
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 7,
+      "failures": {}
+    },
+    "integrity": {
+      "ok": false,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 42,
+      "units_double_committed": 11,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793446730.9952714,
+      "until_t": 1793446851.946095,
+      "breach_seconds": 25.0,
+      "failed_journeys": 73,
+      "time_to_mitigate_s": 25.0,
+      "mitigation_censored": false,
+      "told_without_incident": 0,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 60.0,
+      "calls_dropped": 0,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 234
+    },
+    "reasons": [
+      "42 incidents had more than one crew en route",
+      "11 units were committed to two incidents at once"
+    ]
+  },
+  "manifest": [
+    {
+      "type": "sealed_10",
+      "target": "cad",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793446730.9952714,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_10",
+      "target": "unit-sync",
+      "class": "bad_config",
+      "detail": {
+        "key": "batch_size",
+        "value": 0
+      },
+      "t": 1793446732.934575,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_10",
+      "target": "dispatcher",
+      "class": "bad_config",
+      "detail": {
+        "key": "ack_timeout_s",
+        "value": 0.05
+      },
+      "t": 1793446734.9314482,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "call-handling",
+        "key": "rollover_s",
+        "value": 3.0
+      },
+      "t": 1793446736.9457111,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793446744.4674768,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "cad",
+      "detail": "cad restarted"
+    },
+    {
+      "t": 1793446749.4564402,
+      "params": {
+        "key": "rollover_s"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "call-handling",
+      "detail": "call-handling rollover_s restored from 3.0 to 2.5 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793446753.683529,
+      "params": {
+        "key": "batch_size"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "unit-sync",
+      "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793446743.798181,
+      "action": "restart",
+      "target": "cad",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "cad restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793446749.4520984,
+      "action": "revert_config",
+      "target": "call-handling",
+      "params": {
+        "key": "rollover_s"
+      },
+      "reason": "A setting change coincides with degraded service.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "call-handling rollover_s restored from 3.0 to 2.5 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793446753.6775978,
+      "action": "revert_config",
+      "target": "unit-sync",
+      "params": {
+        "key": "batch_size"
+      },
+      "reason": "A setting change coincides with degraded service.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "unit-sync batch_size restored from 0 to 200 (changed earlier by operator)"
+    }
+  ],
+  "timing": {
+    "t0": 1793446730.9952714,
+    "t_alert": 1793446741.9457111,
+    "horizon": 1793446851.9457111,
+    "verdict_t": 1793446862.0226018
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9300,
+  "error": null
+}

@@ -1,0 +1,480 @@
+{
+  "case": {
+    "id": "h-30-ff",
+    "input": {
+      "system": "bank",
+      "seed": 260030,
+      "condition": "four_faults",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "stale_balances",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "slow_screening",
+          "at_s": 4,
+          "params": {
+            "latency_ms": 1800,
+            "jitter_ms": 0
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 5,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "screening",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "screening",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    },
+    "source_id": "h-30"
+  },
+  "arm": "oracle",
+  "result": {
+    "arm": "oracle",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held"
+      },
+      {
+        "target": "screening",
+        "class": "dependency_slow"
+      },
+      {
+        "target": "gateway",
+        "class": "bad_config"
+      },
+      {
+        "target": "clearing",
+        "class": "poison_message"
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793438669.1130316,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793438670.1977658,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793438671.205252,
+        "action": "revert_config",
+        "target": "gateway",
+        "params": {
+          "key": "balance_cache_ttl_s"
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+      },
+      {
+        "t": 1793438672.2375915,
+        "action": "quarantine",
+        "target": "clearing",
+        "params": {
+          "item": 100
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing item 100 set aside for the operations team"
+      },
+      {
+        "t": 1793438673.259772,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Labelled fixes applied as a validity control.",
+      "background": "Fixes came from scenario labels and the injection manifest.",
+      "assessment": "recovered",
+      "recommendation": "Use the independent checker verdict."
+    },
+    "t_start": 1793438669.087155,
+    "t_first_action": 1793438669.1130316,
+    "t_declared": 1793438676.8847682,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793438788.802265,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793438758.802,
+      1793438778.802
+    ],
+    "journeys": {
+      "n": 218,
+      "ok": 218,
+      "success_rate": 1.0,
+      "p95_ms": 74.99980926513672,
+      "payments": {
+        "n": 166,
+        "ok": 166
+      },
+      "balances": {
+        "n": 52,
+        "fresh": 52
+      },
+      "p95_allowed_ms": 319.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "set_aside",
+          "item": 100,
+          "payment_id": "batch-017"
+        }
+      ],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793438653.6607883,
+      "until_t": 1793438778.802265,
+      "breach_seconds": 20.0,
+      "failed_journeys": 48,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 38,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 100
+      },
+      "t": 1793438653.6607883,
+      "at_s": 0
+    },
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793438655.6680722,
+      "at_s": 2
+    },
+    {
+      "type": "slow_screening",
+      "target": "screening",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "payments->screening",
+        "latency_ms": 1800,
+        "jitter_ms": 0
+      },
+      "t": 1793438657.6673465,
+      "at_s": 4
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 75420,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793438663.704791,
+      "at_s": 5
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793438663.8018265,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793438669.195919,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793438670.202459,
+      "params": {
+        "to": "standby"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "failover",
+      "target": "screening",
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793438671.2355921,
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "gateway",
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    },
+    {
+      "t": 1793438672.2567997,
+      "params": {
+        "item": 100
+      },
+      "ok": true,
+      "refused": false,
+      "action": "quarantine",
+      "target": "clearing",
+      "detail": "clearing item 100 set aside for the operations team"
+    },
+    {
+      "t": 1793438673.8814273,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793438669.1130316,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793438670.1977658,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793438671.205252,
+      "action": "revert_config",
+      "target": "gateway",
+      "params": {
+        "key": "balance_cache_ttl_s"
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway balance_cache_ttl_s restored from 600.0 to 0.5 (changed earlier by operator)"
+    },
+    {
+      "event": "act",
+      "t": 1793438672.2375915,
+      "action": "quarantine",
+      "target": "clearing",
+      "params": {
+        "item": 100
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing item 100 set aside for the operations team"
+    },
+    {
+      "event": "act",
+      "t": 1793438673.259772,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793438653.6607883,
+    "t_alert": 1793438668.8018265,
+    "horizon": 1793438778.8018265,
+    "verdict_t": 1793438788.8752759
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

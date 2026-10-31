@@ -1,0 +1,329 @@
+{
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held",
+        "confidence": 0.8,
+        "evidence": "A held lock is blocking writes."
+      },
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      },
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.8,
+        "evidence": "Callers see failures or excessive delay on this dependency."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793439284.8267684,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "A held lock is blocking writes.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793439291.0401862,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "gateway restarted"
+      },
+      {
+        "t": 1793439295.900302,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted, but it is not answering health checks"
+      },
+      {
+        "t": 1793439300.5328424,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Callers see failures or excessive delay on this dependency.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793439306.3966327,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted, but it is not answering health checks"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "No untried safe runbook rule can restore the failing journey.",
+      "urgency": "now",
+      "to": null,
+      "ask": "Investigate the failing components and restore service."
+    },
+    "sbar": {
+      "situation": "The runbook ended with escalated.",
+      "background": "Surveyed 8 components; attempted 5 bounded actions.",
+      "assessment": "ledger: lock_held; gateway: process_down; clearing: process_down; screening: dependency_slow",
+      "recommendation": "A human operator should investigate the remaining symptoms."
+    },
+    "t_start": 1793439280.652409,
+    "t_first_action": 1793439284.8267684,
+    "t_declared": 1793439313.7986658,
+    "trace": [
+      {
+        "t": 0.03582167625427246,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.1509275436401367,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 4.174256324768066,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 4.1743574142456055,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A held lock is blocking writes."
+      },
+      {
+        "t": 4.258253335952759,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 4.258269548416138,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "A held lock is blocking writes."
+      },
+      {
+        "t": 7.365776538848877,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 10.387677192687988,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 10.387773990631104,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 11.077463626861572,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 11.077478408813477,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 14.183875322341919,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 15.24777865409851,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 15.247890949249268,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 15.77883243560791,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 15.778843879699707,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 18.829578399658203,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 19.88031029701233,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 19.880431652069092,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "Callers see failures or excessive delay on this dependency."
+      },
+      {
+        "t": 19.898560523986816,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 19.898571968078613,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "failover",
+        "summary": "Callers see failures or excessive delay on this dependency."
+      },
+      {
+        "t": 21.972622632980347,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 25.744078159332275,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 25.744220972061157,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 26.274423360824585,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 26.274435997009277,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 29.38158082962036,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 33.1461455821991,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 33.14626693725586,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with escalated."
+      }
+    ],
+    "calls": []
+  },
+  "error": null
+}

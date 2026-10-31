@@ -1,0 +1,449 @@
+{
+  "case": {
+    "id": "h-01-ff",
+    "input": {
+      "system": "bank",
+      "seed": 260001,
+      "condition": "four_faults",
+      "faults": [
+        {
+          "type": "sealed_2",
+          "at_s": 0,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "slow_screening",
+          "at_s": 4,
+          "params": {
+            "latency_ms": 1800,
+            "jitter_ms": 0
+          }
+        },
+        {
+          "type": "bad_setting",
+          "at_s": 4,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "crash",
+          "at_s": 4,
+          "params": {
+            "target": "clearing"
+          }
+        },
+        {
+          "type": "locked_ledger",
+          "at_s": 5,
+          "params": {
+            "hold_s": 420
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "ledger",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "ledger",
+            "params": {}
+          }
+        },
+        {
+          "target": "screening",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "screening",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "clearing",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    },
+    "source_id": "h-01"
+  },
+  "arm": "oracle",
+  "result": {
+    "arm": "oracle",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "ledger",
+        "class": "lock_held"
+      },
+      {
+        "target": "screening",
+        "class": "dependency_slow"
+      },
+      {
+        "target": "payments",
+        "class": "bad_config"
+      },
+      {
+        "target": "clearing",
+        "class": "process_down"
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793437475.0073612,
+        "action": "release_lock",
+        "target": "ledger",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "ended lock-holding session(s): reconciliation"
+      },
+      {
+        "t": 1793437476.0814173,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793437477.1112425,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      },
+      {
+        "t": 1793437478.1193964,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "Labelled oracle fix.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Labelled fixes applied as a validity control.",
+      "background": "Fixes came from scenario labels and the injection manifest.",
+      "assessment": "recovered",
+      "recommendation": "Use the independent checker verdict."
+    },
+    "t_start": 1793437474.9774423,
+    "t_first_action": 1793437475.0073612,
+    "t_declared": 1793437481.735662,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793437594.6967444,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793437564.697,
+      1793437584.697
+    ],
+    "journeys": {
+      "n": 219,
+      "ok": 219,
+      "success_rate": 1.0,
+      "p95_ms": 76.99990272521973,
+      "payments": {
+        "n": 170,
+        "ok": 170
+      },
+      "balances": {
+        "n": 49,
+        "fresh": 49
+      },
+      "p95_allowed_ms": 324.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793437460.190817,
+      "until_t": 1793437584.6967444,
+      "breach_seconds": 20.0,
+      "failed_journeys": 121,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "sealed_2",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793437460.190817,
+      "at_s": 0
+    },
+    {
+      "type": "slow_screening",
+      "target": "screening",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "payments->screening",
+        "latency_ms": 1800,
+        "jitter_ms": 0
+      },
+      "t": 1793437463.49068,
+      "at_s": 4
+    },
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793437463.510044,
+      "at_s": 4
+    },
+    {
+      "type": "crash",
+      "target": "clearing",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793437463.5614505,
+      "at_s": 4
+    },
+    {
+      "type": "locked_ledger",
+      "target": "ledger",
+      "class": "lock_held",
+      "detail": {
+        "holder_pid": 78300,
+        "hold_s": 420.0,
+        "holding": true
+      },
+      "t": 1793437469.5533695,
+      "at_s": 5
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793437469.6131232,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793437469.6964142,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793437475.0793774,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "ledger",
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "t": 1793437476.1091561,
+      "params": {
+        "to": "standby"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "failover",
+      "target": "screening",
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793437477.116471,
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "payments",
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+    },
+    {
+      "t": 1793437478.733405,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793437475.0073612,
+      "action": "release_lock",
+      "target": "ledger",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended lock-holding session(s): reconciliation"
+    },
+    {
+      "event": "act",
+      "t": 1793437476.0814173,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793437477.1112425,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+    },
+    {
+      "event": "act",
+      "t": 1793437478.1193964,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "Labelled oracle fix.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted"
+    }
+  ],
+  "timing": {
+    "t0": 1793437460.190817,
+    "t_alert": 1793437474.6964142,
+    "horizon": 1793437584.6964142,
+    "verdict_t": 1793437594.7716932
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

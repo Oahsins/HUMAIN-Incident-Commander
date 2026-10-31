@@ -1,0 +1,319 @@
+{
+  "case": {
+    "id": "h-30",
+    "input": {
+      "system": "bank",
+      "seed": 260030,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "stale_balances",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "gateway",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "gateway",
+            "params": {
+              "key": "balance_cache_ttl_s"
+            }
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793430410.217759,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted, but it is not answering health checks"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing",
+        "gateway"
+      ],
+      "class": null,
+      "reason": "No untried safe runbook rule can restore the failing journey.",
+      "urgency": "now",
+      "to": null,
+      "ask": "Investigate the failing components and restore service."
+    },
+    "sbar": {
+      "situation": "The runbook ended with escalated.",
+      "background": "Surveyed 8 components; attempted 1 bounded actions.",
+      "assessment": "clearing: process_down",
+      "recommendation": "A human operator should investigate the remaining symptoms."
+    },
+    "t_start": 1793430406.3767734,
+    "t_first_action": 1793430410.217759,
+    "t_declared": 1793430417.5829592,
+    "trace": [
+      {
+        "t": 0.026706933975219727,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.0766148567199707,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 3.840893268585205,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 3.8409833908081055,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 4.3768603801727295,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 4.376876354217529,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 7.448929071426392,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.206065893173218,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.206195592880249,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with escalated."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793430526.0970743,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793430496.097,
+      1793430516.097
+    ],
+    "journeys": {
+      "n": 224,
+      "ok": 170,
+      "success_rate": 0.7589,
+      "p95_ms": 72.00002670288086,
+      "payments": {
+        "n": 170,
+        "ok": 170
+      },
+      "balances": {
+        "n": 54,
+        "fresh": 0
+      },
+      "p95_allowed_ms": 316.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 1081,
+      "wrongly_quarantined": 0,
+      "stale_reads": 54,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "54 of 224 customer journeys failed (0 payments, 54 balance reads)",
+      "1081 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793430395.0308065,
+      "until_t": 1793430516.0970743,
+      "breach_seconds": 125.0,
+      "failed_journeys": 307,
+      "time_to_mitigate_s": 121.1,
+      "mitigation_censored": true,
+      "late_clearings": 996,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 100
+      },
+      "t": 1793430395.0308065,
+      "at_s": 0
+    },
+    {
+      "type": "stale_balances",
+      "target": "gateway",
+      "class": "bad_config",
+      "detail": {
+        "key": "balance_cache_ttl_s"
+      },
+      "t": 1793430397.0490546,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430401.096715,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793430410.7514763,
+      "params": {},
+      "ok": false,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted, but it is not answering health checks"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793430410.2177706,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": false,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted, but it is not answering health checks"
+    }
+  ],
+  "timing": {
+    "t0": 1793430395.0308065,
+    "t_alert": 1793430406.096715,
+    "horizon": 1793430516.096715,
+    "verdict_t": 1793430526.183914
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8300,
+  "error": null
+}

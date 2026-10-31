@@ -1,0 +1,200 @@
+{
+  "case": {
+    "id": "h-16",
+    "input": {
+      "system": "bank",
+      "seed": 260016,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "crash",
+          "at_s": 0,
+          "params": {
+            "target": "clearing"
+          }
+        },
+        {
+          "type": "slow_screening",
+          "at_s": 2,
+          "params": {
+            "latency_ms": 1800,
+            "jitter_ms": 0
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "screening",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "screening",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "clearing",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "noop",
+  "result": {
+    "arm": "noop",
+    "mode": "auto",
+    "outcome": "no_incident",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "No intervention control.",
+      "background": "No observations or actions.",
+      "assessment": "Recovery is decided by the independent checker.",
+      "recommendation": "Retain the checker verdict."
+    },
+    "t_start": 1793426866.3342345,
+    "t_first_action": null,
+    "t_declared": 1793426866.3342347,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793426986.0558186,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793426956.056,
+      1793426976.056
+    ],
+    "journeys": {
+      "n": 78,
+      "ok": 19,
+      "success_rate": 0.2436,
+      "p95_ms": null,
+      "payments": {
+        "n": 59,
+        "ok": 0
+      },
+      "balances": {
+        "n": 19,
+        "fresh": 19
+      },
+      "p95_allowed_ms": 324.0
+    },
+    "slo_ok": false,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 16,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "59 of 78 customer journeys failed (59 payments, 0 balance reads)",
+      "16 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793426853.0265937,
+      "until_t": 1793426976.0558186,
+      "breach_seconds": 125.0,
+      "failed_journeys": 346,
+      "time_to_mitigate_s": 123.0,
+      "mitigation_censored": true,
+      "late_clearings": 14,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "crash",
+      "target": "clearing",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793426853.0265937,
+      "at_s": 0
+    },
+    {
+      "type": "slow_screening",
+      "target": "screening",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "payments->screening",
+        "latency_ms": 1800,
+        "jitter_ms": 0
+      },
+      "t": 1793426854.9924366,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793426860.091866,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793426861.055393,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793426853.0265937,
+    "t_alert": 1793426866.055393,
+    "horizon": 1793426976.055393,
+    "verdict_t": 1793426986.0981615
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

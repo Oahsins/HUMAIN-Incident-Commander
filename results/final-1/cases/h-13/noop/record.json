@@ -1,0 +1,185 @@
+{
+  "case": {
+    "id": "h-13",
+    "input": {
+      "system": "bank",
+      "seed": 260013,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": ""
+    }
+  },
+  "arm": "noop",
+  "result": {
+    "arm": "noop",
+    "mode": "auto",
+    "outcome": "no_incident",
+    "root_causes": [],
+    "actions": [],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "No intervention control.",
+      "background": "No observations or actions.",
+      "assessment": "Recovery is decided by the independent checker.",
+      "recommendation": "Retain the checker verdict."
+    },
+    "t_start": 1793425672.3744094,
+    "t_first_action": null,
+    "t_declared": 1793425672.3744094,
+    "trace": [],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793425792.158085,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793425762.158,
+      1793425782.158
+    ],
+    "journeys": {
+      "n": 231,
+      "ok": 231,
+      "success_rate": 1.0,
+      "p95_ms": 65.00005722045898,
+      "payments": {
+        "n": 170,
+        "ok": 170
+      },
+      "balances": {
+        "n": 61,
+        "fresh": 61
+      },
+      "p95_allowed_ms": 318.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 1092,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "1092 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793425659.093867,
+      "until_t": 1793425782.158085,
+      "breach_seconds": 0.0,
+      "failed_journeys": 0,
+      "time_to_mitigate_s": 0.0,
+      "mitigation_censored": false,
+      "late_clearings": 1005,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 91
+      },
+      "t": 1793425659.093867,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793425666.179756,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793425667.1579278,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [],
+  "audit": [],
+  "timing": {
+    "t0": 1793425659.093867,
+    "t_alert": 1793425672.1579278,
+    "horizon": 1793425782.1579278,
+    "verdict_t": 1793425792.2100174
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8100,
+  "error": null
+}

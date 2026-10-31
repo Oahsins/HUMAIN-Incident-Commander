@@ -1,0 +1,730 @@
+{
+  "case": {
+    "id": "t-15",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310015,
+      "faults": [
+        {
+          "type": "sealed_3",
+          "at_s": 0,
+          "params": {
+            "target": "dispatcher",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_10",
+          "at_s": 2,
+          "params": {
+            "target": "alerting",
+            "variant": "v7"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 4,
+          "params": {
+            "target": "cad",
+            "variant": "v2"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "alerting",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "alerting",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "dispatcher",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "dispatcher",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "alerting",
+        "class": "dependency_slow",
+        "confidence": 0.8,
+        "evidence": "Callers see failures or excessive delay on this dependency."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793445867.1844049,
+        "action": "failover",
+        "target": "alerting",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Callers see failures or excessive delay on this dependency.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "alerting now served by its standby"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The runbook ended with recovered.",
+      "background": "Surveyed 9 components; attempted 1 bounded actions.",
+      "assessment": "alerting: dependency_slow",
+      "recommendation": "Continue monitoring the system."
+    },
+    "t_start": 1793445865.7254882,
+    "t_first_action": 1793445867.1844049,
+    "t_declared": 1793445880.7121067,
+    "trace": [
+      {
+        "t": 0.029092073440551758,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.1344449520111084,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.4588050842285156,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.458914041519165,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "Callers see failures or excessive delay on this dependency."
+      },
+      {
+        "t": 1.4666666984558105,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 1.4666786193847656,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "failover",
+        "summary": "Callers see failures or excessive delay on this dependency."
+      },
+      {
+        "t": 3.582763195037842,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 3.951439380645752,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 3.9515280723571777,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 1; checking a ten-second window."
+      },
+      {
+        "t": 9.062628269195557,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 9.450288772583008,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 9.450387001037598,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 2; checking a ten-second window."
+      },
+      {
+        "t": 14.511855363845825,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 14.986530780792236,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 14.986615896224976,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 3; checking a ten-second window."
+      },
+      {
+        "t": 14.98662805557251,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with recovered."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "slo_ok": false,
+    "t": 1793445985.3362403,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793445955.336,
+      1793445975.336
+    ],
+    "journeys": {
+      "n": 92,
+      "ok": 62,
+      "success_rate": 0.6739,
+      "p95_ms": 41.0,
+      "p90_ms": 36.0,
+      "p95_allowed_ms": 288.6,
+      "by_source": {
+        "normal": {
+          "n": 47,
+          "ok": 33
+        },
+        "surge": {
+          "n": 45,
+          "ok": 29
+        }
+      },
+      "linked": 3,
+      "failures": {
+        "not_reached": 30
+      }
+    },
+    "integrity": {
+      "ok": false,
+      "told_without_incident": 0,
+      "told_without_incident_by": {
+        "missing": 0,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 30,
+      "unit_records_wrong": 0,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 0
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": [
+        {
+          "kind": "dropped_incident",
+          "incident_id": 45,
+          "calls": [
+            "C-503c6d66"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 48,
+          "calls": [
+            "C-999018d7"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 51,
+          "calls": [
+            "C-d93c7837"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 54,
+          "calls": [
+            "C-8183fc04"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 57,
+          "calls": [
+            "C-b4028222"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 63,
+          "calls": [
+            "C-5d653057"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 66,
+          "calls": [
+            "C-a9b9baab"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 69,
+          "calls": [
+            "C-ebef247f"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 72,
+          "calls": [
+            "C-f671cd5c"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 75,
+          "calls": [
+            "C-8ad19eea"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 78,
+          "calls": [
+            "C-799a59c2"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 81,
+          "calls": [
+            "C-9f6e4651"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 84,
+          "calls": [
+            "C-a597bee7"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 87,
+          "calls": [
+            "C-664f6fcc"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 90,
+          "calls": [
+            "C-130b6285"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 93,
+          "calls": [
+            "C-7ff12048"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 96,
+          "calls": [
+            "C-1ed46485"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 99,
+          "calls": [
+            "C-507ce2aa"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 102,
+          "calls": [
+            "C-1e0721b3"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 108,
+          "calls": [
+            "C-ff872b91"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 111,
+          "calls": [
+            "C-18010047"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 114,
+          "calls": [
+            "C-6b8b0ae7"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 117,
+          "calls": [
+            "C-0dd41b6b"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 123,
+          "calls": [
+            "C-12e50798"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 126,
+          "calls": [
+            "C-4aa5d818"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 132,
+          "calls": [
+            "C-b6a343db"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 135,
+          "calls": [
+            "C-78b5a4fb"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 138,
+          "calls": [
+            "C-6f69657b"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 141,
+          "calls": [
+            "C-18d358e1"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 144,
+          "calls": [
+            "C-a6900753"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 147,
+          "calls": [
+            "C-365956e6"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 150,
+          "calls": [
+            "C-03deffb4"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 153,
+          "calls": [
+            "C-c7299626"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 156,
+          "calls": [
+            "C-36c9fa40"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 159,
+          "calls": [
+            "C-fce39c0f"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 162,
+          "calls": [
+            "C-595476ea"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 165,
+          "calls": [
+            "C-f73783c8"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 171,
+          "calls": [
+            "C-7f7d29b7"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 174,
+          "calls": [
+            "C-8b4739b0"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 177,
+          "calls": [
+            "C-4c6c5a6c"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 180,
+          "calls": [
+            "C-e2e1838e"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 183,
+          "calls": [
+            "C-d3035bfc"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 186,
+          "calls": [
+            "C-3bf55e52"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 189,
+          "calls": [
+            "C-394771be"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 192,
+          "calls": [
+            "C-3c043f92"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 198,
+          "calls": [
+            "C-1820a42b"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 201,
+          "calls": [
+            "C-4db22f87"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 204,
+          "calls": [
+            "C-17defd08"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 207,
+          "calls": [
+            "C-a94cb4a9"
+          ]
+        },
+        {
+          "kind": "dropped_incident",
+          "incident_id": 210,
+          "calls": [
+            "C-c48450de"
+          ]
+        }
+      ]
+    },
+    "impact": {
+      "since_t": 1793445857.545192,
+      "until_t": 1793445975.3362403,
+      "breach_seconds": 120.0,
+      "failed_journeys": 219,
+      "time_to_mitigate_s": 117.8,
+      "mitigation_censored": true,
+      "told_without_incident": 0,
+      "incidents_dropped": 186,
+      "unit_record_wrong_seconds": 0.0,
+      "calls_dropped": 0,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0
+    },
+    "reasons": [
+      "30 of 92 calls failed: 30 with no crew en route within 3 s of being told",
+      "30 incidents callers were told about were dropped: no crew ever went en route and CAD is no longer working them"
+    ]
+  },
+  "manifest": [
+    {
+      "type": "sealed_3",
+      "target": "dispatcher",
+      "class": "bad_release",
+      "detail": {
+        "release": "2.2",
+        "pid": 6556
+      },
+      "t": 1793445857.545192,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_10",
+      "target": "alerting",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "dispatcher->alerting",
+        "drop_pct": 1.0
+      },
+      "t": 1793445858.3244233,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "cad",
+        "key": "write_timeout_ms",
+        "value": 2000
+      },
+      "t": 1793445860.3355386,
+      "at_s": 4
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793445867.1900845,
+      "params": {
+        "to": "standby"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "failover",
+      "target": "alerting",
+      "detail": "alerting now served by its standby"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793445867.18442,
+      "action": "failover",
+      "target": "alerting",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Callers see failures or excessive delay on this dependency.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "alerting now served by its standby"
+    }
+  ],
+  "timing": {
+    "t0": 1793445857.545192,
+    "t_alert": 1793445865.3355386,
+    "horizon": 1793445975.3355386,
+    "verdict_t": 1793445985.443606
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9300,
+  "error": null
+}

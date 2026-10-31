@@ -1,0 +1,456 @@
+{
+  "case": {
+    "id": "h-29",
+    "input": {
+      "system": "bank",
+      "seed": 260029,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "bad_setting",
+          "at_s": 0,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "blind_1",
+          "at_s": 2,
+          "params": {
+            "target": "gateway",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "gateway",
+          "class": "process_down",
+          "fix": {
+            "action": "restart",
+            "target": "gateway",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": true,
+      "acceptable_secondary": [],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "gateway",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      },
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "A setting change coincides with degraded service."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793430916.2782505,
+        "action": "restart",
+        "target": "gateway",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "gateway restarted"
+      },
+      {
+        "t": 1793430920.0871122,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "A setting change coincides with degraded service.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "The runbook ended with recovered.",
+      "background": "Surveyed 8 components; attempted 2 bounded actions.",
+      "assessment": "gateway: process_down; payments: bad_config",
+      "recommendation": "Continue monitoring the system."
+    },
+    "t_start": 1793430912.0728362,
+    "t_first_action": 1793430916.2782505,
+    "t_declared": 1793430935.0570426,
+    "trace": [
+      {
+        "t": 0.049567222595214844,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.1619019508361816,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 4.205259084701538,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 4.205411195755005,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 4.887056827545166,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 4.887072801589966,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 8.004746913909912,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 8.01409387588501,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 8.014272689819336,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 8.03840684890747,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 8.038429021835327,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 10.12079405784607,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.051862955093384,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.051952600479126,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 1; checking a ten-second window."
+      },
+      {
+        "t": 16.1496102809906,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 17.06588888168335,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 17.066030740737915,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 2; checking a ten-second window."
+      },
+      {
+        "t": 22.137179374694824,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 22.984025955200195,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 22.984201908111572,
+        "phase": "verify",
+        "kind": "note",
+        "name": "consecutive_pass",
+        "summary": "Successful probe 3; checking a ten-second window."
+      },
+      {
+        "t": 22.984222888946533,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with recovered."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": true,
+    "t": 1793431031.7992766,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793431001.799,
+      1793431021.799
+    ],
+    "journeys": {
+      "n": 225,
+      "ok": 225,
+      "success_rate": 1.0,
+      "p95_ms": 67.00015068054199,
+      "payments": {
+        "n": 175,
+        "ok": 175
+      },
+      "balances": {
+        "n": 50,
+        "fresh": 50
+      },
+      "p95_allowed_ms": 323.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 0,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": true
+    },
+    "reasons": [],
+    "impact": {
+      "since_t": 1793430898.7476323,
+      "until_t": 1793431021.7992766,
+      "breach_seconds": 25.0,
+      "failed_journeys": 81,
+      "time_to_mitigate_s": 25.0,
+      "mitigation_censored": false,
+      "late_clearings": 0,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793430898.7476323,
+      "at_s": 0
+    },
+    {
+      "type": "blind_1",
+      "target": "gateway",
+      "class": "process_down",
+      "detail": {},
+      "t": 1793430900.7558568,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430904.8357103,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430905.8167973,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793430906.799057,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793430916.9578757,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "restart",
+      "target": "gateway",
+      "detail": "gateway restarted"
+    },
+    {
+      "t": 1793430920.1088357,
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "payments",
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793430916.278267,
+      "action": "restart",
+      "target": "gateway",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "gateway restarted"
+    },
+    {
+      "event": "act",
+      "t": 1793430920.087133,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "A setting change coincides with degraded service.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by scheduler)"
+    }
+  ],
+  "timing": {
+    "t0": 1793430898.7476323,
+    "t_alert": 1793430911.799057,
+    "horizon": 1793431021.799057,
+    "verdict_t": 1793431031.8748617
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

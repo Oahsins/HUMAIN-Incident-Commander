@@ -1,0 +1,245 @@
+{
+  "arm": "abcde",
+  "mode": "auto",
+  "outcome": "recovered",
+  "root_causes": [
+    {
+      "target": "call-handling",
+      "class": "bad_release",
+      "confidence": 0.8,
+      "evidence": "[A1] \"call-handling: 7% of requests are refused (baseline 0%)\" began right after [E1] \"deploy by operator (from=5.2, to=5.3)\" 7 s ago. All dependencies probe ok."
+    }
+  ],
+  "actions": [
+    {
+      "t": 1793443551.7001917,
+      "action": "rollback",
+      "target": "call-handling",
+      "params": {},
+      "reason": "bad_release: [A1] \"call-handling: 7% of requests are refused (baseline 0%)\" began right after [E1] \"deploy by operator (from=5.2, to=5.3)\" 7 s ago. All dependencies probe ok.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "call-handling 5.3 -> 5.2"
+    }
+  ],
+  "proposed_actions": [],
+  "escalation": null,
+  "sbar": {
+    "situation": "Dispatch has recovered. Call-handling is back on version 5.2, and two recovery checks in a row came back clean.",
+    "background": "An operator deployed call-handling from 5.2 to 5.3. Right after, call-handling began refusing 7% of requests against a 0% baseline, which broke the 99% success target.",
+    "assessment": "The root cause is a bad release of call-handling 5.3 (confidence 0.8), and all dependencies probed ok. The incident commander rolled call-handling back from 5.3 to 5.2 itself, and the check at 20 s was clean. The cad write_timeout_ms change from 1000 to 2000 is routine tuning and not a fault.",
+    "recommendation": "Keep call-handling on 5.2 and block redeploying 5.3 until its owners find why it refuses requests. Ask the operations team to review the calls refused while 5.3 was live and confirm none were lost."
+  },
+  "t_start": 1793443544.4472406,
+  "t_first_action": 1793443551.7001917,
+  "t_declared": 1793443564.5843966,
+  "trace": [
+    {
+      "t": 0.04,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "describe",
+      "summary": "dispatch: 9 components",
+      "data": {
+        "ms": 41.8
+      }
+    },
+    {
+      "t": 0.14,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 97.0
+      }
+    },
+    {
+      "t": 0.65,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 509.3
+      }
+    },
+    {
+      "t": 0.65,
+      "phase": "survey",
+      "kind": "survey",
+      "name": "abcde",
+      "summary": "1 fault findings, 3 findings in all, 9 components checked",
+      "data": {
+        "findings": [
+          {
+            "id": "A1",
+            "letter": "A",
+            "component": "call-handling",
+            "severity": "fault",
+            "text": "7% of requests are refused (baseline 0%)"
+          },
+          {
+            "id": "E1",
+            "letter": "E",
+            "component": "call-handling",
+            "severity": "info",
+            "text": "7 s ago: deploy by operator (from=5.2, to=5.3)"
+          },
+          {
+            "id": "E2",
+            "letter": "E",
+            "component": "cad",
+            "severity": "info",
+            "text": "6 s ago: config by pipeline (key=write_timeout_ms, from=1000, to=2000)"
+          }
+        ]
+      }
+    },
+    {
+      "t": 0.67,
+      "phase": "survey",
+      "kind": "tool",
+      "name": "logs",
+      "summary": "89 log records from call-handling",
+      "data": {
+        "ms": 25.8
+      }
+    },
+    {
+      "t": 7.25,
+      "phase": "triage",
+      "kind": "model",
+      "name": "assess",
+      "summary": "claude-opus-5-5 answered in 6.578 s"
+    },
+    {
+      "t": 7.97,
+      "phase": "remediate",
+      "kind": "action",
+      "name": "rollback",
+      "summary": "rollback call-handling: done (call-handling 5.3 -> 5.2)",
+      "data": {
+        "target": "call-handling",
+        "params": {},
+        "sent": true,
+        "ok": true,
+        "refused_reason": null
+      }
+    },
+    {
+      "t": 15.11,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 131.8
+      }
+    },
+    {
+      "t": 15.48,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 379.4
+      }
+    },
+    {
+      "t": 15.48,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 1: clean (1 of 2 in a row)"
+    },
+    {
+      "t": 19.6,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "observe",
+      "summary": "9 components",
+      "data": {
+        "ms": 118.1
+      }
+    },
+    {
+      "t": 20.14,
+      "phase": "verify",
+      "kind": "tool",
+      "name": "probe",
+      "summary": "emergency_call journey ok",
+      "data": {
+        "ms": 533.7
+      }
+    },
+    {
+      "t": 20.14,
+      "phase": "verify",
+      "kind": "note",
+      "name": "check",
+      "summary": "look 2: clean (2 of 2 in a row)"
+    },
+    {
+      "t": 20.14,
+      "phase": "hand_over",
+      "kind": "note",
+      "name": "outcome",
+      "summary": "recovered"
+    },
+    {
+      "t": 24.83,
+      "phase": "hand_over",
+      "kind": "model",
+      "name": "sbar",
+      "summary": "claude-opus-5-5 answered in 4.696 s"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "assess",
+      "input_tokens": 3507,
+      "output_tokens": 512,
+      "latency_s": 6.578,
+      "estimated_cost_usd": 0.024268,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "purpose": "sbar",
+      "input_tokens": 817,
+      "output_tokens": 305,
+      "latency_s": 4.696,
+      "estimated_cost_usd": 0.009368,
+      "status": "ok",
+      "error": null,
+      "cost_basis": "standard API token prices; excludes hardware and other services"
+    }
+  ],
+  "steps": 9,
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793443551.7001917,
+      "action": "rollback",
+      "target": "call-handling",
+      "params": {},
+      "reason": "bad_release: [A1] \"call-handling: 7% of requests are refused (baseline 0%)\" began right after [E1] \"deploy by operator (from=5.2, to=5.3)\" 7 s ago. All dependencies probe ok.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "call-handling 5.3 -> 5.2"
+    }
+  ]
+}

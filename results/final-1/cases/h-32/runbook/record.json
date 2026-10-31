@@ -1,0 +1,1060 @@
+{
+  "case": {
+    "id": "h-32",
+    "input": {
+      "system": "bank",
+      "seed": 260032,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "double_posting",
+          "at_s": 2,
+          "params": {
+            "target": "payments",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "slow_screening",
+          "at_s": 4,
+          "params": {
+            "latency_ms": 1800,
+            "jitter_ms": 0
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "screening",
+          "class": "dependency_slow",
+          "fix": {
+            "action": "failover",
+            "target": "screening",
+            "params": {
+              "to": "standby"
+            }
+          }
+        },
+        {
+          "target": "payments",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "payments",
+            "params": {}
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      },
+      {
+        "target": "screening",
+        "class": "dependency_slow",
+        "confidence": 0.8,
+        "evidence": "Callers see failures or excessive delay on this dependency."
+      },
+      {
+        "target": "payments",
+        "class": "bad_release",
+        "confidence": 0.8,
+        "evidence": "A changed release coincides with local failures."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793431956.9021482,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted, but it is not answering health checks"
+      },
+      {
+        "t": 1793431961.5186353,
+        "action": "failover",
+        "target": "screening",
+        "params": {
+          "to": "standby"
+        },
+        "reason": "Callers see failures or excessive delay on this dependency.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "screening now served by its standby"
+      },
+      {
+        "t": 1793431963.677002,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted, but it is not answering health checks"
+      },
+      {
+        "t": 1793431967.349525,
+        "action": "rollback",
+        "target": "payments",
+        "params": {},
+        "reason": "A changed release coincides with local failures.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "payments 1.5 -> 1.3"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "No untried safe runbook rule can restore the failing journey.",
+      "urgency": "now",
+      "to": null,
+      "ask": "Investigate the failing components and restore service."
+    },
+    "sbar": {
+      "situation": "The runbook ended with escalated.",
+      "background": "Surveyed 8 components; attempted 4 bounded actions.",
+      "assessment": "clearing: process_down; screening: dependency_slow; payments: bad_release",
+      "recommendation": "A human operator should investigate the remaining symptoms."
+    },
+    "t_start": 1793431955.6892438,
+    "t_first_action": 1793431956.9021482,
+    "t_declared": 1793431975.8804197,
+    "trace": [
+      {
+        "t": 0.04683113098144531,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.13428902626037598,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.2127466201782227,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 1.2129015922546387,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 1.7458643913269043,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 1.7458827495574951,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 4.790277004241943,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 5.829196929931641,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 5.829387903213501,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "Callers see failures or excessive delay on this dependency."
+      },
+      {
+        "t": 5.8353798389434814,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 5.835401296615601,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "failover",
+        "summary": "Callers see failures or excessive delay on this dependency."
+      },
+      {
+        "t": 7.945701599121094,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 7.987574338912964,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 7.987755060195923,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 8.507089614868164,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 8.507104396820068,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 11.591978788375854,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.660163164138794,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 11.660279035568237,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A changed release coincides with local failures."
+      },
+      {
+        "t": 12.322748899459839,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 12.322761058807373,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "rollback",
+        "summary": "A changed release coincides with local failures."
+      },
+      {
+        "t": 16.425350666046143,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 20.191030979156494,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 20.19118618965149,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with escalated."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793432075.3987734,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793432045.399,
+      1793432065.399
+    ],
+    "journeys": {
+      "n": 229,
+      "ok": 229,
+      "success_rate": 1.0,
+      "p95_ms": 65.99998474121094,
+      "payments": {
+        "n": 172,
+        "ok": 172
+      },
+      "balances": {
+        "n": 57,
+        "fresh": 57
+      },
+      "p95_allowed_ms": 327.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 1002,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-01-000009",
+          "payment_ids": [
+            "388e276f83e14086",
+            "616d4696cd1843be"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-01-000010",
+          "payment_ids": [
+            "2037b178b3e24472",
+            "74c73a3ff5374eca"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000006",
+          "payment_ids": [
+            "fb3cace5886a4bd5",
+            "912d596432d24a59"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000009",
+          "payment_ids": [
+            "18fcb0ded2c44897",
+            "5826a4988abf4f17"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-02-000010",
+          "payment_ids": [
+            "93633c8c70264a6c",
+            "709ba3270e654155"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-03-000007",
+          "payment_ids": [
+            "e4baa806d4c645e0",
+            "f809fa3e6dee4b75"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-03-000010",
+          "payment_ids": [
+            "3865584625de4ca2",
+            "efe5ab55ff2348fe"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-04-000009",
+          "payment_ids": [
+            "b12a1c0c621c4581",
+            "188b4273e4724078"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-04-000010",
+          "payment_ids": [
+            "f262eb82be754fb6",
+            "1086961876be403d"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000006",
+          "payment_ids": [
+            "ed3de5ac97a841d5",
+            "2161e04dc0c74038"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000009",
+          "payment_ids": [
+            "9ae10dc6aa484a54",
+            "2a9f1166a2a8432a"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-05-000010",
+          "payment_ids": [
+            "1259a5c4526447e0",
+            "357ae875a6a04395"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000009",
+          "payment_ids": [
+            "d21340a474634c7d",
+            "9b208adc5b6d4f19"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-06-000010",
+          "payment_ids": [
+            "5fe84b65e3044be1",
+            "65296af44f7a4ebc"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000006",
+          "payment_ids": [
+            "c212e51d5bee44ba",
+            "6d9ccc8290be419d"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000009",
+          "payment_ids": [
+            "ea31223b1d1249a5",
+            "78074bc655e847fc"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-07-000010",
+          "payment_ids": [
+            "85f6df45e4934b55",
+            "62d2ba61984c46d9"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000006",
+          "payment_ids": [
+            "62108f348e524a28",
+            "825fa5d5dc4d4a88"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000009",
+          "payment_ids": [
+            "b1b8a0996427454e",
+            "06d2f68b191d44af"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-08-000010",
+          "payment_ids": [
+            "573af5968af4428d",
+            "0cb99db77aec4430"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000006",
+          "payment_ids": [
+            "da99b52b299b4224",
+            "9667cd885f984571"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000009",
+          "payment_ids": [
+            "f010daa930184edb",
+            "9e30544043034f2f"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-09-000010",
+          "payment_ids": [
+            "10fa7b192b964158",
+            "b0ed95da748945ab"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000009",
+          "payment_ids": [
+            "14a365cddca84793",
+            "bc26b168652b47d1"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000012",
+          "payment_ids": [
+            "b87f1caa15aa47f8",
+            "78f8f92a0dfb419d"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-10-000013",
+          "payment_ids": [
+            "ce973eb967624cb9",
+            "1c8a4d4e672f4d32"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000007",
+          "payment_ids": [
+            "b5a1b52027b043d7",
+            "fff6bc26e7fb46a0"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000010",
+          "payment_ids": [
+            "ddbc03be18d946ab",
+            "f4a28eb740494ac4"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-11-000011",
+          "payment_ids": [
+            "02057079d67a4cfe",
+            "21d0dfeb00644e7f"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000006",
+          "payment_ids": [
+            "e0e95f30194e4605",
+            "c78d5c141c324666"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000009",
+          "payment_ids": [
+            "6adafadc06be43bd",
+            "628600bda0c44116"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-12-000010",
+          "payment_ids": [
+            "f865c960fcdf4bbf",
+            "42f17b9b4de34987"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-13-000007",
+          "payment_ids": [
+            "cf06b66116c4477e",
+            "97831dab5d664d57"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-13-000010",
+          "payment_ids": [
+            "4e75c3e80b204d9b",
+            "e0ee3c376d3446f4"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-13-000011",
+          "payment_ids": [
+            "b637a34c4fb64950",
+            "4de4979204f440f5"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-14-000005",
+          "payment_ids": [
+            "b7f1493142a94a52",
+            "6830f3fd15e840f5"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-14-000008",
+          "payment_ids": [
+            "7888bfe4a2754daf",
+            "5dc1c4521f104f4f"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000006",
+          "payment_ids": [
+            "0aaba3fcf63746f5",
+            "d7bb6ccc4cf94d1e"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000009",
+          "payment_ids": [
+            "4ca04072ae0d4349",
+            "9dd9799e74a64d8e"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000010",
+          "payment_ids": [
+            "e868e81eeb9c4199",
+            "ab7880b0104c4b98"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-15-000011",
+          "payment_ids": [
+            "09013947fb174e16",
+            "ba9626301c5848b5"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-16-000009",
+          "payment_ids": [
+            "fa24acec7aa045ea",
+            "1fccbe73ce7f480e"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-16-000010",
+          "payment_ids": [
+            "537bca897e9742e6",
+            "4e11a13051704960"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-16-000011",
+          "payment_ids": [
+            "983a49d359924bba",
+            "f432c4d89c524a0c"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-17-000006",
+          "payment_ids": [
+            "b921da2c5f414d7e",
+            "18f4cfa1ad4a48c7"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-17-000009",
+          "payment_ids": [
+            "8c9371fe9ab74ec1",
+            "ea1eace1c1324299"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-17-000010",
+          "payment_ids": [
+            "145ae0e125244ded",
+            "c566ff5b5f384e5c"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-18-000006",
+          "payment_ids": [
+            "abcccc7617b24b83",
+            "f048839cc18743b2"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-18-000009",
+          "payment_ids": [
+            "36252cee4fc3429a",
+            "2f59c0dbfcf84647"
+          ],
+          "copies": 2
+        },
+        {
+          "kind": "posted_twice",
+          "end_to_end_id": "cust-18-000010",
+          "payment_ids": [
+            "9f4f69e4614a4093",
+            "5e1a3571714943d3"
+          ],
+          "copies": 2
+        }
+      ],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "1002 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793431942.3276315,
+      "until_t": 1793432065.3987734,
+      "breach_seconds": 20.0,
+      "failed_journeys": 40,
+      "time_to_mitigate_s": 20.0,
+      "mitigation_censored": false,
+      "late_clearings": 917,
+      "double_postings": 55,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 95
+      },
+      "t": 1793431942.3276315,
+      "at_s": 0
+    },
+    {
+      "type": "double_posting",
+      "target": "payments",
+      "class": "bad_release",
+      "detail": {
+        "release": "1.5"
+      },
+      "t": 1793431945.0495882,
+      "at_s": 2
+    },
+    {
+      "type": "slow_screening",
+      "target": "screening",
+      "class": "dependency_slow",
+      "detail": {
+        "route": "payments->screening",
+        "latency_ms": 1800,
+        "jitter_ms": 0
+      },
+      "t": 1793431946.3438544,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793431948.399592,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793431949.392594,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793431950.3980248,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793431957.4330409,
+      "params": {},
+      "ok": false,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted, but it is not answering health checks"
+    },
+    {
+      "t": 1793431961.522517,
+      "params": {
+        "to": "standby"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "failover",
+      "target": "screening",
+      "detail": "screening now served by its standby"
+    },
+    {
+      "t": 1793431964.194254,
+      "params": {},
+      "ok": false,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted, but it is not answering health checks"
+    },
+    {
+      "t": 1793431968.0103488,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "rollback",
+      "target": "payments",
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793431956.9021637,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": false,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted, but it is not answering health checks"
+    },
+    {
+      "event": "act",
+      "t": 1793431961.5186622,
+      "action": "failover",
+      "target": "screening",
+      "params": {
+        "to": "standby"
+      },
+      "reason": "Callers see failures or excessive delay on this dependency.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "screening now served by its standby"
+    },
+    {
+      "event": "act",
+      "t": 1793431963.6770196,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": false,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted, but it is not answering health checks"
+    },
+    {
+      "event": "act",
+      "t": 1793431967.349536,
+      "action": "rollback",
+      "target": "payments",
+      "params": {},
+      "reason": "A changed release coincides with local failures.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments 1.5 -> 1.3"
+    }
+  ],
+  "timing": {
+    "t0": 1793431942.3276315,
+    "t_alert": 1793431955.3980248,
+    "horizon": 1793432065.3980248,
+    "verdict_t": 1793432075.4656272
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

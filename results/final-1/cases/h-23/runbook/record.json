@@ -1,0 +1,434 @@
+{
+  "case": {
+    "id": "h-23",
+    "input": {
+      "system": "bank",
+      "seed": 260023,
+      "condition": "default",
+      "faults": [
+        {
+          "type": "poison_payment",
+          "at_s": 0,
+          "params": {
+            "target": "clearing",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "bad_setting",
+          "at_s": 2,
+          "params": {
+            "target": "payments",
+            "key": "max_transfer_minor",
+            "value": 1
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 6,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 7,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_1",
+          "at_s": 8,
+          "params": {
+            "target": "screening-standby",
+            "variant": "v1"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "payments",
+          "class": "bad_config",
+          "fix": {
+            "action": "revert_config",
+            "target": "payments",
+            "params": {
+              "key": "max_transfer_minor"
+            }
+          }
+        },
+        {
+          "target": "clearing",
+          "class": "poison_message",
+          "fix": {
+            "action": "quarantine",
+            "target": "clearing",
+            "params": {
+              "item": null
+            },
+            "then": [
+              {
+                "action": "restart",
+                "target": "clearing",
+                "params": {}
+              }
+            ]
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": [
+        {
+          "class": "process_down",
+          "target": "clearing"
+        }
+      ],
+      "notes": "Independent changes share the customer journey."
+    }
+  },
+  "arm": "runbook",
+  "result": {
+    "arm": "runbook",
+    "mode": "auto",
+    "outcome": "escalated",
+    "root_causes": [
+      {
+        "target": "payments",
+        "class": "bad_config",
+        "confidence": 0.8,
+        "evidence": "A setting change coincides with degraded service."
+      },
+      {
+        "target": "clearing",
+        "class": "process_down",
+        "confidence": 0.8,
+        "evidence": "The process is down or is not answering."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793428225.100349,
+        "action": "revert_config",
+        "target": "payments",
+        "params": {
+          "key": "max_transfer_minor"
+        },
+        "reason": "A setting change coincides with degraded service.",
+        "sent": true,
+        "declined": false,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+      },
+      {
+        "t": 1793428230.972959,
+        "action": "restart",
+        "target": "clearing",
+        "params": {},
+        "reason": "The process is down or is not answering.",
+        "sent": true,
+        "declined": false,
+        "ok": false,
+        "refused": false,
+        "refused_reason": null,
+        "detail": "clearing restarted, but it is not answering health checks"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": {
+      "components": [
+        "clearing"
+      ],
+      "class": null,
+      "reason": "No untried safe runbook rule can restore the failing journey.",
+      "urgency": "now",
+      "to": null,
+      "ask": "Investigate the failing components and restore service."
+    },
+    "sbar": {
+      "situation": "The runbook ended with escalated.",
+      "background": "Surveyed 8 components; attempted 2 bounded actions.",
+      "assessment": "payments: bad_config; clearing: process_down",
+      "recommendation": "A human operator should investigate the remaining symptoms."
+    },
+    "t_start": 1793428224.9760902,
+    "t_first_action": 1793428225.100349,
+    "t_declared": 1793428238.3409007,
+    "trace": [
+      {
+        "t": 0.03456902503967285,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.0951988697052002,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.12412667274475098,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 0.12425661087036133,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 0.1287081241607666,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 0.12871932983398438,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "revert_config",
+        "summary": "A setting change coincides with degraded service."
+      },
+      {
+        "t": 2.225816249847412,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 5.996717691421509,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 5.996865272521973,
+        "phase": "triage",
+        "kind": "note",
+        "name": "first_matching_rule",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 6.524823904037476,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "act",
+        "summary": "Requested a bounded action."
+      },
+      {
+        "t": 6.524841547012329,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "restart",
+        "summary": "The process is down or is not answering."
+      },
+      {
+        "t": 9.591761350631714,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 13.364700078964233,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "Read the current system."
+      },
+      {
+        "t": 13.364818096160889,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "sbar",
+        "summary": "The runbook ended with escalated."
+      }
+    ],
+    "calls": []
+  },
+  "checker": {
+    "recovered": false,
+    "t": 1793428344.6864362,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793428314.686,
+      1793428334.686
+    ],
+    "journeys": {
+      "n": 222,
+      "ok": 222,
+      "success_rate": 1.0,
+      "p95_ms": 66.99991226196289,
+      "payments": {
+        "n": 171,
+        "ok": 171
+      },
+      "balances": {
+        "n": 51,
+        "fresh": 51
+      },
+      "p95_allowed_ms": 321.0
+    },
+    "slo_ok": true,
+    "integrity": {
+      "money_conserved": true,
+      "balances_match_postings": true,
+      "unbalanced_payments": 0,
+      "double_postings": 0,
+      "ghost_payments": 0,
+      "lost_payments": 0,
+      "stuck_items": 983,
+      "wrongly_quarantined": 0,
+      "stale_reads": 0,
+      "for_operations": [],
+      "harmful_quarantines": 0,
+      "ok": false
+    },
+    "reasons": [
+      "983 payments waiting more than 5 s to clear"
+    ],
+    "impact": {
+      "since_t": 1793428211.6145978,
+      "until_t": 1793428334.6864362,
+      "breach_seconds": 15.0,
+      "failed_journeys": 98,
+      "time_to_mitigate_s": 15.0,
+      "mitigation_censored": false,
+      "late_clearings": 902,
+      "double_postings": 0,
+      "unbalanced_payments": 0
+    }
+  },
+  "manifest": [
+    {
+      "type": "poison_payment",
+      "target": "clearing",
+      "class": "poison_message",
+      "detail": {
+        "item": 86
+      },
+      "t": 1793428211.6145978,
+      "at_s": 0
+    },
+    {
+      "type": "bad_setting",
+      "target": "payments",
+      "class": "bad_config",
+      "detail": {
+        "key": "max_transfer_minor",
+        "value": 1
+      },
+      "t": 1793428213.624606,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793428217.7005465,
+      "at_s": 6
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793428218.6805642,
+      "at_s": 7
+    },
+    {
+      "type": "sealed_1",
+      "target": null,
+      "class": null,
+      "detail": {},
+      "t": 1793428219.6862276,
+      "at_s": 8
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793428225.1035075,
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "ok": true,
+      "refused": false,
+      "action": "revert_config",
+      "target": "payments",
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "t": 1793428231.4981627,
+      "params": {},
+      "ok": false,
+      "refused": false,
+      "action": "restart",
+      "target": "clearing",
+      "detail": "clearing restarted, but it is not answering health checks"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793428225.1003623,
+      "action": "revert_config",
+      "target": "payments",
+      "params": {
+        "key": "max_transfer_minor"
+      },
+      "reason": "A setting change coincides with degraded service.",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "payments max_transfer_minor restored from 1 to 1000000 (changed earlier by pipeline)"
+    },
+    {
+      "event": "act",
+      "t": 1793428230.9729772,
+      "action": "restart",
+      "target": "clearing",
+      "params": {},
+      "reason": "The process is down or is not answering.",
+      "sent": true,
+      "ok": false,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "clearing restarted, but it is not answering health checks"
+    }
+  ],
+  "timing": {
+    "t0": 1793428211.6145978,
+    "t_alert": 1793428224.6862276,
+    "horizon": 1793428334.6862276,
+    "verdict_t": 1793428344.7213736
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 8200,
+  "error": null
+}

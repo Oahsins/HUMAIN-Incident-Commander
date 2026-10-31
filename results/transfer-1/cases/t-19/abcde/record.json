@@ -1,0 +1,644 @@
+{
+  "case": {
+    "id": "t-19",
+    "input": {
+      "system": "dispatch",
+      "condition": "default",
+      "seed": 310019,
+      "faults": [
+        {
+          "type": "sealed_1",
+          "at_s": 0,
+          "params": {
+            "target": "call-handling",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_5",
+          "at_s": 2,
+          "params": {
+            "target": "unit-sync",
+            "variant": "v1"
+          }
+        },
+        {
+          "type": "sealed_10",
+          "at_s": 4,
+          "params": {
+            "target": "cad-db",
+            "variant": "v8"
+          }
+        },
+        {
+          "type": "sealed_9",
+          "at_s": 6,
+          "params": {
+            "target": "cad",
+            "variant": "v2"
+          }
+        }
+      ]
+    },
+    "target": {
+      "root_causes": [
+        {
+          "target": "cad-db",
+          "class": "lock_held",
+          "fix": {
+            "action": "release_lock",
+            "target": "cad-db",
+            "params": {}
+          }
+        },
+        {
+          "target": "call-handling",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "call-handling",
+            "params": {}
+          }
+        },
+        {
+          "target": "unit-sync",
+          "class": "bad_release",
+          "fix": {
+            "action": "rollback",
+            "target": "unit-sync",
+            "params": {}
+          }
+        }
+      ],
+      "healthy": false,
+      "must_escalate": false,
+      "blind": false,
+      "acceptable_secondary": []
+    }
+  },
+  "arm": "abcde",
+  "result": {
+    "arm": "abcde",
+    "mode": "auto",
+    "outcome": "recovered",
+    "root_causes": [
+      {
+        "target": "cad-db",
+        "class": "lock_held",
+        "confidence": 0.92,
+        "evidence": "[B3] \"lock held by session incident-archive-28752 (write) for 7.3 s: INSERT INTO rms_export ... (export batch)\". cad logs repeatedly show \"cad-db is busy; the calls write was not made\" and \"...the mdt write was not made\", and the probe fails at 'cad' with \"504 cad timed out\"."
+      }
+    ],
+    "actions": [
+      {
+        "t": 1793447325.7588205,
+        "action": "release_lock",
+        "target": "cad-db",
+        "params": {},
+        "reason": "lock_held: [B3] \"lock held by session incident-archive-28752 (write) for 7.3 s: INSERT INTO rms_export ... (export batch)\". cad logs repeatedly show \"cad-db is busy; the calls write was not made\" and \"...the mdt write was not made\", and the probe fails at 'cad' with \"504 cad timed out\".",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended 1 session(s) holding cad-db: incident-archive-28752"
+      }
+    ],
+    "proposed_actions": [],
+    "escalation": null,
+    "sbar": {
+      "situation": "Dispatch has recovered. Three recovery checks were run, and the last two in a row, ending at 25 s, came back clean.",
+      "background": "The incident-archive export job took a write lock on cad-db for 7.3 s. Its session was incident-archive-28752, running an export batch INSERT INTO rms_export. While the lock was held, cad could not write calls or MDT terminal reports, so it timed out with 504 errors.",
+      "assessment": "The root cause was a lock held on cad-db by session incident-archive-28752 (confidence 0.92). Because of it, call-handling could not enter 9-1-1 calls and unit status reports piled up. The incident commander ended that session itself with release_lock on cad-db, and the checks afterwards were clean.",
+      "recommendation": "Find out why the incident-archive export job holds a long write lock on cad-db, and schedule it or change it so this does not happen again. Ask operations to review any 9-1-1 calls or unit status reports that were not written during the outage. Also confirm the interrupted rms_export batch is rerun or completed."
+    },
+    "t_start": 1793447313.2740142,
+    "t_first_action": 1793447325.7588205,
+    "t_declared": 1793447338.5608401,
+    "trace": [
+      {
+        "t": 0.05,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "describe",
+        "summary": "dispatch: 9 components",
+        "data": {
+          "ms": 53.1
+        }
+      },
+      {
+        "t": 0.25,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 199.3
+        }
+      },
+      {
+        "t": 1.94,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey failed at cad",
+        "data": {
+          "ms": 1689.8
+        }
+      },
+      {
+        "t": 1.94,
+        "phase": "survey",
+        "kind": "survey",
+        "name": "abcde",
+        "summary": "11 fault findings, 17 findings in all, 9 components checked",
+        "data": {
+          "findings": [
+            {
+              "id": "A1",
+              "letter": "A",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "27% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A2",
+              "letter": "A",
+              "component": "cad",
+              "severity": "fault",
+              "text": "63% of requests fail (baseline 0%)"
+            },
+            {
+              "id": "A3",
+              "letter": "A",
+              "component": "cad",
+              "severity": "info",
+              "text": "traffic 6.1/s (baseline 26.8/s), less work from its callers"
+            },
+            {
+              "id": "A4",
+              "letter": "A",
+              "component": "alerting",
+              "severity": "info",
+              "text": "traffic 0.0/s (baseline 1.9/s), less work from its callers"
+            },
+            {
+              "id": "A5",
+              "letter": "A",
+              "component": "cad",
+              "severity": "fault",
+              "text": "emergency_call journey fails at step 'cad': 504 cad timed out"
+            },
+            {
+              "id": "B1",
+              "letter": "B",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "p95 1027 ms (baseline 36 ms)"
+            },
+            {
+              "id": "B2",
+              "letter": "B",
+              "component": "cad",
+              "severity": "fault",
+              "text": "p95 2274 ms (baseline 24 ms)"
+            },
+            {
+              "id": "B3",
+              "letter": "B",
+              "component": "cad-db",
+              "severity": "fault",
+              "text": "lock held by session incident-archive-28752 (write) for 7.3 s: INSERT INTO rms_export ... (export batch)"
+            },
+            {
+              "id": "B4",
+              "letter": "B",
+              "component": "cad-db",
+              "severity": "fault",
+              "text": "31 failed writes in the window"
+            },
+            {
+              "id": "C1",
+              "letter": "C",
+              "component": "incident-archive",
+              "severity": "info",
+              "text": "job running"
+            },
+            {
+              "id": "D1",
+              "letter": "D",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "calls to cad fail: 100%"
+            },
+            {
+              "id": "D2",
+              "letter": "D",
+              "component": "call-handling",
+              "severity": "fault",
+              "text": "calls to cad are slow: p95 1031 ms (cad itself answered in 24 ms at baseline)"
+            },
+            {
+              "id": "D3",
+              "letter": "D",
+              "component": "cad",
+              "severity": "fault",
+              "text": "data check failed: unit status timers expired = 2"
+            },
+            {
+              "id": "D4",
+              "letter": "D",
+              "component": "unit-sync",
+              "severity": "fault",
+              "text": "data check failed: unit reports overdue = 20"
+            },
+            {
+              "id": "E1",
+              "letter": "E",
+              "component": "call-handling",
+              "severity": "info",
+              "text": "12 s ago: deploy by pipeline (from=5.2, to=5.3)"
+            },
+            {
+              "id": "E2",
+              "letter": "E",
+              "component": "unit-sync",
+              "severity": "info",
+              "text": "10 s ago: deploy by operator (from=4.0, to=4.1)"
+            },
+            {
+              "id": "E3",
+              "letter": "E",
+              "component": "cad",
+              "severity": "info",
+              "text": "6 s ago: config by pipeline (key=write_timeout_ms, from=1000, to=2000)"
+            }
+          ]
+        }
+      },
+      {
+        "t": 1.97,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "118 log records from call-handling",
+        "data": {
+          "ms": 26.0
+        }
+      },
+      {
+        "t": 2.0,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "35 log records from cad",
+        "data": {
+          "ms": 29.8
+        }
+      },
+      {
+        "t": 2.02,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "0 log records from cad-db",
+        "data": {
+          "ms": 22.6
+        }
+      },
+      {
+        "t": 2.05,
+        "phase": "survey",
+        "kind": "tool",
+        "name": "logs",
+        "summary": "77 log records from unit-sync",
+        "data": {
+          "ms": 24.7
+        }
+      },
+      {
+        "t": 12.48,
+        "phase": "triage",
+        "kind": "model",
+        "name": "assess",
+        "summary": "claude-opus-5-5 answered in 10.438 s"
+      },
+      {
+        "t": 12.6,
+        "phase": "remediate",
+        "kind": "action",
+        "name": "release_lock",
+        "summary": "release_lock cad-db: done (ended 1 session(s) holding cad-db: incident-archive-28752)",
+        "data": {
+          "target": "cad-db",
+          "params": {},
+          "sent": true,
+          "ok": true,
+          "refused_reason": null
+        }
+      },
+      {
+        "t": 15.74,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 135.6
+        }
+      },
+      {
+        "t": 16.27,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 528.8
+        }
+      },
+      {
+        "t": 16.27,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 1: not clean (0 of 2 in a row); still abnormal: call-handling: 10% of requests fail (baseline 0%); cad: 3% of requests fail (baseline 0%); call-handling: p95 1013 ms (baseline 36 ms) (+4 more)"
+      },
+      {
+        "t": 20.42,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 146.7
+        }
+      },
+      {
+        "t": 20.86,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 447.3
+        }
+      },
+      {
+        "t": 20.86,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 2: clean (1 of 2 in a row)"
+      },
+      {
+        "t": 24.97,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "observe",
+        "summary": "9 components",
+        "data": {
+          "ms": 110.0
+        }
+      },
+      {
+        "t": 25.29,
+        "phase": "verify",
+        "kind": "tool",
+        "name": "probe",
+        "summary": "emergency_call journey ok",
+        "data": {
+          "ms": 312.2
+        }
+      },
+      {
+        "t": 25.29,
+        "phase": "verify",
+        "kind": "note",
+        "name": "check",
+        "summary": "look 3: clean (2 of 2 in a row)"
+      },
+      {
+        "t": 25.29,
+        "phase": "hand_over",
+        "kind": "note",
+        "name": "outcome",
+        "summary": "recovered"
+      },
+      {
+        "t": 29.94,
+        "phase": "hand_over",
+        "kind": "model",
+        "name": "sbar",
+        "summary": "claude-opus-5-5 answered in 4.654 s"
+      }
+    ],
+    "calls": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "assess",
+        "input_tokens": 4640,
+        "output_tokens": 1047,
+        "latency_s": 10.438,
+        "estimated_cost_usd": 0.0395,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "purpose": "sbar",
+        "input_tokens": 888,
+        "output_tokens": 356,
+        "latency_s": 4.654,
+        "estimated_cost_usd": 0.010672,
+        "status": "ok",
+        "error": null,
+        "cost_basis": "standard API token prices; excludes hardware and other services"
+      }
+    ],
+    "steps": 14,
+    "audit": [
+      {
+        "event": "act",
+        "t": 1793447325.7588205,
+        "action": "release_lock",
+        "target": "cad-db",
+        "params": {},
+        "reason": "lock_held: [B3] \"lock held by session incident-archive-28752 (write) for 7.3 s: INSERT INTO rms_export ... (export batch)\". cad logs repeatedly show \"cad-db is busy; the calls write was not made\" and \"...the mdt write was not made\", and the probe fails at 'cad' with \"504 cad timed out\".",
+        "sent": true,
+        "ok": true,
+        "refused": false,
+        "refused_reason": null,
+        "declined": false,
+        "detail": "ended 1 session(s) holding cad-db: incident-archive-28752"
+      }
+    ]
+  },
+  "checker": {
+    "recovered": false,
+    "slo_ok": false,
+    "t": 1793447432.8265977,
+    "window_s": 20.0,
+    "lag_s": 10.0,
+    "window": [
+      1793447402.827,
+      1793447422.827
+    ],
+    "journeys": {
+      "n": 50,
+      "ok": 27,
+      "success_rate": 0.54,
+      "p95_ms": 36.6,
+      "p90_ms": 35.6,
+      "p95_allowed_ms": 287.2,
+      "by_source": {
+        "normal": {
+          "n": 50,
+          "ok": 27
+        },
+        "surge": {
+          "n": 0,
+          "ok": 0
+        }
+      },
+      "linked": 2,
+      "failures": {
+        "no_incident": 23
+      }
+    },
+    "integrity": {
+      "ok": false,
+      "told_without_incident": 23,
+      "told_without_incident_by": {
+        "missing": 23,
+        "test": 0,
+        "other_emergency": 0,
+        "closed_before_link": 0
+      },
+      "incidents_dropped": 0,
+      "unit_records_wrong": 4,
+      "unit_records_wrong_by": {
+        "wrong_writes": 0,
+        "units_behind": 4
+      },
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0,
+      "units_double_committed": 0,
+      "incident_details_wrong": 0,
+      "test_alerts_to_crews": 0,
+      "wrongly_quarantined": 0,
+      "harmful_quarantines": 0,
+      "calls_dropped": 0,
+      "incidents_waiting": 0,
+      "unreadable_set_aside": 0,
+      "field_messages_waiting": 0,
+      "for_operations": []
+    },
+    "impact": {
+      "since_t": 1793447302.5214639,
+      "until_t": 1793447422.8265977,
+      "breach_seconds": 125.0,
+      "failed_journeys": 205,
+      "time_to_mitigate_s": 120.3,
+      "mitigation_censored": true,
+      "told_without_incident": 151,
+      "incidents_dropped": 0,
+      "unit_record_wrong_seconds": 384.0,
+      "calls_dropped": 0,
+      "duplicate_incidents": 0,
+      "incidents_double_sent": 0
+    },
+    "reasons": [
+      "23 of 50 calls failed: 23 told with no incident of theirs in CAD",
+      "23 callers were told help is on the way but CAD holds no incident of theirs",
+      "4 units' CAD records differed from their crews for longer than the 3 s status lag"
+    ]
+  },
+  "manifest": [
+    {
+      "type": "sealed_1",
+      "target": "call-handling",
+      "class": "bad_release",
+      "detail": {
+        "release": "5.3"
+      },
+      "t": 1793447302.5214639,
+      "at_s": 0
+    },
+    {
+      "type": "sealed_5",
+      "target": "unit-sync",
+      "class": "bad_release",
+      "detail": {
+        "release": "4.1"
+      },
+      "t": 1793447304.521401,
+      "at_s": 2
+    },
+    {
+      "type": "sealed_10",
+      "target": "cad-db",
+      "class": "lock_held",
+      "detail": {
+        "pid": 38604,
+        "hold_s": 600
+      },
+      "t": 1793447305.8381183,
+      "at_s": 4
+    },
+    {
+      "type": "sealed_9",
+      "target": null,
+      "class": null,
+      "detail": {
+        "component": "cad",
+        "key": "write_timeout_ms",
+        "value": 2000
+      },
+      "t": 1793447307.8262699,
+      "at_s": 6
+    }
+  ],
+  "injection_complete": true,
+  "telemetry_complete": true,
+  "actions": [
+    {
+      "t": 1793447325.8748918,
+      "params": {},
+      "ok": true,
+      "refused": false,
+      "action": "release_lock",
+      "target": "cad-db",
+      "detail": "ended 1 session(s) holding cad-db: incident-archive-28752"
+    }
+  ],
+  "audit": [
+    {
+      "event": "act",
+      "t": 1793447325.7588205,
+      "action": "release_lock",
+      "target": "cad-db",
+      "params": {},
+      "reason": "lock_held: [B3] \"lock held by session incident-archive-28752 (write) for 7.3 s: INSERT INTO rms_export ... (export batch)\". cad logs repeatedly show \"cad-db is busy; the calls write was not made\" and \"...the mdt write was not made\", and the probe fails at 'cad' with \"504 cad timed out\".",
+      "sent": true,
+      "ok": true,
+      "refused": false,
+      "refused_reason": null,
+      "declined": false,
+      "detail": "ended 1 session(s) holding cad-db: incident-archive-28752"
+    }
+  ],
+  "timing": {
+    "t0": 1793447302.5214639,
+    "t_alert": 1793447312.8262699,
+    "horizon": 1793447422.8262699,
+    "verdict_t": 1793447432.8736937
+  },
+  "attempt": 1,
+  "purpose": "main",
+  "port_base": 9100,
+  "error": null
+}
