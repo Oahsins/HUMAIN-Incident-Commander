@@ -5,10 +5,13 @@ bank, behind the same adapter. This document gives the facts about it that an in
 the users do, what the checker counts, and what each channel offers a fault. You can write incidents from it
 without reading the code in `targets/dispatch/`.
 
-The facts follow the code. The measured numbers come from live runs on a 4-CPU Linux machine with seed 0, and
-each table says how it was measured. Nothing was measured on Windows. Every measured number here was taken before
-the dispatcher's 30 s re-offer rule (11.1, Pending incidents), except the alerting outage given there. The rule
-changes nothing on a healthy copy.
+The facts follow the code. The measured numbers come from live runs on a 4-CPU Linux machine with seed 0 unless a
+table says otherwise, and each table says how it was measured. Nothing was measured on Windows. Every measured
+number here was taken before the dispatcher's 30 s re-offer rule (11.1, Pending incidents), except the alerting
+outage given there and the drain after a unit-sync outage (section 6, also used in 11.6). The rule acts only on
+an incident a unit failed to acknowledge, so it changes nothing on a healthy copy. Older results for breaks that
+leave assignments unacknowledged (for example alerting or its link, unit-sync, a short `ack_timeout_s`) may
+differ under it.
 
 ## 1. What dispatch is
 
@@ -106,9 +109,10 @@ through the `dispatcher->alerting` relay and records the call under `alerting`. 
 
 **describe() also gives:**
 
-- the six actions with the bank's `est_seconds`, `undo` and `params`. `failover` takes `{"to": "standby" |
-  "primary"}`, and `quarantine` takes `{"item": <extra.head_item.id>}`. The restart description warns that a
-  restart of call-handling cuts off calls being answered;
+- the six actions with the bank's `est_seconds` (3 for restart, 4 for rollback, 1 for the others), `undo` and
+  `params`. `revert_config` takes an optional `{"key": <setting>}` (section 3), `failover` takes `{"to":
+  "standby" | "primary"}` (default `standby`), and `quarantine` takes `{"item": <extra.head_item.id>}`. The
+  restart description warns that a restart of call-handling cuts off calls being answered;
 - four forbidden lines: "close or cancel an incident", "change a call's priority", "stand down or reassign a
   unit committed to an incident" and "contact a caller". No action does any of these;
 - one contact per component: shift supervisor (call-handling, dispatcher); CAD administrator (cad, cad-db,
@@ -117,11 +121,14 @@ through the `dispatcher->alerting` relay and records the call under `alerting`. 
 
 ## 3. Settings
 
-Every setting is a number or a named choice. A bool is never usable. The defaults are safe. A component reads
+Every setting is a JSON number or a named choice. A bool is never usable, and neither is a number written as a
+string, such as `"10"`; a whole-number setting also takes `20.0`. The defaults are safe. A component reads
 its settings at most 0.2 s old. The workers sleep in 0.25 s slices and wake early when a setting changes. The
 sleep compares with the settings the cycle started with, so a change made during a cycle also cuts short the
 sleep its old `poll_interval_s` set. So `revert_config` takes effect within about 0.25 s, or about 0.25 s after
-the cycle in progress ends.
+the cycle in progress ends. With `{"key": k}`, `revert_config` restores the value that the newest change to k (not
+yet undone) replaced, not the default. With no key it undoes the newest change on that component, not yet undone,
+that the agent did not make. Either way the undo is a new version and a new change in the feed.
 
 | Component | Setting | Default | Usable values | When unusable |
 |---|---|---|---|---|
@@ -141,8 +148,11 @@ the cycle in progress ends.
 | unit-sync | `max_message_age_s` | 10.0 | number, 0 < v ≤ 3600 | applying stops |
 
 - alerting, alerting-backup and call-network have no settings.
-- **Unusable.** A component with an unusable value writes one ERROR line `settings_unusable`, naming the key and
-  never the value, every 2 s until the setting changes. It does not crash. A worker pauses its work.
+- **Unusable.** A component with an unusable value writes an ERROR line `settings_unusable` at once, then at most
+  one every 2 s until the setting changes. The line names the key, in its message and its `key` field, and never
+  the value; a worker's reads "setting batch_size cannot be used; work is paused until it changes". The component
+  does not crash, and it stays up and answering. A worker pauses: it runs no cycle, so the dispatcher neither
+  commits, alerts nor expires assignments, and unit-sync reads no report and raises no `attempts`.
 - **Harmful.** A usable but harmful value is used as given. A dispatcher `poll_interval_s` of 30 makes every
   dispatch late.
 
@@ -221,7 +231,8 @@ move to a closed assignment state, and every incident close, sets `closed_t`.
 
 **Who writes what.**
 
-- cad inserts `incidents` and `calls` in one transaction, and inserts `field_queue` rows.
+- cad inserts `incidents` and `calls` in one transaction per call (11.1, Behaviour the methods carry), and inserts
+  `field_queue` rows.
 - The dispatcher inserts and updates `assignments`, and moves incidents between `pending` and `dispatched`. It
   closes an `enroute` or `onscene` incident whose last open assignment expires (`completed`). It never writes
   `units`.
@@ -237,7 +248,8 @@ reached about 16 MB per copy, plus a 4.4 MB write-ahead log.
 
 - **Stations** on a 20 × 20 km grid: S1 (4, 4), S2 (16, 4), S3 (10, 10), S4 (4, 16), S5 (16, 16).
 - **Units.** Station Sk has medics M(2k−1) and M(2k) and engines E(2k−1) and E(2k): M1-M10 and E1-E10. S2 has
-  M3, M4, E3 and E4.
+  M3, M4, E3 and E4. Roster order, which `station_order` follows, goes station by station: M1, M2, E1, E2, M3,
+  M4, E3, E4, and so on.
 - **Test unit.** `TEST-1` (`test` 1, type `test`) at station `TEST` (0, 0). No crew serves it.
 - Every unit starts `available`, with no incident.
 
@@ -272,7 +284,7 @@ never logged or raised.
 | `logs/<component>.jsonl`, `logs/*.out` | component logs and process output |
 | `logs/call-surge-<pid>.jsonl` | each surge helper's caller lines |
 | `releases/<component>/v<x_y>.py` | a copy of each release deployed with `module_path` (11.1, Releases) |
-| `actions.jsonl`, `changes.jsonl` | the agent's actions, and every recorded change |
+| `actions.jsonl`, `changes.jsonl` | the agent's actions, and every recorded change: deploys and rollbacks, setting changes and reverts, stops and starts made with `log_change` true, restarts, failovers, quarantines and lock releases. A kill, a link change, a spawn or surge, a hang and a datastore write record nothing. observe() shows the changes of the last 15 minutes |
 
 ## 5. Users and the users' log
 
@@ -322,9 +334,11 @@ There are 20 crews, one per real unit, in the people process.
 
 - **One scheduler** runs every 0.05 s. It reads the new lines of both station inboxes and makes every crew
   transition and heartbeat.
-- **Alert.** For an alert to one of its units, it writes an `alert` line, with `taken` true only if the crew is
-  free. A repeated `assignment_id`, or an incident the crew already served, is ignored and not logged. A busy
-  crew does not respond.
+- **Alert.** For an alert to one of its units with a whole-number `incident_id` (0 < id < 2^63), it writes an
+  `alert` line, with `taken` true only if the crew is free. A repeated `assignment_id`, or an incident the crew
+  has taken before, is ignored and not logged: a crew never takes the same incident twice. A busy crew does not
+  respond. A crew that takes an alert drives to the alert's `x` and `y`, taking the 1.8 s cap when they are
+  missing.
 - **Taken.** After turnout of 0.2-0.4 s: `status enroute`. After the drive: `onscene`. After 0.6-1.2 s on scene:
   `available` with no incident.
 - **Log before post.** Each transition is written to the log at its time `t`, then a report with the same `t`
@@ -397,8 +411,11 @@ Numbers are fictional: `0PP-555-01NN`. No area code starts with 0, and 555-01NN 
 - About 2.2 emergencies per second plus 10% callbacks: about 2.4 calls per second, about 49 calls per 20 s
   window. The checker needs at least 20. In the soak (section 7) a 20 s window outside surges held 43-54 calls
   (median 48-49), and up to 122 during a surge at the cap.
-- About 20% of positions busy, and about 20% of units committed. In the soak: 2.2 of 14 positions busy on
-  average outside surges (at most 5), and 3-4 of 20 units committed at the median (at most 16).
+- About 20% of positions busy, and about 20% of units committed. A call holds its position from the answer until
+  its report is answered: the caller's 0.8-1.6 s of talk (0.2-0.3 s for a callback) plus a few ms, and 1.2-2.0 s
+  more when the location is given by voice. That keeps about 2.7 of 14 positions busy on average outside surges
+  (from the code). In the soak:
+  at most 5 positions busy outside surges, and 3-4 of 20 units committed at the median (at most 16).
 - About 27 field reports per second: 20 heartbeats plus about 7 status changes.
 
 **Capacity.** Measured on one copy while three other copies shared the machine. Each surge ran 150 s with the
@@ -431,21 +448,28 @@ the start.
   green sooner than 30 s after the last failing call (window 20 s plus lag 10 s).
 - The drain with a surge was not measured.
 
-**Drain after a unit-sync outage.** An unreadable report stopped unit-sync for F seconds, then `quarantine` and
-`restart`, with no surge, on one copy alone on the machine (one run each, sampled every 5 s). Times are from the
+**Drain after a unit-sync outage**, measured with the 30 s re-offer rule.
+An unreadable report stopped unit-sync for F seconds, then `quarantine` and
+`restart`, with no surge, on one copy (seed 11) alone on the machine (one run each, sampled every 5 s). Times are from the
 fix.
 
-| F | Backlog (pending at the fix) | Backlog cleared | First green verdict | Verdict 125 s after the break |
+| F | Backlog (dispatcher `queue_depth` at the fix) | Backlog cleared | First green verdict | Verdict 125 s after the break |
 |---|---|---|---|---|
 | 30 s | 51 | by 15 s | 40.3 s | green |
 | 60 s | 120 | by 25 s | 50.6 s | green |
 | 90 s | 185 | by 41 s | 66.1 s | red: "31 of 47 calls failed: 31 with no crew en route within 3 s of being told" |
 
 - While unit-sync is down, crews still take alerts and serve incidents, but CAD never hears of it: each
-  assignment becomes `no_ack`, and its incident returns to `pending` and is sent to another unit. Once unit-sync
+  assignment becomes `no_ack`, and its incident returns to `pending` and is sent to another unit. No incident
+  closes, so the dispatcher's `queue_depth` grows by about 2 a second (the backlog column). Its `processed_per_s`
+  runs at several times the everyday rate, as each unit CAD shows free is committed again about every 2 s (from
+  the code). Once unit-sync
   is back, the reports from the outage are too old (`max_message_age_s`, 10 s) or superseded by each unit's
   newest report, so every incident that no crew is serving at that moment is dispatched again, by
-  priority then id. The backlog grows with the outage, and fresh calls wait behind it: they were reached again
+  priority then id. A crew never takes an incident it has already taken (5.2), so offering one to a crew that took
+  it during the outage holds the unit for `ack_timeout_s` (2.0 s) for nothing, and only a crew that has not taken
+  it before can take it now (from the code, not measured).
+  The backlog grows with the outage, and fresh calls wait behind it: they were reached again
   by about 10, 21 and 36 s after fixes at 30, 60 and 90 s (the first green verdict less 30 s).
 - At the harness's timing (11.6) a unit-sync outage is therefore judged recovered only when its fix comes within
   about 70 s of the break. A dispatcher outage drains faster (the table above).
@@ -518,16 +542,21 @@ holds only about 21 calls.
 ## 8. Monitors
 
 The kit fills the standard fields: rps, error and reject rates, latency, `dependencies`, the exit keys,
-`not_answering`, `active` (alerting) and `running` (incident-archive). Dispatch adds the keys below. Each sits
-on the component that owns that watchdog in a real centre. Each is current state and drops back to 0 once its
-cause is fixed. Integrity counts leave out test rows and TEST-1; queue keys count every row.
+`not_answering`, `active` (alerting) and `running` (incident-archive). `dependencies` gives, for each component
+a process calls, `{n, rps, p95_ms, error_rate, reject_rate}` as that process saw its calls over the observe()
+window: a reject is a 4xx answer, and an error any other failure (a 5xx, a timeout or a failed connection).
+`active`, on alerting only, is the side routing names, "primary" or "standby"; only `failover` changes it.
+Dispatch adds the keys below. Each sits on the component that owns that watchdog in a real centre. Each is
+current state and drops back to 0 once its cause is fixed. Integrity counts, and the dispatcher's `queue_depth`
+and `oldest_pending_s`, leave out test rows and TEST-1; the other queue keys, the dispatcher's `processed_per_s`
+included, count every row.
 
 | On | Key | Definition | Reason (real practice) | Healthy |
 |---|---|---|---|---|
 | call-handling | `queue_depth`, `oldest_pending_s`, `processed_per_s` | calls ringing now; the longest current ring; calls answered per second | the call queue wallboard | 0-1; under 0.1 s; about 2.4 |
 | dispatcher | `queue_depth`, `oldest_pending_s`, `processed_per_s` | real `pending` incidents; seconds since the oldest was created; units the dispatcher committed per second. Read from cad-db, so they show while the dispatcher is down. No `head_item`: these are live calls | CAD's pending-incident list | 0-2, up to 5 during a surge at the cap; under 0.3 s |
-| dispatcher | `integrity.units_not_acknowledging` | real units with an assignment `assigned` or `alerted` for more than 3.0 s | the "dispatched, not acknowledged" timer | 0 |
-| cad | `integrity.unit_status_timers_expired` | real units whose record has been `enroute` or `onscene` for more than 4.0 s | the en-route and on-scene status (welfare) timers | 0 |
+| dispatcher | `integrity.units_not_acknowledging` | real units with an assignment still `assigned` or `alerted` more than 3.0 s after it was committed. With `ack_timeout_s` at 2.0 the acknowledgement timer ends such an assignment first, so it reads above 0 only while that timer runs late or not at all | the "dispatched, not acknowledged" timer | 0 |
+| cad | `integrity.unit_status_timers_expired` | real units whose record has shown the same `enroute` or `onscene` status and incident for more than 4.0 s, timed from when unit-sync applied that change (`units.status_since`); a move from en route to on scene restarts the timer | the en-route and on-scene status (welfare) timers | 0 |
 | cad | `integrity.possible_duplicate_incidents` | open real incidents that share a number with another open real incident | duplicate-call detection by number | 0 |
 | unit-sync | `queue_depth`, `oldest_pending_s`, `processed_per_s`, `head_item {id, age_s, attempts}`, `quarantined_items` | pending field reports; age of the oldest; reports applied or skipped per second; the oldest pending report; reports set aside so far. Read from cad-db | the terminal message queue monitor | 0-30; under 0.5 s |
 | unit-sync | `integrity.unit_reports_overdue` | real units with no report applied for more than 3.0 s | the terminal-not-reporting indicator | 0 |
@@ -555,7 +584,16 @@ cap, and no component wrote a WARN or ERROR line. Two breaks barely show in obse
 Section 12 gives what observe() showed for each break.
 
 The checker's counts (section 10) never appear in observe(). Staff learn of them through callbacks, crews on the
-radio, or later review.
+radio, or later review. The adapter has no checker call: it offers describe(), observe(), logs(), probe() and
+act(). The harness takes the verdict once, after the agent's turn (`eval/runner.py`).
+
+**Logs.** Besides the WARN and ERROR lines, most journey steps write an INFO line: call-handling's
+`call_answered`, then `call_entered` naming the incident id cad answered; cad's `incident_created` or
+`call_linked`, naming the same id; the dispatcher's `unit_assigned`; and unit-sync's `status_applied` for each
+change of a unit's status or incident. alerting writes no line for an alert. Each process also writes an INFO
+`start` line naming its release when it starts. logs() returns the newest 200 lines of the last 60 s by
+default, so at everyday load it holds only about the last 30 s of unit-sync's log and 40 s of call-handling's,
+and less while a fault adds lines (from the code, not measured).
 
 ## 9. The probe
 
@@ -578,13 +616,14 @@ false with one step `journey`, "no journey named that". The probe never raises.
 | 3 | cad-db | the incident exists with `test` 1, is open, holds this call, and has the test location and priority | "incident not recorded" or "incident differs from the call" |
 | 4 | call-network | the dial carried a location within 0.05 km of (0, 0) | "location not verified (unavailable)" or "location not verified (differs)" |
 | 5 | dispatcher | an assignment of the incident to TEST-1 appears within 2.5 s | "no unit committed within 2.5 s" |
-| 6 | alerting, or alerting-backup after a failover | the active side's inbox holds that assignment within 1.0 s | "alert not delivered on <side> within 1.0 s" |
-| 7 | unit-sync | the probe, as TEST-1's terminal, posts `enroute` to cad `/mdt`, and TEST-1's record shows it within 1.5 s; then it posts `available` without waiting. A failed post is reported as step `cad` | "unit record not updated within 1.5 s"; for a failed post, "unit report not taken in: " and the status and error, or the error kind |
+| 6 | alerting, or alerting-backup after a failover | the active side's inbox holds that assignment within 1.0 s | "alert not delivered on primary within 1.0 s", or "on standby" after a failover |
+| 7 | unit-sync | the probe, as TEST-1's terminal, posts `enroute` to cad `/mdt`, and TEST-1's record shows exactly `enroute` with the test incident within 1.5 s; then it posts `available` without waiting. A failed post is reported as step `cad` | "unit record not updated within 1.5 s"; for a failed post, "unit report not taken in: " and the status and error, or the error kind |
 
 A healthy probe takes about 0.3 s. The worst case, every step slow but passing, is about 13.5 s (0.5 s cleanup,
 3.5 + 2.5 s for the call, 2.5 + 1.0 s of polls, then 1.0 + 1.5 + 1.0 s for TEST-1's two reports), inside the
 adapter's 15 s. No crew is ever alerted: TEST-1 has no crew, and `test_alerts_to_crews` proves it. Test rows
-are left out of every monitor and checker count, and the probe never writes the users' log.
+are left out of every integrity monitor and checker count (some queue keys count them, section 8), and the
+probe never writes the users' log.
 
 ## 10. The checker
 
@@ -644,7 +683,9 @@ crews en route, not as wrong unit records (10.4, 11.7).
   row at or before x.
 - **belongs(c)**, for a told call c with incident I: I was inserted with `test` 0 (from `incident_events`); its
   `first_call_id` is a call of c's emergency; it was not deleted before c was told; and a linked call was linked
-  while I was still open. Otherwise the reason is `missing`, `test`, `other_emergency` or `closed_before_link`.
+  while I was still open. Otherwise the reason is the first that applies, in this order: `missing` (never
+  inserted, or deleted before c was told; an insert made after c was told still counts), `test`,
+  `other_emergency` or `closed_before_link`.
 - **details_ok(c)**: cad holds the call on I. When the call created I, I also carries the caller's number and
   nature, the nature's priority, and a location within 0.1 km of the caller's.
 
@@ -655,12 +696,13 @@ are right; and a real crew went en route at most 3.0 s after told (for a linked 
 
 `journeys` holds `n`, `ok`, `success_rate`, `p95_ms` and `p90_ms` (answer time over answered calls, null when
 none), `p95_allowed_ms`, `by_source {normal: {n, ok}, surge: {n, ok}}`, `linked`, and `failures`. Each failed
-call counts once, in its first failing category:
+call counts once, in its first failing category. `failures` and the reason sentence list the categories in the
+order below, leaving out those with no call:
 
 | Key | Reason text |
 |---|---|
-| `rolled_over` | rolled over to the backup centre |
 | `not_answered` | not answered |
+| `rolled_over` | rolled over to the backup centre |
 | `not_told` | answered but not told help is on the way |
 | `slow_entry` | told more than 3 s after answer |
 | `no_incident` | told with no incident of theirs in CAD |
@@ -673,13 +715,15 @@ call counts once, in its first failing category:
 ### 10.4 Integrity
 
 Each blocking count is exact, reads 0 when healthy, and blocks `recovered`. Its reason sentence is the one the
-verdict shows.
+verdict shows. A count over calls takes every call in W that fits it, whatever its category in 10.3: a call told
+more than 3 s after answer is `slow_entry` there, and still counts here if its incident does not belong or its
+details are wrong.
 
 | Key | Definition | Reason sentence |
 |---|---|---|
 | `told_without_incident` | calls in W told help is on the way that do not belong. `told_without_incident_by` splits them `{missing, test, other_emergency, closed_before_link}` | "N callers were told help is on the way but CAD holds no incident of theirs" |
-| `incidents_dropped` | distinct incidents I told to a call in W that belongs, told at least 3.0 s ago, where no real crew ever went en route to I and CAD is no longer working I (not `pending`, and no `assigned` or `alerted` assignment newer than 3.0 s). An incident deleted after the caller was told counts here | "N incidents callers were told about were dropped: no crew ever went en route and CAD is no longer working them" |
-| `unit_records_wrong` | real units wrong by rule W or rule S (below). `unit_records_wrong_by` gives `{wrong_writes, units_behind}` | "N units' CAD records differed from their crews for longer than the 3 s status lag" |
+| `incidents_dropped` | distinct incidents I told to a call in W that belongs, told at least 3.0 s before the verdict, where no real crew ever went en route to I and, at the verdict, CAD is not working I: I is not `pending` and has no `assigned` or `alerted` assignment made in the last 3.0 s. So a closed incident stops being worked the moment it closes, whatever its `close_reason` (the checker never reads it), and an incident deleted after the caller was told counts here. An incident whose assignment has waited more than 3.0 s for its alert or for the acknowledgement timer also counts while it waits, though CAD has not given it up | "N incidents callers were told about were dropped: no crew ever went en route and CAD is no longer working them" |
+| `unit_records_wrong` | real units wrong by rule W or rule S (below), each counted once. `unit_records_wrong_by` gives `{wrong_writes, units_behind}`: `wrong_writes` is the number of rows that break rule W (one unit can write several), and `units_behind` the number of units that break rule S | "N units' CAD records differed from their crews for longer than the 3 s status lag" |
 | `duplicate_incidents` | for each emergency with a call in W, its real incidents (deleted ones included) created while another of them was still open. Two created in the same millisecond (one transaction) are ordered by id, so the second counts | "N incidents duplicate an open incident of the same emergency" |
 | `incidents_double_sent` | distinct incidents told to a call in W that belongs, with two or more real crews en route | "N incidents had more than one crew en route" |
 | `units_double_committed` | real units with two assignments whose times overlap, the overlap meeting [lo, hi) | "N units were committed to two incidents at once" |
@@ -711,7 +755,9 @@ slo_ok       = n >= 20 and success_rate >= 0.99 and p95_ms <= p95_allowed_ms and
 recovered    = slo_ok and integrity.ok
 ```
 
-`reasons` lists the service-level sentences first, then one sentence per blocking count that is not 0:
+`reasons` lists the service-level sentences first, in the order below, then one sentence per blocking count that
+is not 0, in the order of the 10.4 table. The failures sentence names its categories in the order of the 10.3
+table, and X and Y are in ms, rounded to 0.1 and printed without trailing zeros (for example 257.9 or 2488):
 
 - "only N calls started in the 20 s window; at least 20 are needed";
 - "K of N calls failed: <count> <reason text>, ...";
@@ -721,14 +767,16 @@ recovered    = slo_ok and integrity.ok
 
 ### 10.5 `integrity.for_operations`
 
-People's work. It never blocks on its own. In time order, at most 50.
+People's work. It never blocks on its own. Items are sorted by time (a set-aside report by when it was set
+aside, a dropped incident by when it was inserted), and only the first 50 are kept.
 
 - `{"kind": "set_aside", "item": <row id>, "unit": <the report's unit if readable, else null>}` for every field
   report set aside, at any time.
 - `{"kind": "dropped_incident", "incident_id": I, "calls": [call ids]}` for every real incident told to a call
   that belongs and started before the window, that no real crew ever reached and CAD is no longer working, and
-  whose emergency never had another incident reached. The window's own dropped incidents block through
-  `incidents_dropped` instead.
+  whose emergency never had another incident reached (any other incident created by a call of the same
+  emergency, such as the new one a callback opens after the first one closed). The window's own dropped
+  incidents block through `incidents_dropped` instead.
 - Callers told help is on the way with no incident before the window are not listed: CAD holds nothing staff
   could find. Impact counts them.
 - `item` and `incident_id` are the identities. `unit` and `calls` are information.
@@ -753,30 +801,32 @@ People's work. It never blocks on its own. In time order, at most 50.
 ## 11. What each dispatch channel offers a fault
 
 These are facts about dispatch, not recipes. The incident's author picks the component, mechanism, class,
-values and channel.
+values and channel. A Control `deploy` or `set_config`, a `stop` or `start` with `log_change` true, and each
+action the agent carries out record a change in the feed observe() shows. `kill`, `link`, `admin`, `spawn`,
+`surge` and datastore writes record nothing.
 
 ### 11.1 Channels
 
 | Channel | Dispatch detail |
 |---|---|
-| Processes | `control.kill(component) -> bool` crashes a process with no change recorded. `control.stop(component, actor="operator", log_change=True) -> bool` and `control.start(...)` work for call-handling, cad, dispatcher, alerting, alerting-backup, unit-sync and call-network. Nothing restarts by itself. A restart of call-handling loses every call between dial and report: a dial in progress is cut off (`cut_off`), a report gets 404 or a refused connection (`dropped`; on Windows a refused connection usually ends as `timeout`, 5.1), and the caller redials. The checker counts these calls in `calls_dropped` and as failed journeys. Any restart of call-handling, a deploy included, loses about 3 calls and turns the verdict red for about 20 s (measured: from 10.7 s to 29 s after a build-label deploy: "3 answered but not told"), and the lost calls count in impact. So judge that a change "stays green" at least 30 s after it. A restart of cad likewise fails the reports that reach it meanwhile (call-handling answers 502, `not_entered`); this was not measured |
-| Releases | `control.deploy(component, release, module_path=None, actor="pipeline") -> bool` restarts the component on that release. With `module_path` it first copies the file to `<data>/releases/<component>/v<release, dots as underscores>.py` (release 3.5 is `v3_5.py`), so nothing the agent reads names the source file. The module defines `class Release`, usually subclassing the current one (`from targets.dispatch.releases.cad.v3_4 import Release as Base`). A deployed release must not import anything from `faults/`, or that path shows in its tracebacks: component logs strip only the repository root and the data folder from traceback paths. Keep what it needs in that one file, and import only from `targets.dispatch.releases`, the shared modules (`worker`, `cadstore`, `fieldmsg`, `area`) and `ic.kit`. Release labels look like normal versions (3.5, 2.1.2). Releases in the repository: call-handling 5.2 and 5.2.1; cad 3.4 and 3.4.1; dispatcher 2.1 and 2.1.1; unit-sync 4.0 and 4.0.1; alerting and alerting-backup 1.6 and 1.6.1; call-network 1.0. Each x.y.1 is a harmless build label. `rollback` returns to the previous release on call-handling, cad, dispatcher and unit-sync. alerting has no rollback: its fix is `failover`. alerting-backup's releases matter only after a failover. A release on call-network is an external outage |
-| Release API | Frozen at the merge (below) |
-| Settings | Section 3. `control.set_config(component, key, value, actor="operator") -> bool` is versioned and shown in `changes`. Which alerting side the dispatcher uses is routing state that only `failover` changes |
-| Pending incidents | `incidents.status = 'pending'`, dispatched by priority then id, up to `batch_size` per cycle every `poll_interval_s`. Test incidents are taken in their own query, and an incident with no free unit does not use up the batch. With no free unit an incident waits; nothing closes it. An unacknowledged assignment becomes `no_ack` after `ack_timeout_s`, and its incident returns to `pending`. That unit is not offered that incident again for 30 s (`REOFFER_S`, counted from the `no_ack`), so the next free unit goes; after that it may be. So during an alerting outage incidents keep cycling through the units, one `ack_timeout_s` per try. (Before this rule, an outage longer than about 40 s, 20 units × 2.0 s, left incidents that every unit had missed waiting for good.) Once alerts get through again, the backlog is dispatched, each incident within 30 s of its last miss when a unit is free. Measured once with this rule, on one copy: during a 75 s alerting outage the dispatcher's `queue_depth` rose to 148, and some incidents went back to pending more than 20 times (up to 29). After the outage ended the backlog read 136, 99, 64, 35, 3 and 0 at 5 s steps. The verdicts, taken every 20 s, were red 20 s after the outage ended ("43 of 46 calls failed: 43 with no crew en route within 3 s of being told" and "7 units were committed to two incidents at once") and 40 s after ("9 of 47 calls failed: 9 with no crew en route within 3 s of being told"), and green from 60 s on. An `enroute` or `onscene` incident whose last open assignment expires this way closes `completed`. These are live calls: they cannot be set aside, and the dispatcher skips an unreadable incident rather than crash |
-| Field-report queue | Table `field_queue` (pending, applied, skipped, quarantined). unit-sync takes the oldest pending rows in id order, up to `batch_size`, and parses them all before writing. An unreadable report (11.2) crashes unit-sync by design, after the readable reports before it are committed and its own `attempts` raised. unit-sync stays down until restarted, and `head_item` names that report with `attempts` at least 1. A report is skipped when it is too old (`max_message_age_s`), superseded by a newer pending report of the same unit (judged from the reports themselves, not the `unit_id` column), or out of order. cad stores any JSON object of at most 4 KB at intake, without checking fields. Rows can be added through `control.db("cad-db")`, or by a helper posting to cad `/mdt` a bounded, one-off set of reports. Fix: `quarantine` with `params.item` = the row id = `head_item.id`, then `restart`. Each unreadable report needs its own quarantine |
+| Processes | `control.kill(component) -> bool` crashes a process with no change recorded; observe() then shows the exit (`exits_15m`, `last_exit_code`). `control.stop(component, actor="operator", log_change=True) -> bool` and `control.start(component, actor="operator", log_change=True) -> bool` work for call-handling, cad, dispatcher, alerting, alerting-backup, unit-sync and call-network. A stop records a change but no exit, so observe() shows the process `up` false with no new exit. start returns False while the process runs, a hung one included, so a hung process needs a stop first, or a restart. Nothing restarts by itself. A restart of call-handling loses every call between dial and report: a dial in progress is cut off (`cut_off`), a report gets 404 or a refused connection (`dropped`; on Windows a refused connection usually ends as `timeout`, 5.1), a dial made while it is down is refused (`refused`), and the caller redials. Each of these calls is a failed journey, and the cut-off and dropped ones also count in `calls_dropped`. At everyday load any restart of call-handling, a deploy included, loses about 3 calls and turns the verdict red for about 20 s (measured: from 10.7 s to 29 s after a build-label deploy: "3 answered but not told"), and the lost calls count in impact. During a surge at the cap about twice as many calls are in flight, so a restart loses about twice as many (from the code, not measured). So judge that a change "stays green" at least 30 s after it. A restart of cad likewise fails the reports that reach it meanwhile (call-handling answers 502, `not_entered`); this was not measured |
+| Releases | `control.deploy(component, release, module_path=None, actor="pipeline") -> bool` restarts the component on that release, and returns True once the new process answers its health check, within 6 s. With `module_path` (a relative path is taken from the caller's working directory) it first copies the file to `<data>/releases/<component>/v<release, dots as underscores>.py` (release 3.5 is `v3_5.py`), so nothing the agent reads names the source file. A missing file makes `deploy` raise and changes nothing. If the release cannot be found or imported, or its `Release` fails to start, the process exits and `deploy` returns False: the deploy is already in the changes feed, and the component stays down on the new release, with the exit in observe() and the traceback only in `logs/<component>.out`, which logs() does not read. A restart starts the same release again; `rollback` returns to the previous one. The module defines `class Release`, usually subclassing the current one (`from targets.dispatch.releases.cad.v3_4 import Release as Base`). The repository's releases are `targets.dispatch.releases.<image>.v<x_y>`, with image `call_handling`, `cad`, `dispatcher`, `unit_sync`, `alerting` (alerting-backup's too) or `call_network`. A deployed release must not import anything from `faults/`, or that path shows in its tracebacks: component logs strip only the repository root and the data folder from traceback paths. Keep what it needs in that one file. Besides the Python standard library (threads included), import only from `targets.dispatch.releases`, the shared modules (`worker`, `cadstore`, `fieldmsg`, `area`) and `ic.kit`. Release labels look like normal versions (3.5, 2.1.2). Use one the component has not run: a deploy under the running label adds nothing for `rollback` to return to, and one under a repository label (3.4.1, say) replaces that release on this copy. Every `up` starts from an empty data folder. Releases in the repository: call-handling 5.2 and 5.2.1; cad 3.4 and 3.4.1; dispatcher 2.1 and 2.1.1; unit-sync 4.0 and 4.0.1; alerting and alerting-backup 1.6 and 1.6.1; call-network 1.0. Each x.y.1 is a harmless build label. `rollback` returns to the previous release on call-handling, cad, dispatcher and unit-sync. alerting has no rollback: its fix is `failover`. alerting-backup's releases matter only after a failover. A release on call-network is an external outage |
+| Release API | Frozen at the merge. After the link thresholds below: each release's methods, what they take and return, which calls which, and the behaviour they carry |
+| Settings | Section 3. `control.set_config(component, key, value, actor="operator") -> bool` stores any JSON value, usable or not, versions it, shows it in `changes` and returns True; the component judges the value when it next reads its settings (a worker at the start of its next cycle), within about 0.5 s on a healthy copy. A worker paused by an unusable value stays up and answering but does no work, so unit-sync's `head_item.attempts` does not rise. `revert_config` with `{"key": k}` restores the value that the newest change to k replaced, not the default; with no key it undoes the newest change the agent did not make. Which alerting side the dispatcher uses is routing state that only `failover` changes |
+| Pending incidents | `incidents.status = 'pending'`, dispatched by priority then id, up to `batch_size` per cycle every `poll_interval_s`. Test incidents come first, from their own query, and an incident with no free unit does not use up the batch. A unit is free when its record shows `available` and it holds no open assignment (the 30 s rule below also applies). An incident gets a free unit of its preferred type when there is one, else of any type: the closest, ties going to the lower unit id compared as text (M10 before M9), or the first in roster order under `station_order`. With no free unit an incident waits; nothing closes it. An unacknowledged assignment becomes `no_ack` after `ack_timeout_s`, and its incident returns to `pending`. That unit is not offered that incident again for 30 s (`REOFFER_S`, counted from the `no_ack`), so the next free unit goes; after that it may be. So during an alerting outage incidents keep cycling through the units. While no acknowledgement reaches CAD (alerting down, or unit-sync applying nothing), each try ends in a WARN `no_acknowledgement` line and a new commit, so the dispatcher's `processed_per_s` stays high (7.3 measured in the alerting hang of section 12) and `queue_depth` grows by about 2 a second, as in the measured run below (for unit-sync, from the code, not measured). The timer runs once per dispatcher cycle, so a try lasts `ack_timeout_s` or a little more, and about 2.5-3.3 s in a hang, where each cycle first waits one `alert_timeout_s` (from the code, not measured). `units_not_acknowledging` therefore reads mostly 0, as the timer ends most assignments before 3.0 s. In a hang a try can pass 3.0 s: that key then reads 1-3 now and then, and a verdict taken at that moment can count the incident as dropped (10.4; from the code, not measured). (Before this rule, an outage longer than about 40 s, 20 units × 2.0 s, left incidents that every unit had missed waiting for good.) Once alerts get through again, the backlog is dispatched, each incident within 30 s of its last miss when a unit is free. Measured once with this rule, on one copy: during a 75 s alerting outage (a `dispatcher->alerting` drop of 1.0) the dispatcher's `queue_depth` rose to 148, and some incidents went back to pending more than 20 times (up to 29). After the outage ended the backlog read 136, 99, 64, 35, 3 and 0 at 5 s steps. The verdicts, taken every 20 s, were red 20 s after the outage ended ("43 of 46 calls failed: 43 with no crew en route within 3 s of being told" and "7 units were committed to two incidents at once") and 40 s after ("9 of 47 calls failed: 9 with no crew en route within 3 s of being told"), and green from 60 s on. A longer outage leaves a longer backlog, so green comes later after the fix (11.6). An `enroute` or `onscene` incident whose last open assignment expires this way closes `completed`. These are live calls: they cannot be set aside, and the dispatcher skips an unreadable incident rather than crash |
+| Field-report queue | Table `field_queue` (pending, applied, skipped, quarantined). unit-sync takes the oldest pending rows in id order, up to `batch_size`, and parses them all before writing. An unreadable report (11.2) crashes unit-sync by design, after the readable reports before it are committed and its own `attempts` raised. unit-sync stays down until restarted, and `head_item` names that report with `attempts` at least 1. A report is skipped when it is too old (`max_message_age_s`), when a later readable report of the same unit is pending as unit-sync takes the batch (superseded: a higher row id, whatever the two reports' `t`, with the unit read from the report itself, not the `unit_id` column), or when it is out of order. cad stores any JSON object of at most 4 KB at intake, without checking fields. Rows can be added through `control.db("cad-db")`, or by a helper posting to cad `/mdt` a bounded, one-off set of reports. Fix: `quarantine` with `params.item` = the row id = `head_item.id`, then `restart`. Each unreadable report needs its own quarantine |
 | Ordering memory | unit-sync remembers, in memory only, the newest report time it has applied for each unit, and skips anything not newer. A restart forgets it. Report times are the terminal's clock. This is the system's one in-memory state that only a restart clears |
 | Repeat calls (idempotency) | `calls.call_id` is the primary key, and entry is idempotent by `call_id` inside cad's write transaction. Under `repeat_match` "ani_open", cad links a call to this number's open incident (same number and test flag, status pending, dispatched, enroute or onscene) |
 | Caller behaviour | Section 5.1: about 2.2 emergencies per second, ring until answer or rollover, ALI read-back with a spoken fallback, talk, report, the redial rules, 10% callbacks, at most 9.1 s per call |
-| Crew behaviour | Section 5.2. Crews read both station inboxes, and a busy crew ignores alerts. A full-state heartbeat goes every 1.0 s. A failed post is not retried, and a report older than 2.0 s is dropped at the terminal. Unit records heal within about 1 s once the path works |
+| Crew behaviour | Section 5.2. Crews read both station inboxes, and a busy crew ignores alerts. A full-state heartbeat goes every 1.0 s. A failed post is not retried, and a report older than 2.0 s is dropped at the terminal. Unit records heal within about 1 s once the path works. After a unit-sync outage, add the time unit-sync takes to work through the reports queued meanwhile, which arrive at about 27 a second: it takes at most `batch_size` (200) a cycle, oldest first, a cycle every 0.2 s or a little more, and a record heals only when its unit's newest report is reached. That is a few seconds after a 2-minute outage (from the code, not measured) |
 | Unit records | Only unit-sync writes `units`, apart from the seed and the probe's TEST-1 cleanup. Keep the `unit_history` and `incident_events` triggers: they are the checker's evidence. A one-time direct write to `units.status` or `units.incident_id` is overwritten by the next heartbeat within about 1 s, so it never lasts into a verdict |
 | Locks | `control.spawn("incident-archive", ["{python}", "-m", "targets.dispatch.jobs.incident_archive", "--data", "{data}", "--hold-lock", "<S>"])` holds `BEGIN IMMEDIATE` on cad-db for S seconds. It registers `{"session": "incident-archive-<pid>", "pid", "since_t", "mode": "write", "statement": "INSERT INTO rms_export ... (export batch)"}` in `cad_locks.json`. observe() shows it under cad-db's `lock_holders`, and `release_lock` on cad-db ends it. Readers keep working (WAL). Every writer waits for its busy timeout and fails. A lock must be held at least about 130 s to still act in the scored window |
 | Helper processes | incident-archive modes: `--export` (normal, about 1 s, batches of at most 50 rows, never registers as a lock holder; measured: 2,008 incidents in 0.4 s and 3,679 in 0.8 s, with no lock holder shown and the copy green), `--hold-lock S`, and `--cpu S` (a harmless busy run at low priority: a background change). `runs` counts only running jobs spawned under exactly the name `incident-archive`; `cpu_pct` and `mem_mb` sum each run and the processes it started, and the first observe() of a run reads `cpu_pct` 0. Anything else spawned is invisible to the agent, and no action reaches it, except `release_lock` for registered lock holders |
 | Datastore writes | `control.db(name=None) -> sqlite3.Connection`: `db("cad-db")` or `db()` gives autocommit, a 5000 ms busy timeout and `sqlite3.Row`. Any other name raises KeyError. Schema in section 4 |
-| Links | `control.link(route, latency_ms=0, jitter_ms=0, drop_pct=0.0) -> bool`. The relay delays each request by `latency_ms` plus a uniform 0-`jitter_ms`; answers are not delayed. `drop_pct` is a fraction of connections, 0.0-1.0; a dropped connection is closed before it reaches the far side. The measured thresholds are below the table. `"dispatcher->alerting"` is alerting as the dispatcher sees it; fix: `failover` on alerting, because the backup path bypasses the relay. `"call-handling->call-network"` is ALI as call-handling sees it; this is an external outage: escalate |
-| Standby | alerting-backup runs the same image and writes its own inbox, and crews read both. It carries alerts only after `failover`. A change there alone shows nothing to users |
-| External | call-network is the provider's. Stopping, killing or hanging it, deploying a release to it, or slowing or dropping its link is `external_outage`, and must be escalated. It has no actions, and the agent sees only call-handling's view of it, with no logs. observe() shows it `up` false whenever every lookup in the window failed, so a link that drops every connection, or slows lookups past `ali_timeout_s`, also shows call-network down. Calls then go spoken: answers are slower and callers are told later |
-| Admin hooks | `control.admin(component, op, payload=None) -> dict`, with `op="hang"`, on any process. Its HTTP server stops answering (`not_answering`), and every background loop stops at its gate |
+| Links | `control.link(route, latency_ms=0, jitter_ms=0, drop_pct=0.0) -> bool` sets all three values (one left out goes back to 0), records no change, and acts within about 0.2 s. The relay delays each chunk it reads from the caller by `latency_ms` plus a fresh uniform 0-`jitter_ms` draw; answers are not delayed. A request is usually one chunk, but the client writes its headers and body separately, so now and then a request is delayed twice (from the code, not measured). `drop_pct` is a fraction of connections, 0.0-1.0; a dropped connection is closed before it reaches the far side. The measured thresholds are below the table. `"dispatcher->alerting"` is alerting as the dispatcher sees it; fix: `failover` on alerting, because the backup path bypasses the relay. `"call-handling->call-network"` is ALI as call-handling sees it; this is an external outage: escalate |
+| Standby | alerting-backup runs the same image and writes its own inbox, and crews read both. It carries alerts only after `failover`. A change there alone shows nothing to users. `failover` does not check the standby: failing over to a stopped alerting-backup returns ok, and every alert then fails there until alerting-backup is restarted or alerts fail back with `{"to": "primary"}` to a working alerting. A failover with no `to` goes to the standby, and one to the side already active is refused |
+| External | call-network is the provider's. Stopping, killing or hanging it, deploying a release to it, or slowing or dropping its link is `external_outage`, and must be escalated: escalating is the agent's outcome `escalated`, not an action. It has no actions, and the agent sees only call-handling's view of it, with no logs. observe() shows it `up` false whenever every lookup in the observe() window (10 s by default) ended in an error (a 4xx answer is a reject and leaves it `up`), and `up` null when there was no lookup, so a link that drops every connection, or slows lookups past `ali_timeout_s`, also shows call-network down. Calls then go spoken, so callers are told later: the spoken location adds 1.2-2.0 s. Of the failed lookups, only one that times out also slows the answer, by about `ali_timeout_s` (0.5 s): a link latency of at least 0.5 s (answer p95 503 ms in the link table below), a hang, or a release that answers that late. A stop, a kill, a dropped connection, or a release that answers at once with an error or a wrong location leaves answer time unchanged at everyday load (the measured drop of 1.0 showed no answer-time reason; on Windows a stop or kill times out instead, 5.1). Each spoken call holds its position 1.2-2.0 s longer, so during a surge answers can still slow (from the code, not measured) |
+| Admin hooks | `control.admin(component, op, payload=None) -> dict`, with `op="hang"` (the only op), on any process, returns `{"ok": true, "hung": true}`. Its HTTP server stops answering, `/health` and `/metrics` included, so observe() shows it `up` false with `not_answering` true and no exit keys, and every background loop stops at its gate. Nothing is recorded in the changes feed, and the hang lasts until the process is restarted: a stop then a start, or a `restart`, deploy or rollback, each of which restarts it |
 | Call surge | `control.surge(rate_per_s, seconds, seed=0, mix="normal") -> int`, the helper's own pid (11.3). It is the only source of extra calls |
 | Other Control calls | `control.snapshot() -> dict`, `control.baseline(window_s=10.0) -> dict`, `control.paths() -> dict`, `control.shutdown()` |
 | Capacity and drain | The tables of section 6. A scored window holds about 49 calls, so a mechanism that touches one call in N misses a window with probability about (1 − 1/N)^49 |
@@ -808,7 +858,13 @@ and red mean all three windows; flaky means a mix. The copy's band was 257.9 ms.
 - **`dispatcher->alerting` is limited by throughput**, not by `alert_timeout_s`. Alerts go out one at a time
   inside the dispatcher's cycle, so it alerts about 1/latency incidents per second (600 ms gives about 1.7,
   against about 2.2 arriving). The edge lies between 300 ms and a mean of about 450 ms (latency 300 ms with
-  jitter 300 ms), far below `alert_timeout_s` (1.0 s). Red points went green 30-49 s after the undo.
+  jitter 300 ms), far below `alert_timeout_s` (1.0 s). Red points went green 30-49 s after the undo. The
+  dispatcher's `processed_per_s` counts commits, not alerts delivered: a commit made while alerts are held (after a
+  failed alert) sends none, and a new commit follows each expired assignment, so it can read above 1/latency. From
+  the code, not measured: an alert answered within `alert_timeout_s` holds nothing, however slowly it comes, so a
+  cycle waits for each due alert in turn and can last many seconds. The timer then runs late, an incident whose
+  assignment has waited more than 3.0 s counts as dropped while it waits (10.4), and the probe can fail at the
+  dispatcher step ("no unit committed within 2.5 s") as well as at alerting.
 - **Above `alert_timeout_s`** each alert times out, but the relay still delivers it, so a crew turns out just as
   the 2.0 s timer gives the incident to another unit: hence the double counts.
 - **`call-handling->call-network`:** the latency edge is the p95 band, b + 250 ms, so it moves with the copy's
@@ -817,31 +873,130 @@ and red mean all three windows; flaky means a mix. The copy's band was 257.9 ms.
 - Measured before the 30 s re-offer rule. With it, incidents no longer stay pending for good after a drop of 1.0
   (11.1, Pending incidents); the rest of this table should not change, but it was not measured again.
 
-**Release API**, frozen at the merge; a rename needs a new row here:
+**Release API**, frozen at the merge; a rename needs a new row here. `->` gives what a method returns. Apart from
+`routes()` and `extra_metrics(window_s)`, which the kit reads, the methods shown without it return nothing that is
+used. A route's dict is its 200 answer:
 
 | Release | Methods |
 |---|---|
-| call-handling 5.2 | `routes()`, `dial(request)`, `take_position(call)`, `lookup_location(ani)`, `report(request)`, `enter_incident(call, body)`, `release_position(call)`, `background()`, `extra_metrics(window_s)` |
-| cad 3.4 | `routes()`, `validate_call(body)`, `find_call(conn, call_id)`, `find_open_incident(conn, ani, test)`, `create_incident(conn, call)`, `link_call(conn, incident_id, call)`, `create_call(request)`, `mdt(request)`, `extra_metrics(window_s)` |
-| dispatcher 2.1 | `cycle(conn, settings)`, `retry_alerts(conn, settings)`, `expire_unacknowledged(conn, settings)`, `pending_batch(conn, settings)`, `free_units(conn, incident)`, `recommend(incident, units, settings)`, `assign(conn, incident, unit)`, `send_alert(conn, assignment, settings)` |
-| unit-sync 4.0 | `cycle(conn, settings)`, `take_batch(conn, settings)`, `parse(item)`, `in_order(msg)`, `apply(conn, item, msg, settings, latest)`, `apply_unit(conn, msg)`, `apply_assignment(conn, msg)` |
-| alerting 1.6 | `routes()`, `alert(request)`, `deliver(alert)` |
-| call-network 1.0 | `routes()`, `ali(request)`, `locate(ani)` |
-| `worker.Worker` (dispatcher and unit-sync) | `background()`, `run_loop()`, `wait(seconds)`, `db()`, `write_error()`, `extra_metrics(window_s)` |
+| call-handling 5.2 | `routes()`, `dial(request) -> {call_id, location, position}`, `take_position(call)`, `lookup_location(ani) -> {x, y} or None`, `report(request) -> enter_incident's answer`, `enter_incident(call, body) -> {told: true, incident_id, linked}`, `release_position(call)`, `background()`, `extra_metrics(window_s)` |
+| cad 3.4 | `routes()`, `validate_call(body) -> call`, `find_call(conn, call_id) -> {incident_id, linked} or None`, `find_open_incident(conn, ani, test) -> incident id or None`, `create_incident(conn, call) -> incident id`, `link_call(conn, incident_id, call)`, `create_call(request) -> {incident_id, linked}` (201 for a new incident, below), `mdt(request) -> {queued: row id}`, `extra_metrics(window_s)` |
+| dispatcher 2.1 | `cycle(conn, settings)`, `retry_alerts(conn, settings)`, `expire_unacknowledged(conn, settings)`, `pending_batch(conn, settings) -> [incident]`, `free_units(conn, incident) -> [unit]`, `recommend(incident, units, settings) -> unit or None`, `assign(conn, incident, unit) -> assignment or None`, `send_alert(conn, assignment, settings) -> bool` (delivered), and the helpers `any_unit_free(conn) -> bool`, `alerts_held() -> bool` and `unreadable(incident, incident_id) -> bool` |
+| unit-sync 4.0 | `cycle(conn, settings)`, `take_batch(conn, settings) -> (items, latest)`, `parse(item) -> msg`, `in_order(msg) -> bool`, `apply_reports(conn, readable, settings, latest)`, `apply(conn, item, msg, settings, latest)`, `apply_unit(conn, msg)`, `apply_assignment(conn, msg)`, `clear(conn, unit, keep, now)` |
+| alerting 1.6 | `routes()`, `alert(request) -> deliver's answer`, `deliver(alert) -> {delivered: true}` |
+| call-network 1.0 | `routes()`, `ali(request) -> {x, y}`, `locate(ani) -> (x, y)` |
+| `worker.Worker` (dispatcher and unit-sync) | `background()`, `run_loop()`, `wait(seconds)`, `db() -> conn`, `write_error()`, `extra_metrics(window_s)` |
+
+**What the methods take.**
+
+- **Requests.** A route gets `request`, a dict `{method, path, tail, query, body, headers}`: `body` is the parsed
+  JSON (`{}` when empty), and `tail` is what follows a route path ending in `/*`. It returns a dict, answered 200,
+  or raises `net.Reply(status, body)`. A `ValueError` that escapes it answers 400 `{"error": "request was not
+  valid JSON"}` and logs nothing. Any other exception answers 500 and logs an ERROR `unhandled_exception` line
+  with a traceback, at most one every 2 s for each exception type and path. Each request runs on its own thread,
+  so state shared between requests needs a lock.
+- **`settings`** is the component's settings as a dict, already checked (section 3), whole-number ones as int.
+- **`conn`** is a cad-db connection in autocommit mode. Its rows are `sqlite3.Row`, read by name; `dict(row)`
+  makes a dict. cad's `create_call` and `mdt` run their work in one `BEGIN IMMEDIATE` that cad commits, so
+  `find_call`, `find_open_incident`, `create_incident` and `link_call` run inside it and must not begin or commit
+  one. A `sqlite3.Error` there rolls it back and answers 503 ("cad-db busy" or "cad-db unavailable"), counted in
+  `db_write_errors`. A worker's `cycle` gets its thread's connection with no transaction open, and each statement
+  commits by itself unless a method opens `BEGIN IMMEDIATE` and commits it, as `expire_unacknowledged`, `assign`
+  and `apply_reports` do. Leave none open: the next `BEGIN IMMEDIATE` on that connection then fails.
+- **A worker's errors.** A `sqlite3.DatabaseError`, busy or locked included, ends the cycle: it is rolled back,
+  counted in `db_write_errors` and logged as WARN `db_busy` or ERROR `db_error`, and the next cycle tries again.
+  Any other exception crashes the process (ERROR `crash` with a traceback, exit code 1), and it stays down.
+- **call-handling.** `call` is a dict `{call_id, ani, test, answered_t, position, location}`, where `location` is
+  ALI's `{x, y}` or None. `enter_incident`'s `body` is `{nature, narrative, location}`, with the location the
+  caller spoke or None; cad gets the spoken location when there is one, else ALI's.
+- **cad.** `validate_call` returns `call`, a dict `{call_id, ani, nature, narrative, location: {x, y},
+  location_source, test}`, or answers 400 naming the first wrong field.
+- **dispatcher.** An `incident` is a dict `{id, nature, priority, unit_type, x, y, test}`, and a `unit` is `{id,
+  type, station}`. An `assignment` is the alert that `send_alert` posts, `{assignment_id, incident_id, unit,
+  station, priority, nature, x, y}`; one that `retry_alerts` reads also carries `unit_type` and `test`.
+- **unit-sync.** `item` is a queue row as a dict `{id, payload_json, attempts}`. `msg` is `fieldmsg.Report`, an
+  immutable namedtuple `(unit, kind, status, incident_id, t)` with `t` a float: read `msg.status`, and pass a
+  changed copy as `msg._replace(status=...)`. `msg["status"]` and `dict(msg)` raise, and so crash unit-sync.
+  `readable` is a list of `(item, msg)` pairs, and `latest` maps each unit to the id of its newest readable
+  pending row.
+- **The base class.** Each process builds one `Release(ctx)` and calls `serve()`; an `__init__` override calls
+  `super().__init__(ctx)`. `ctx` is `{system, component, version, data_dir, port, ports, admin_token}`, and
+  `self.version` is the release label. `background()` runs on its own thread. Every stop, restart, deploy and
+  rollback kills the process, so what it held in memory (positions, the ordering memory, threads) is gone.
+  `self.call(dep, method, url, payload, timeout)` returns `(status, body)` or raises `net.CallError`, whose
+  `kind` is timeout, refused, http (a 4xx or 5xx, with `status` and `body`) or bad_response, and it counts the
+  call under `dep` in observe()'s `dependencies`. `self.log.info`, `.warn` and `.error(event, msg, **fields)`
+  append a line to `logs/<component>.jsonl`, which logs() reads; `self.log_every(key, interval_s, level, event,
+  msg, **fields)` writes at most one line per interval, with an `occurrences` count. "Actors and words" applies.
+
+**Who calls whom.** Base methods call each other through `self`, so an override changes what its callers get.
+
+- call-handling: `dial` checks the body, then calls `take_position`, which holds the lowest free position and sets
+  the call's `position` and `answered_t`, and then `lookup_location`. `report` takes the call out of memory,
+  checks the body, answers with what `enter_incident` returns, and calls `release_position` whatever the answer.
+- cad: `create_call` calls `validate_call`, then, in its transaction, `find_call`. For a call it does not hold it
+  calls `find_open_incident` under "ani_open", and `link_call` when that finds an incident, else `create_incident`.
+- dispatcher: `cycle` calls `retry_alerts` (which calls `send_alert` for each due alert), `expire_unacknowledged`
+  and `pending_batch`, then for each incident `free_units`, `recommend`, `assign` and `send_alert`, with
+  `unreadable`, `alerts_held` and `any_unit_free` as helpers.
+- unit-sync: `cycle` calls `take_batch`, which also calls `parse` on every pending row it reads, to find `latest`
+  (rows past the batch come as `sqlite3.Row` with `id` and `payload_json` only). It then calls `parse` on each
+  item; the first item whose `parse` raises anything is treated as unreadable (11.1, Field-report queue). `cycle`
+  then calls `apply_reports`, which calls `apply` for each readable report. `apply` calls `in_order` and, for a
+  report it applies, `apply_unit` and then `apply_assignment` with the same `msg`; `apply_assignment` calls
+  `clear`.
+- alerting: `alert` calls `deliver`. call-network: `ali` calls `locate`. A worker's `background` calls
+  `run_loop`, which calls `db`, `cycle` and `wait`, and ignores what `cycle` returns.
 
 **Behaviour the methods carry.**
 
-- The dispatcher's `send_alert` posts to the active side with `alert_timeout_s`. A failed alert is retried every
-  0.3 s. When the path fails (no answer, or a server error), the other due alerts wait those 0.3 s too, so a
-  silent alerting path costs a cycle at most one `alert_timeout_s` and the timer and new commits keep their pace.
-- `free_units` leaves out a unit that failed to acknowledge this incident in the last 30 s (`REOFFER_S`).
+- call-handling seats each call, in ring order, at the lowest free position while fewer than `positions` are
+  held, and after `rollover_s` answers 503 `{"error": "rolled over", "at": "call-handling"}`. A call holds its
+  position from its answer until its report is answered, whatever the answer; a call never reported is freed
+  15 s after its answer. `lookup_location` returns None when ALI fails or takes over `ali_timeout_s`, and the
+  call goes on with a spoken location. `enter_incident` tells the caller whenever cad answers 200 or 201 with a
+  whole-number `incident_id`, without reading cad-db (the caller then needs 0 < id < 2^63, 5.1). It passes a
+  cad 4xx on as it is, and answers 504 when cad does not answer within `cad_timeout_s` and 502 otherwise, each
+  with `"at": "cad"`.
+- cad's `create_call` answers a `call_id` it already holds with that call's incident (200). Under "ani_open" a
+  call from a number with an open incident (same test flag) is linked to the newest one: `link_call` inserts the
+  call's row with `linked` 1 (200). Otherwise `create_incident` inserts the incident (`pending`, `release` the
+  release label) and the call's row, and returns the new id. A new incident is answered 201 `{"incident_id",
+  "linked": false}`, raised as `net.Reply`, so code that wraps `super().create_call(request)` gets an exception
+  there, not a return value; the others get 200 `{"incident_id", "linked"}`. Nothing reads the incident back.
+- The dispatcher's `pending_batch` lists every pending test incident, then the real ones by priority then id,
+  leaving out unreadable ones. `free_units` gives the units shown `available` with the incident's test flag
+  that hold no open assignment, except one that failed to acknowledge this incident in the last 30 s
+  (`REOFFER_S`). `recommend` gives a test incident only TEST-1 and a real one never. It keeps the units of the
+  incident's `unit_type` if any are free, else all, and picks the closest station, ties going by unit id as
+  text (M1 before M2, but M10 before M9), or under "station_order" the first in roster order (section 4). When
+  a real incident gets no unit and no real unit is free at all, the batch ends. `assign` re-checks, in its
+  transaction, that the incident is still pending and the unit still free.
+- `send_alert` posts the alert to the active side with `alert_timeout_s`. Delivered, the assignment becomes
+  `alerted`; otherwise it is sent again 0.3 s later. When an alert fails other than with a 4xx (no answer, a
+  closed connection, a 5xx), alerts are held for 0.3 s: `retry_alerts` sends none while the hold lasts, and
+  commits made meanwhile send none either (theirs go out on a later retry). So a silent path costs a cycle one
+  `alert_timeout_s`, and one more each time a commit comes after a hold has ended. A path that is slow but
+  answers holds nothing: each due alert and each commit's alert waits for its answer in turn, so a cycle can
+  last seconds, the acknowledgement timer runs late, and an incident no crew has reached whose assignment has
+  waited over 3.0 s for its alert counts in `incidents_dropped` (10.4). From the code, not measured; the link
+  thresholds above show such counts.
 - No release holds a cad-db transaction across a network call.
-- unit-sync's `apply_unit` sets `status`, `incident_id`, `status_t` (the report's `t`) and `applied_t`.
+- unit-sync's `apply` skips a report that is too old, superseded or out of order (Field-report queue row), and
+  otherwise calls `apply_unit` and then `apply_assignment` with the same report. `apply_unit` sets `status`,
+  `incident_id`, `status_t` (the report's `t`), `applied_t` (unit-sync's clock) and `source` `field`. It moves
+  `status_since` to unit-sync's clock only when the status or the incident changes, as the history trigger
+  does, and cad's status timer (`unit_status_timers_expired`, section 8) counts from `status_since`.
   `apply_assignment` keeps assignments in step with the state a report carries: `enroute` or `onscene` for X acks
-  (or inserts, source `field`) the unit's assignment to X and clears its other acked or on-scene ones;
-  `available` clears acked and on-scene assignments and leaves `assigned` and `alerted` ones to the timer. An
-  incident left with no open assignment closes `completed`. A report for an incident that does not exist changes
-  only the unit record, with a WARN line.
+  (or inserts, source `field`) the unit's assignment to X, moves X on (never back, and never out of `closed`) and
+  clears its other acked or on-scene ones; `available` clears acked and on-scene assignments and leaves
+  `assigned` and `alerted` ones to the timer; `outofservice` changes only the unit record. An incident left with
+  no open assignment closes `completed`. A report for an incident that does not exist changes only the unit
+  record, with a WARN line.
+- Each release logs an INFO line for its normal work, with the ids involved: call-handling `call_answered` and
+  `call_entered`, cad `incident_created` and `call_linked`, the dispatcher `unit_assigned`, and unit-sync
+  `status_applied` when a unit's status or incident changes. So logs() shows the incident ids a release hands
+  out. An override that skips a base method also skips its line.
 
 ### 11.2 Unreadable field reports
 
@@ -858,7 +1013,8 @@ is true exactly when `parse` raises. A report is unreadable when any of these ho
 - `t` is missing, or not a finite number (a bool is not a number).
 
 A future `t` is readable. Extra keys are ignored. Every report the crews and the probe build is readable, and a
-readable report never crashes unit-sync.
+readable report never crashes unit-sync 4.0. The checker judges with `fieldmsg` whatever a unit-sync release's
+`parse` does: a report set aside that `fieldmsg` can read counts as `wrongly_quarantined` (10.4).
 
 ### 11.3 The call surge
 
@@ -890,15 +1046,16 @@ control.spawn("call-surge", ["{python}", "-m", "targets.dispatch.surge", "--data
   number from 1 to 900" and "mix must be normal, medical or fire".
 - Emergencies start at random (exponential) gaps, each in its own thread, at most 64 at once. They follow the
   callers' redial, callback and timeout rules. The helper runs its full `seconds` whatever call-handling does,
-  then up to 10 s more for calls in flight, and then exits.
+  but starts no emergency, redial or callback after them. It then waits up to 10 s for calls in flight, and exits.
 - It writes `logs/call-surge-<pid>.jsonl`, and prints only a started line, counts every 10 s, and a finished
   line.
-- It is not a component. The agent sees a surge only as more calls (rps, the call queue keys, the pending
-  board).
+- It is not a component, and it records nothing in the changes feed. The agent sees a surge only as more calls
+  (rps, the call queue keys, the pending board).
 - Measured: a surge of 3.0 per second for 150 s registered within 0.07-0.18 s, ran 151 s and placed 445
   emergencies (482 calls, all told). A second surge that would pass the cap was refused within 0.1 s.
-- A fault that acts only during a surge needs the surge to cover the scored window: start it with at least
-  130 s.
+- A fault that acts only during a surge needs the surge to cover the scored window, the calls that start 95-115 s
+  after the last fault the case injects (11.6): start it with at least 130 s, and d s more when it starts d s
+  before that fault.
 
 ### 11.4 Not a channel
 
@@ -924,28 +1081,42 @@ No action can repair these, or they touch the users or the checker's evidence:
 | `dependency_slow` | the alerting link, or a slow alerting release (failover) |
 | `poison_message` | the field-report queue |
 | `stale_cache` | the ordering memory (restart) |
-| `resource_exhaustion` | a release that exhausts a process |
-| `external_outage` | call-network and its link |
+| `resource_exhaustion` | a release that exhausts its process: CPU, memory, disk, connections or file handles used up, which a restart relieves only for a while (CONTRACT 4: restart buys time, then escalate). A release that ties up call-taker positions or another count it keeps in memory, and that a rollback cures, is `bad_release`, since the class names the mechanism that the fix reverses |
+| `external_outage` | call-network and its link. No action reaches them: the agent escalates, which is an outcome (`escalated`), not an action |
 
 ### 11.6 Timing rule
 
-The harness takes its verdict about 125 s after the last change it makes, on calls that started 95-115 s after
-it (`window_s` 20, `lag_s` 10), with `since_t` the first change. **A fault must still act 95-115 s after it.**
+The harness takes one verdict, about 125 s after the last fault the case injects (the alert 5 s after it, the
+agent's 90 s, the 20 s soak and the 10 s lag), on calls that started 95-115 s after that fault (`window_s` 20,
+`lag_s` 10), with `since_t` the first fault. A fault's time is the `t` in its manifest entry, else when its
+`inject()` returns, so all the writes one fault makes count as one. Every fault counts, whatever it does: a kill,
+a link change, a hang, a surge or a datastore write counts, although none of them shows in the changes feed. The
+agent acts from about 5 s to 95 s after the last fault and never sees the verdict or its reasons.
+**A fault must still act 95-115 s after the last fault.**
 One that ends by itself before then (a short lock, a short surge, a one-time record write) is green with no
 action, and the case is excluded.
 
-A fix must also come early enough. After an outage the backlog drains in proportion to the outage's length,
-and fresh calls keep failing until it has drained (section 6). Measured on unit-sync: the right fix applied 60 s
+A fix must also come early enough. A break that leaves incidents waiting for a unit (a stop, kill
+or hang of the dispatcher, alerting or unit-sync, an unusable setting of the dispatcher or unit-sync, or a red
+`dispatcher->alerting` link change) builds a backlog that grows with the outage, and fresh calls keep failing
+until it has drained (section 6). Measured on unit-sync: the right fix applied 60 s
 after the break was green at the verdict, and applied 90 s after it, red. An arm that fixes a unit-sync outage
-later than about 70 s after the break is judged red even with the right fix.
+later than about 70 s after the break is judged red even with the right fix. The 75 s alerting outage in 11.1
+(Pending incidents), a `dispatcher->alerting` drop of 1.0 then undone, was red 40 s after the undo and green
+from 60 s, so an arm that ends an outage of alerting or its link much later than about 70 s after the break is
+likely judged red too (estimated from that run, not measured at the harness's timing). A dispatcher outage
+drains faster (section 6). A break that leaves no backlog, of call-handling, cad or a lock on cad-db, is green
+about 30 s after its fix (section 12).
 
 ### 11.7 The far-future report
 
 A report dated far ahead freezes its unit's CAD record until unit-sync restarts: the ordering memory skips every
-later report as out of order. It freezes the unit **only if no newer report of that unit is pending at
-unit-sync's next cycle**; otherwise it is skipped as superseded. Confirm the freeze took effect: the unit's
-`units.status_t` equals the `t` you inserted. If it does not, insert it again (in the measured run the first
-insert was superseded and the second froze the unit).
+later report as out of order. It freezes the unit **only if no later report of that unit (a higher row id,
+whatever its `t`) is pending when unit-sync next takes a batch**; otherwise it is skipped as superseded. Confirm
+the freeze once its `field_queue` row has left `pending`: the row is `applied`, and the unit's `units.status_t`
+equals the `t` you inserted. A `skipped` row was superseded, so insert it again (in the measured run the first
+insert was superseded and the second froze the unit). A row still pending can still freeze its unit later, so
+insert again only after the first has left `pending`.
 
 What the verdict shows depends on the state the report carries, which is the state the record freezes in:
 
@@ -958,30 +1129,44 @@ What the verdict shows depends on the state the report carries, which is the sta
 - **Frozen while busy** (`enroute` or `onscene`, with the crew's incident). CAD shows the unit busy for good, so
   it is never sent again, and its crew clears and stays free. Rule S counts the record from about 3 s after the
   crew leaves that state, so the verdict (lag 10 s) shows "1 units' CAD records differed from their crews for
-  longer than the 3 s status lag" from about 13 s after it. It goes on showing it until about 30 s after the
-  restart (window 20 s plus lag 10 s), since the record heals within about 1 s of the restart. The unit's last
-  incident keeps its open assignment and stays open. Not measured live.
+  longer than the 3 s status lag" from about 13 s after the crew leaves it, about 13-15 s after the freeze (the
+  drive is at most 1.8 s, the scene at most 1.2 s). It goes on showing it until about 30 s after the restart
+  (window 20 s plus lag 10 s), since the record heals within about 1 s of the restart. Until the restart the
+  unit's last incident keeps its open assignment and stays open; then the crew's next report frees the unit and
+  closes that incident `completed`. Not measured live.
 - **observe().** Frozen at `available`, observe() showed only unit-sync's `unit_reports_overdue` 1. Frozen while
   busy, cad's `unit_status_timers_expired` also reads 1 once the record has shown that state for 4.0 s (from the
   code). Either way, unit-sync's log shows WARN `skipped` lines, "report N from <unit> skipped (out of order)",
-  at most one every 2 s; the healthy soak wrote no WARN line.
-- A report carrying a state its crew did not hold in the last 3 s is also a wrong write (Rule W).
+  at most one every 2 s for each skip reason across the whole of unit-sync, not per unit; each names one report,
+  and its `occurrences` counts the reports skipped for that reason since the previous line. A report skipped as
+  superseded logs at INFO instead. The healthy soak wrote no WARN line.
+- A report that changes the record to a state its crew did not hold in the last 3 s is also a wrong write (Rule
+  W). One that repeats the record's current state writes no `unit_history` row, so it is never a wrong write;
+  rule S judges the record as it stands.
 
 ## 12. Break and heal by hand
 
 The validity matrix. Each row is red with no action at verdict time, and green within the soak after its
-labelled fix. `control` is the copy's Control and `adapter` its adapter. A fix goes through the adapter, as
-the agent's would. The reason column gives the sentences the verdict should show; N, K, X and Y are counts and
-times.
+labelled fix when the fix comes early enough
+(11.6). `control` is the copy's Control and `adapter` its adapter. A fix goes through the adapter, as
+the agent's would. The reason column gives the sentences the verdict should show; N and K are counts, and X and Y
+times in ms, rounded to 0.1 and printed without trailing zeros. A verdict gives the service-level sentences first,
+then the integrity ones in the order of the 10.4 table, whatever their order in a cell.
 
-**Timing, measured on one copy** with the checker's 20 s window and 10 s lag: red about 10 s after the break
-(12-18 s for `positions` 1, `repeat_match` "off", the far-future report and the call-network drop), and green,
-two verdicts in a row, 26-41 s after the fix. The checker judges calls and records 10 s late (the lag), so a row
-turns red about 10 s after its break, and green no sooner than 30 s after the last failing call. A break that
+**Timing, measured on one copy** with the checker's 20 s window and 10 s lag, before the 30 s re-offer rule
+and with each break held about 35-40 s: red about 10 s after the break
+(12-18 s for `positions` 1, `repeat_match` "off", the far-future report and the call-network drop), and green
+26-41 s after the fix (the first of two green verdicts in a
+row). The checker judges calls and records 10 s late (the lag), so a row
+turns red about 10 s after its break, and green no sooner than 30 s after the last failing call.
+After a longer outage of the dispatcher, alerting or its link, or unit-sync, green comes later, since fresh calls
+wait behind a backlog that grows with the outage (section 6), and at the harness's timing such a fix can come
+too late (11.6). A break that
 fails calls already under way (for example a kill, stop or hang of call-handling, cad, the dispatcher or
 alerting) can turn it red up to about 2 s sooner, about 4 s if callers give the location by voice: such a call
 started before the break, and one failed call makes an everyday window (about 49 calls) red. Any restart of
-call-handling, a build label on it included, loses about 3 calls and is red for about 20 s, so judge that a
+call-handling, a build label on it included, loses the calls in flight (about 3 at everyday
+load) and is red for about 20 s, so judge that a
 change "stays green" at least 30 s after it.
 
 | Break (Control) | Reasons with no action | Labelled fix (adapter) |
@@ -989,22 +1174,25 @@ change "stays green" at least 30 s after it.
 | `control.kill("call-handling")`, or `stop`, or `admin("call-handling", "hang")` | "K of N calls failed: K not answered"; "no call in the window was answered" | `act("restart", "call-handling")` |
 | `control.kill("cad")`, or `stop`, or `admin("cad", "hang")` | "K of N calls failed: K answered but not told help is on the way"; also "N units' CAD records differed from their crews for longer than the 3 s status lag" (reports to `/mdt` are lost) | `act("restart", "cad")` |
 | `control.kill("dispatcher")`, or `stop`, or `admin("dispatcher", "hang")` | "K of N calls failed: K with no crew en route within 3 s of being told" | `act("restart", "dispatcher")` |
-| `control.stop("unit-sync")`, or `kill`, or `admin("unit-sync", "hang")` | "K of N calls failed: K with no crew en route within 3 s of being told"; "N incidents had more than one crew en route" (acknowledgements never reach CAD, so the timer re-sends); "N units' CAD records differed from their crews ..." for the units whose record showed `enroute` or `onscene` when unit-sync stopped (a record stuck at `available` is never counted, 10.4) | `act("restart", "unit-sync")` |
-| `control.admin("alerting", "hang")`, or `kill` or `stop` | "K of N calls failed: K with no crew en route within 3 s of being told". Nothing is dropped: when an alert fails, the dispatcher holds the other alerts 0.3 s and keeps committing, and incidents cycle through the units (11.1, Pending incidents) | `act("restart", "alerting")`; `act("failover", "alerting", {"to": "standby"})` also works |
+| `control.stop("unit-sync")`, or `kill`, or `admin("unit-sync", "hang")` | "K of N calls failed: K with no crew en route within 3 s of being told"; "N units' CAD records differed from their crews ..." for the units whose record showed `enroute` or `onscene` when unit-sync stopped (a record stuck at `available` is never counted, 10.4). Acknowledgements never reach CAD and no incident closes, so each assignment expires after 2.0 s and its incident is sent again, and the units keep going to the oldest open incidents (priority, then id). Newer incidents soon get no unit at all: from about a minute after the break every call in the window fails this way, at the 125 s verdict too, and "N incidents had more than one crew en route" shows only in earlier verdicts (from the code) | `act("restart", "unit-sync")` |
+| `control.admin("alerting", "hang")`, or `kill` or `stop` | "K of N calls failed: K with no crew en route within 3 s of being told". Nothing is dropped: when an alert fails, the dispatcher holds the other alerts 0.3 s and keeps committing, and incidents cycle through the units (11.1, Pending incidents) | `act("restart", "alerting")`; `act("failover", "alerting", {"to": "standby"})` also works, but only while alerting-backup runs: failover does not check it (from the code, not measured) |
 | `control.set_config("call-handling", "positions", 1)` | "K of N calls failed: K rolled over to the backup centre"; "answer time p95 X ms is above Y ms"; "answer time p90 X ms is above 750 ms" | `act("revert_config", "call-handling", {"key": "positions"})` |
 | `control.set_config("dispatcher", "ack_timeout_s", 0.05)` | "N incidents had more than one crew en route"; also "N units were committed to two incidents at once". No integrity key shows it; the changes feed does, and the dispatcher's log has a WARN `no_acknowledgement` line for nearly every assignment (section 8) | `act("revert_config", "dispatcher", {"key": "ack_timeout_s"})` |
 | `control.set_config("cad", "repeat_match", "off")` | "N incidents duplicate an open incident of the same emergency". The changes feed shows it, and cad's `possible_duplicate_incidents` reads 2 for about 1-2 s after each callback, again and again while it lasts (section 8) | `act("revert_config", "cad", {"key": "repeat_match"})` |
-| an unusable setting, e.g. `control.set_config("dispatcher", "batch_size", 0)` | a worker stops: "... with no crew en route within 3 s of being told" (dispatcher) or "N units' CAD records differed ..." (unit-sync). call-handling answers 503: "... not answered". cad answers 503: "... answered but not told help is on the way" | `act("revert_config", <component>, {"key": <key>})` |
+| an unusable setting, e.g. `control.set_config("dispatcher", "batch_size", 0)` | the verdict is as if the component were stopped (section 3, Unusable). The dispatcher pauses: "K of N calls failed: K with no crew en route within 3 s of being told". unit-sync pauses and applies no report: as a stopped unit-sync (the unit-sync stop row above), counting the units whose record showed `enroute` or `onscene` at the change. call-handling answers 503 to `/dial` and `/report`: "K of N calls failed: K not answered"; "no call in the window was answered". cad answers 503 to `/calls` and `/mdt`: "K of N calls failed: K answered but not told help is on the way"; also "N units' CAD records differed ..." for the units whose record showed `enroute` or `onscene` at the change (from the code, not measured) | `act("revert_config", <component>, {"key": <key>})` |
 | `control.link("dispatcher->alerting", latency_ms=1500)` (above `alert_timeout_s` 1.0), or `drop_pct=1.0` | "K of N calls failed: K with no crew en route within 3 s of being told". With the latency, also "N incidents had more than one crew en route" and "N units were committed to two incidents at once": each alert times out at 1.0 s but the relay still delivers it, so a crew turns out just as the 2.0 s timer gives the incident to another unit. With `drop_pct=1.0`, only the first sentence | `act("failover", "alerting", {"to": "standby"})` |
 | `control.spawn("incident-archive", ["{python}", "-m", "targets.dispatch.jobs.incident_archive", "--data", "{data}", "--hold-lock", "600"])` (at least 130 s) | "K of N calls failed: K answered but not told help is on the way"; often "answer time p95 ...", "answer time p90 ..." and "N units' CAD records differed ..." | `act("release_lock", "cad-db")` |
-| an unreadable report, inserted through `control.db()` (below) | unit-sync crashes: "N units' CAD records differed from their crews ..." for the units whose record showed `enroute` or `onscene` at the crash; then "... more than one crew en route" and "... no crew en route within 3 s ..." as the board ages | `act("quarantine", "unit-sync", {"item": <head_item.id>})`, then `act("restart", "unit-sync")`; `for_operations` then lists `{"kind": "set_aside", "item": <id>, ...}` |
+| an unreadable report, inserted through `control.db()` (below) | unit-sync crashes, and from then on the verdict is that of a stopped unit-sync (the unit-sync stop row above), counting the units whose record showed `enroute` or `onscene` at the crash | `act("quarantine", "unit-sync", {"item": <head_item.id>})`, then `act("restart", "unit-sync")`; `for_operations` then lists `{"kind": "set_aside", "item": <id>, ...}` |
 | a far-future report for one unit (below) | depends on the state it freezes (11.7). Frozen at `available`, the usual case: "N incidents had more than one crew en route", perhaps also "... no crew en route within 3 s ...", and never the unit-records sentence. Frozen at `enroute` or `onscene`: "1 units' CAD records differed from their crews ...", counted from about 3 s after its crew moves on, so shown from about 13 s after | `act("restart", "unit-sync")` |
 | a bad release: `control.deploy(component, "<version>", module_path=<file>)` | depends on the mechanism; each shape is counted exactly | `act("rollback", component)` |
-| call-network: `control.stop("call-network")`, or `control.link("call-handling->call-network", drop_pct=1.0)` or a latency | calls go spoken: "K of N calls failed: K told more than 3 s after answer"; with a slow link also "answer time p95 X ms is above Y ms". observe() shows call-network `up` false even when only the link drops every connection | escalate (no action); red with no action by design |
+| call-network: `control.stop("call-network")`, or `control.link("call-handling->call-network", drop_pct=1.0)`, or a latency of at least `ali_timeout_s` (500 ms) | calls go spoken: "K of N calls failed: K told more than 3 s after answer"; with the latency also "answer time p95 X ms is above Y ms", as every lookup waits out `ali_timeout_s`. observe() shows call-network `up` false even when only the link drops every connection or slows every lookup past `ali_timeout_s`. A smaller delay (latency plus jitter) makes no call spoken: it is red only by "answer time p95 X ms is above Y ms", once answer p95 passes the band (about 258 ms), and green below it (11.1, Link thresholds) | escalate (no action); red with no action by design |
 | a surge at or below the cap; `control.stop("alerting-backup")` alone; `--cpu`; a build label (`control.deploy("call-handling", "5.2.1")`); a harmless setting move | green; a build label on call-handling only from about 30 s after the deploy (its restart loses about 3 calls) | none: healthy or a background change |
 
-**Measured** on one copy, before the 30 s re-offer rule. Red and green are seconds from the break to the first
-red verdict, and from the fix to the second green verdict in a row.
+**Measured** on one copy, before the 30 s re-offer rule; rows whose break leaves assignments
+unacknowledged may differ under it (the header). Each break was held about 35-40 s before its fix. Red is
+seconds from the break to the first red verdict, and green from the fix to the first of two green verdicts in a
+row. The red reasons are those of the verdict just before the fix, about 35 s after the break; the harness's
+verdict, 125 s after it, can differ (the unit-sync rows above).
 
 | Break | Red reasons seen | What observe() showed | Red | Green |
 |---|---|---|---|---|
@@ -1053,7 +1241,8 @@ finally:
 
 **At the real timing.** The live tests run three families this way: kill dispatcher; hold-lock 600; an
 unreadable report. With no action the verdict 125 s after the break (with `since_t` the break) is red. With the
-labelled fix applied 5 s after the break it is green.
+labelled fix applied 5 s after the break it is green. No other row was run at the real timing; section 6 gives the
+unit-sync verdict 125 s after the break for later fixes.
 
 ## 13. Running it
 
