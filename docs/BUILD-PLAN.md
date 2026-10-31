@@ -91,6 +91,8 @@ The final run goes case-major in the line order of `heldout.jsonl` (its first 40
 
 ## 6. Saturday 31 Oct
 
+Changed on Sat 31 Oct at 07:30: the final run did not start on Friday night. It started at 07:28 with the core40 cut in full and ends about 12:45 (`DECISIONS.md`, 31 Oct). C7 keeps 09:00-12:00 and overlaps it; the 11:00 stop no longer applies. The 12:00 row now starts when the final run ends: Session B's results tables from about 12:45, a 10-minute dispatch soak on the laptop at about 12:45-13:00, then the transfer run at about 13:15-14:25, stopped 2 h 15 min after it starts (about 15:30) whatever its state.
+
 | Time | Omar | Claude | Codex Session A | Codex Session B |
 |---|---|---|---|---|
 | 09:00-12:00 | Check the final run finished; merge the dispatch pull request once green | Record the dispatch tree id in `DECISIONS.md` at the merge (CONTRACT section 15); fix anything in dispatch (each fix gives a new id, and Session A re-checks its incidents on it) | C7: write the dispatch faults and 20 sealed incidents from the dispatch adapter and control interfaces, with at least one of each of the three shapes in CONTRACT section 8; push only `scenarios/transfer/SEALED.json`. At 11:00, if the main exam is incomplete, stop the robustness subset and report the completed paired cases as n of N | - |
